@@ -1,0 +1,195 @@
+# HelpDesk SaaS
+
+Sistema SaaS de Help Desk multi-tenancy para gestão de atendimento ao cliente, construído com stack MERN.
+
+## 🚀 Funcionalidades
+
+### Módulo de Tickets
+- Criação e gerenciamento de tickets
+- Categorias e prioridades
+- Status workflow (Aberto → Em Andamento → Resolvido → Fechado)
+- SLA (Service Level Agreement)
+- Anexos e comentários
+- Filtros e busca avançada
+
+### Base de Conhecimento
+- Artigos publicados
+- Busca por texto
+- Categorização
+- Feedback de utilidade
+- Artigos relacionados
+
+### Dashboard & Relatórios
+- Métricas em tempo real
+- Gráficos de tickets por status/prioridade/categoria
+- Tendência temporal
+- Top agentes
+- Compliance SLA
+- Satisfação do cliente
+
+### Autenticação & Autorização
+- JWT Authentication
+- Roles: Admin, Manager, Agent, Client
+- Multi-tenancy (empresas isoladas)
+
+## 🛠 Tech Stack
+
+### Backend
+- Node.js + Express
+- TypeScript
+- MongoDB + Mongoose
+- Redis (cache)
+- Socket.io (tempo real)
+- JWT + Bcrypt
+
+### Frontend
+- React 18 + TypeScript
+- Vite
+- Tailwind CSS
+- Radix UI + shadcn/ui
+- TanStack Query
+- Recharts
+- React Hook Form + Zod
+
+### DevOps
+- Docker + Docker Compose
+- GitHub Actions
+- Railway / Render / Vercel
+
+## 📦 Instalação
+
+### Pré-requisitos
+- Node.js 20+
+- MongoDB
+- Redis (opcional)
+
+### Configuração
+
+```bash
+# Clone o repositório
+git clone https://github.com/seu-usuario/helpdesk-saas.git
+cd helpdesk-saas
+
+# Backend
+cd backend
+cp .env.example .env
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+### Variáveis de Ambiente (Backend)
+
+```env
+PORT=3000
+NODE_ENV=development
+MONGODB_URI=mongodb://localhost:27017/helpdesk
+JWT_SECRET=sua-chave-secreta
+JWT_EXPIRES_IN=7d
+FRONTEND_URL=http://localhost:5173
+```
+
+## 🚀 Executando
+
+```bash
+# Backend (development com hot reload)
+cd backend
+npm run dev
+
+# Frontend
+cd frontend
+npm run dev
+```
+
+Acesse:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+
+## 🐳 Docker
+
+```bash
+# Executar todos os serviços
+docker-compose up -d
+
+# Parar serviços
+docker-compose down
+```
+
+## 📁 Estrutura
+
+```
+helpdesk-saas/
+├── backend/
+│   ├── src/
+│   │   ├── config/       # Configurações
+│   │   ├── controllers/  # Controladores
+│   │   ├── middlewares/   # Middlewares
+│   │   ├── models/       # Models Mongoose
+│   │   ├── routes/       # Rotas
+│   │   └── index.ts      # Entry point
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/  # Componentes React
+│   │   ├── pages/       # Páginas
+│   │   ├── contexts/    # Contextos React
+│   │   ├── config/     # Configurações
+│   │   └── types/      # Tipos TypeScript
+│   └── package.json
+├── docker-compose.yml
+└── README.md
+```
+
+## 📊 API Endpoints
+
+### Auth
+- `POST /api/auth/register` - Registro
+- `POST /api/auth/login` - Login
+- `GET /api/auth/me` - Perfil atual
+
+### Tickets
+- `GET /api/tickets` - Listar tickets
+- `POST /api/tickets` - Criar ticket
+- `GET /api/tickets/:id` - Detalhe ticket
+- `PUT /api/tickets/:id` - Atualizar ticket
+- `POST /api/tickets/:id/comments` - Adicionar comentário
+
+### Categorias
+- `GET /api/categories` - Listar
+- `POST /api/categories` - Criar
+- `PUT /api/categories/:id` - Atualizar
+- `DELETE /api/categories/:id` - Deletar
+
+### Artigos
+- `GET /api/articles` - Listar artigos
+- `GET /api/articles/public` - Artigos públicos
+- `POST /api/articles` - Criar artigo
+- `PUT /api/articles/:id` - Atualizar
+- `POST /api/articles/:id/vote` - Votar
+
+### Analytics
+- `GET /api/analytics/dashboard` - Stats dashboard
+- `GET /api/analytics/tickets-by-status` - Por status
+- `GET /api/analytics/tickets-by-priority` - Por prioridade
+- `GET /api/analytics/tickets-trend` - Tendência
+- `GET /api/analytics/top-agents` - Top agentes
+- `GET /api/analytics/sla-compliance` - Compliance SLA
+- `GET /api/analytics/satisfaction` - Satisfação
+
+## 🎨 Screenshots
+
+[Adicione screenshots do projeto]
+
+## 📝 Licença
+
+MIT License
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2. Crie sua branch (`git checkout -b feature/nova-feature`)
+3. Commit suas mudanças (`git commit -am 'Adiciona nova feature'`)
+4. Push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request

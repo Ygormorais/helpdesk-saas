@@ -1,0 +1,37 @@
+{
+  "name": "helpdesk-backend",
+  "version": "1.0.0",
+  "description": "HelpDesk SaaS Backend",
+  "buildCommand": "npm install && npm run build",
+  "startCommand": "npm start",
+  "env": {
+    "NODE_ENV": "production",
+    "MONGODB_URI": {
+      "description": "Connection string para MongoDB (use MongoDB Atlas)",
+      "required": true
+    },
+    "JWT_SECRET": {
+      "description": "Chave secreta para JWT",
+      "required": true
+    },
+    "FRONTEND_URL": {
+      "description": "URL do frontend deployado",
+      "required": true
+    },
+    "REDIS_URL": {
+      "description": "URL do Redis (opcional)"
+    },
+    "SMTP_HOST": {
+      "description": "Servidor SMTP para emails"
+    },
+    "SMTP_PORT": {
+      "description": "Porta SMTP"
+    },
+    "SMTP_USER": {
+      "description": "Usuário SMTP"
+    },
+    "SMTP_PASS": {
+      "description": "Senha SMTP"
+    }
+  }
+}

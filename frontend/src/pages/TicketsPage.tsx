@@ -1,0 +1,173 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Plus, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+const tickets = [
+  { id: '1', ticketNumber: 'TKT-00001', title: 'Problema no login', status: 'open', priority: 'high', category: 'Técnico', createdBy: 'João Silva', createdAt: '2024-01-15' },
+  { id: '2', ticketNumber: 'TKT-00002', title: 'Dúvida sobre cobrança', status: 'in_progress', priority: 'medium', category: 'Financeiro', createdBy: 'Maria Santos', createdAt: '2024-01-14' },
+  { id: '3', ticketNumber: 'TKT-00003', title: 'Erro no sistema', status: 'resolved', priority: 'urgent', category: 'Técnico', createdBy: 'Pedro Oliveira', createdAt: '2024-01-13' },
+  { id: '4', ticketNumber: 'TKT-00004', title: 'Solicitação de acesso', status: 'waiting_customer', priority: 'low', category: 'Administrativo', createdBy: 'Ana Costa', createdAt: '2024-01-12' },
+  { id: '5', ticketNumber: 'TKT-00005', title: 'Feedback sobre atendimento', status: 'open', priority: 'low', category: 'Geral', createdBy: 'Lucas Mendes', createdAt: '2024-01-11' },
+];
+
+const getStatusBadge = (status: string) => {
+  const styles: Record<string, string> = {
+    open: 'bg-red-100 text-red-800',
+    in_progress: 'bg-blue-100 text-blue-800',
+    resolved: 'bg-green-100 text-green-800',
+    waiting_customer: 'bg-yellow-100 text-yellow-800',
+    closed: 'bg-gray-100 text-gray-800',
+  };
+  const labels: Record<string, string> = {
+    open: 'Aberto',
+    in_progress: 'Em Andamento',
+    resolved: 'Resolvido',
+    waiting_customer: 'Aguardando Cliente',
+    closed: 'Fechado',
+  };
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
+};
+
+const getPriorityBadge = (priority: string) => {
+  const styles: Record<string, string> = {
+    urgent: 'bg-red-100 text-red-800',
+    high: 'bg-orange-100 text-orange-800',
+    medium: 'bg-yellow-100 text-yellow-800',
+    low: 'bg-green-100 text-green-800',
+  };
+  const labels: Record<string, string> = {
+    urgent: 'Urgente',
+    high: 'Alta',
+    medium: 'Média',
+    low: 'Baixa',
+  };
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[priority]}`}>
+      {labels[priority]}
+    </span>
+  );
+};
+
+export default function TicketsPage() {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+
+  const filteredTickets = tickets.filter((ticket) => {
+    const matchesSearch = ticket.title.toLowerCase().includes(search.toLowerCase()) ||
+      ticket.ticketNumber.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
+    const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Tickets</h1>
+        <Link to="/tickets/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Ticket
+          </Button>
+        </Link>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar tickets..."
+                className="pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="open">Aberto</SelectItem>
+                <SelectItem value="in_progress">Em Andamento</SelectItem>
+                <SelectItem value="resolved">Resolvido</SelectItem>
+                <SelectItem value="waiting_customer">Aguardando Cliente</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Prioridades</SelectItem>
+                <SelectItem value="urgent">Urgente</SelectItem>
+                <SelectItem value="high">Alta</SelectItem>
+                <SelectItem value="medium">Média</SelectItem>
+                <SelectItem value="low">Baixa</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Título</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Prioridade</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Categoria</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Criado por</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTickets.map((ticket) => (
+                <tr key={ticket.id} className="border-b last:border-0 hover:bg-muted/50">
+                  <td className="px-4 py-3">
+                    <Link to={`/tickets/${ticket.id}`} className="font-medium text-primary hover:underline">
+                      {ticket.ticketNumber}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link to={`/tickets/${ticket.id}`} className="hover:underline">
+                      {ticket.title}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">{getStatusBadge(ticket.status)}</td>
+                  <td className="px-4 py-3">{getPriorityBadge(ticket.priority)}</td>
+                  <td className="px-4 py-3 text-sm">{ticket.category}</td>
+                  <td className="px-4 py-3 text-sm">{ticket.createdBy}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{ticket.createdAt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
