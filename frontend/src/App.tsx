@@ -19,6 +19,7 @@ import WebhooksPage from '@/pages/WebhooksPage';
 import SettingsPage from '@/pages/SettingsPage';
 import TeamPage from '@/pages/TeamPage';
 import ChatPage from '@/pages/ChatPage';
+import SatisfactionPage from '@/pages/SatisfactionPage';
 import { useAuth } from '@/contexts/AuthContext';
 
 const queryClient = new QueryClient({
@@ -73,6 +74,7 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="chat" element={<ChatPage />} />
+        <Route path="satisfaction" element={<SatisfactionPage />} />
       </Route>
     </Routes>
   );

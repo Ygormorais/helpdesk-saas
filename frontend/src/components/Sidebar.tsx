@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Ticket, FolderOpen, BookOpen, PenTool, Users, Webhook, History, Settings, MessageCircle, LogOut } from 'lucide-react';
+import { LayoutDashboard, Ticket, FolderOpen, BookOpen, PenTool, Users, Webhook, History, Settings, MessageCircle, LogOut, Star } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +12,7 @@ const navigation = [
   { name: 'Equipe', href: '/team', icon: Users },
   { name: 'Admin Artigos', href: '/admin/articles', icon: PenTool },
   { name: 'Webhooks', href: '/webhooks', icon: Webhook },
+  { name: 'Satisfação', href: '/satisfaction', icon: Star },
   { name: 'Audit Log', href: '/audit', icon: History },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ];

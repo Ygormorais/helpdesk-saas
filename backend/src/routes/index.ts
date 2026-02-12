@@ -8,6 +8,7 @@ import webhookRoutes from './webhookRoutes.js';
 import inviteRoutes from './inviteRoutes.js';
 import auditRoutes from './auditRoutes.js';
 import chatRoutes from './chatRoutes.js';
+import satisfactionRoutes from './satisfactionRoutes.js';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/webhooks', webhookRoutes);
 router.use('/invites', inviteRoutes);
 router.use('/audit', auditRoutes);
 router.use('/chat', chatRoutes);
+router.use('/satisfaction', satisfactionRoutes);
 
 export default router;
