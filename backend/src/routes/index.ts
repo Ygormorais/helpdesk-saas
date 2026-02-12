@@ -10,6 +10,7 @@ import auditRoutes from './auditRoutes.js';
 import chatRoutes from './chatRoutes.js';
 import satisfactionRoutes from './satisfactionRoutes.js';
 import timeTrackingRoutes from './timeTrackingRoutes.js';
+import planRoutes from './planRoutes.js';
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use('/audit', auditRoutes);
 router.use('/chat', chatRoutes);
 router.use('/satisfaction', satisfactionRoutes);
 router.use('/time', timeTrackingRoutes);
+router.use('/plan', planRoutes);
 
 export default router;

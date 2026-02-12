@@ -4,6 +4,7 @@ import { config } from '../config/index.js';
 import { Tenant, User, UserRole } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
+import { planService } from '../services/planService.js';
 import { z } from 'zod';
 
 const registerSchema = z.object({
@@ -42,6 +43,9 @@ export const register = async (
       name: tenantName,
       slug: tenantName.toLowerCase().replace(/\s+/g, '-'),
     });
+
+    // Inicializa plano com trial de 14 dias
+    await planService.initializeTenantPlan(tenant._id.toString());
 
     const user = await User.create({
       email,
