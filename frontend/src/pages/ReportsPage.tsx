@@ -139,6 +139,13 @@ export default function ReportsPage() {
     { name: 'Pedro', resolved: 32, total: 40 },
   ]
 
+  const exportAllCSVs = () => {
+    exportCSV_Tickets();
+    exportCSV_Status();
+    exportCSV_SLA();
+    exportCSV_Agents();
+  }
+
   return (
     <div className="space-y-6 p-4">
       <div className="flex items-center justify-between">
@@ -165,6 +172,7 @@ export default function ReportsPage() {
         <span> até </span>
         <input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} className="border rounded px-2 py-1"/>
         <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={exportCSV_Tickets}>Export Tickets CSV</button>
+        <button className="ml-2 px-3 py-1 bg-gray-200 rounded" onClick={exportAllCSVs}>Export All CSVs</button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
