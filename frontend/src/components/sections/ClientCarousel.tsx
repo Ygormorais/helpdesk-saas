@@ -59,17 +59,13 @@ export const ClientCarousel: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-center items-center space-x-8 overflow-hidden py-6">
           {current.items.map((c, i) => {
-            const LogoSrc = logos[c.name ? (c.name.toLowerCase().replace(/\s+/g, '')).slice(0, 12) : ''] // placeholder, not used
-            const logoKey = c as any
-            // Prefer explicit logo field if available in JSON
-            // If not, fallback to color circle
             const logoPath = (logos as any)[(c as any).logo]
             return (
               <div key={i} className="flex flex-col items-center">
                 {logoPath ? (
                   <img src={logoPath} alt={c.name} className="w-20 h-20 object-contain" />
                 ) : (
-                  <div className="w-20 h-20 rounded-full shadow-md" style={{ background: c.color }} />
+                  <div className="w-20 h-20 rounded-full shadow-md" style={{ background: (c as any).color }} />
                 )}
                 <span className="mt-2 text-sm font-semibold text-gray-700">{c.name}</span>
               </div>

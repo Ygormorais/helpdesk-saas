@@ -9,6 +9,7 @@ import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import DashboardPage from '@/pages/DashboardPage';
+import ReportsPage from '@/pages/ReportsPage';
 import TicketsPage from '@/pages/TicketsPage';
 import TicketDetailPage from '@/pages/TicketDetailPage';
 import CategoriesPage from '@/pages/CategoriesPage';
@@ -73,6 +74,7 @@ function AppRoutes() {
         }
       >
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="categories" element={<CategoriesPage />} />
