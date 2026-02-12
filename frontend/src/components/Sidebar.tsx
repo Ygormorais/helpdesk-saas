@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Ticket, FolderOpen, BookOpen, PenTool, Users, Webhook, History, Settings } from 'lucide-react';
+import { LayoutDashboard, Ticket, FolderOpen, BookOpen, PenTool, Users, Webhook, History, Settings, MessageCircle, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Tickets', href: '/tickets', icon: Ticket },
+  { name: 'Chat', href: '/chat', icon: MessageCircle },
   { name: 'Categorias', href: '/categories', icon: FolderOpen },
   { name: 'Base de Conhecimento', href: '/knowledge', icon: BookOpen },
   { name: 'Equipe', href: '/team', icon: Users },

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ChatProvider } from '@/contexts/ChatContext';
 import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -17,6 +18,7 @@ import AuditLogsPage from '@/pages/AuditLogsPage';
 import WebhooksPage from '@/pages/WebhooksPage';
 import SettingsPage from '@/pages/SettingsPage';
 import TeamPage from '@/pages/TeamPage';
+import ChatPage from '@/pages/ChatPage';
 import { useAuth } from '@/contexts/AuthContext';
 
 const queryClient = new QueryClient({
@@ -49,11 +51,13 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
-      <Route
+        <Route
         path="/"
         element={
           <ProtectedRoute>
-            <Layout />
+            <ChatProvider>
+              <Layout />
+            </ChatProvider>
           </ProtectedRoute>
         }
       >
@@ -68,6 +72,7 @@ function AppRoutes() {
         <Route path="webhooks" element={<WebhooksPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="team" element={<TeamPage />} />
+        <Route path="chat" element={<ChatPage />} />
       </Route>
     </Routes>
   );

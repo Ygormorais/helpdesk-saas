@@ -7,6 +7,7 @@ import analyticsRoutes from './analyticsRoutes.js';
 import webhookRoutes from './webhookRoutes.js';
 import inviteRoutes from './inviteRoutes.js';
 import auditRoutes from './auditRoutes.js';
+import chatRoutes from './chatRoutes.js';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/invites', inviteRoutes);
 router.use('/audit', auditRoutes);
+router.use('/chat', chatRoutes);
 
 export default router;
