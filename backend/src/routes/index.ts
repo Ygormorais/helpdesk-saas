@@ -9,6 +9,7 @@ import inviteRoutes from './inviteRoutes.js';
 import auditRoutes from './auditRoutes.js';
 import chatRoutes from './chatRoutes.js';
 import satisfactionRoutes from './satisfactionRoutes.js';
+import timeTrackingRoutes from './timeTrackingRoutes.js';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/invites', inviteRoutes);
 router.use('/audit', auditRoutes);
 router.use('/chat', chatRoutes);
 router.use('/satisfaction', satisfactionRoutes);
+router.use('/time', timeTrackingRoutes);
 
 export default router;

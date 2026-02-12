@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ChatProvider } from '@/contexts/ChatContext';
+import { TimeTrackingProvider } from '@/contexts/TimeTrackingContext';
 import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -20,6 +21,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import TeamPage from '@/pages/TeamPage';
 import ChatPage from '@/pages/ChatPage';
 import SatisfactionPage from '@/pages/SatisfactionPage';
+import TimeReportsPage from '@/pages/TimeReportsPage';
 import { useAuth } from '@/contexts/AuthContext';
 
 const queryClient = new QueryClient({
@@ -56,9 +58,11 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
-            <ChatProvider>
-              <Layout />
-            </ChatProvider>
+            <TimeTrackingProvider>
+              <ChatProvider>
+                <Layout />
+              </ChatProvider>
+            </TimeTrackingProvider>
           </ProtectedRoute>
         }
       >
@@ -75,6 +79,7 @@ function AppRoutes() {
         <Route path="team" element={<TeamPage />} />
         <Route path="chat" element={<ChatPage />} />
         <Route path="satisfaction" element={<SatisfactionPage />} />
+        <Route path="time" element={<TimeReportsPage />} />
       </Route>
     </Routes>
   );
