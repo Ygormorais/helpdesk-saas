@@ -85,10 +85,10 @@ export default function ReportsPage() {
   // filtered trend based on date range (using mockTrendData as fallback)
   const filteredTrend = mockTrendData.filter((d) => {
     if (!startDate && !endDate) return true
-    const s = startDate ? new Date(startDate).getMonth() + 1 : 1
-    const e = endDate ? new Date(endDate).getMonth() + 1 : 12
-    const month = Number(d.date)
-    return month >= s && month <= e
+    const s = startDate ? new Date(startDate).getTime() : new Date('2000-01-01').getTime()
+    const e = endDate ? new Date(endDate).getTime() : new Date('2099-12-31').getTime()
+    const dDate = new Date(d.date).getTime()
+    return dDate >= s && dDate <= e
   })
   const totalTickets = filteredTrend.reduce((a, b) => a + b.created, 0)
 
@@ -201,8 +201,8 @@ export default function ReportsPage() {
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={mockStatusData} dataKey="value" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
-                  {mockStatusData.map((entry, index) => (
+                <Pie data={statusData} dataKey="value" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
+                  {statusData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>

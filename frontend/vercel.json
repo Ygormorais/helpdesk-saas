@@ -13,8 +13,6 @@
     }
   ],
   "env": {
-    "VITE_API_URL": {
-      "description": "URL da API backend deployada"
-    }
+    "VITE_API_URL": ""
   }
 }
