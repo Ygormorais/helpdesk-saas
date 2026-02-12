@@ -11,6 +11,7 @@ import chatRoutes from './chatRoutes.js';
 import satisfactionRoutes from './satisfactionRoutes.js';
 import timeTrackingRoutes from './timeTrackingRoutes.js';
 import planRoutes from './planRoutes.js';
+import billingRoutes from './billingRoutes.js';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/chat', chatRoutes);
 router.use('/satisfaction', satisfactionRoutes);
 router.use('/time', timeTrackingRoutes);
 router.use('/plan', planRoutes);
+router.use('/billing', billingRoutes);
 
 export default router;

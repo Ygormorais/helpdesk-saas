@@ -28,4 +28,7 @@ export const config = {
     bucketName: process.env.AWS_BUCKET_NAME || '',
     region: process.env.AWS_REGION || 'us-east-1',
   },
+
+  asaasApiKey: process.env.ASAAS_API_KEY || '',
+  asaasWebhookSecret: process.env.ASAAS_WEBHOOK_SECRET || '',
 };

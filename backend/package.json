@@ -22,6 +22,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
     "multer": "^1.4.5-lts.1",
+    "asaas": "^1.0.0",
+    "axios": "^1.6.2",
     "nodemailer": "^6.9.7",
     "socket.io": "^4.7.2",
     "swagger-jsdoc": "^6.2.8",

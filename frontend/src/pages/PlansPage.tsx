@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Check, X, Sparkles, Zap, Building2 } from 'lucide-react';
+import { Check, X, Sparkles, Zap, Building2, CreditCard, QrCode, FileText, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface Plan {
   id: string;
@@ -39,6 +48,10 @@ export default function PlansPage() {
   const [currentPlan, setCurrentPlan] = useState<CurrentPlan | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [billingType, setBillingType] = useState<'CREDIT_CARD' | 'BOLETO' | 'PIX'>('CREDIT_CARD');
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,30 +79,49 @@ export default function PlansPage() {
     }
   };
 
-  const handleUpgrade = async (planId: string) => {
+  const openCheckout = (planId: string) => {
+    setSelectedPlan(planId);
+    setIsCheckoutOpen(true);
+  };
+
+  const processCheckout = async () => {
+    if (!selectedPlan) return;
+    
+    setIsProcessing(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/plan/upgrade', {
+      const response = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ plan: planId }),
+        body: JSON.stringify({ 
+          plan: selectedPlan,
+          billingType 
+        }),
       });
       
       const data = await response.json();
       
       if (data.checkoutUrl) {
-        // Redireciona para Stripe checkout
-        window.location.href = data.checkoutUrl;
+        // Redireciona para página de pagamento Asaas
+        window.open(data.checkoutUrl, '_blank');
+        setIsCheckoutOpen(false);
+        
+        toast({
+          title: 'Redirecionando...',
+          description: 'Complete o pagamento na nova aba. Seu plano será ativado automaticamente.',
+        });
       }
     } catch (error) {
       toast({
         title: 'Erro',
-        description: 'Não foi possível iniciar o upgrade',
+        description: 'Não foi possível iniciar o checkout',
         variant: 'destructive',
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -246,7 +278,7 @@ export default function PlansPage() {
                   className="w-full"
                   variant={isCurrentPlan ? 'outline' : 'default'}
                   disabled={isCurrentPlan}
-                  onClick={() => handleUpgrade(plan.id)}
+                  onClick={() => openCheckout(plan.id)}
                 >
                   {isCurrentPlan ? 'Plano Atual' : 'Escolher Plano'}
                 </Button>
@@ -255,6 +287,76 @@ export default function PlansPage() {
           );
         })}
       </div>
+
+      {/* Checkout Dialog */}
+      <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Escolher Forma de Pagamento</DialogTitle>
+            <DialogDescription>
+              Plano {selectedPlan?.charAt(0).toUpperCase()}{selectedPlan?.slice(1)} - 
+              R$ {availablePlans.find(p => p.id === selectedPlan)?.price.toFixed(2).replace('.', ',')}/mês
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <RadioGroup
+              value={billingType}
+              onValueChange={(value) => setBillingType(value as any)}
+              className="space-y-3"
+            >
+              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted transition-colors">
+                <RadioGroupItem value="CREDIT_CARD" id="credit" />
+                <Label htmlFor="credit" className="flex-1 flex items-center gap-3 cursor-pointer">
+                  <CreditCard className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <div className="font-medium">Cartão de Crédito</div>
+                    <div className="text-sm text-muted-foreground">Pagamento recorrente automático</div>
+                  </div>
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted transition-colors">
+                <RadioGroupItem value="PIX" id="pix" />
+                <Label htmlFor="pix" className="flex-1 flex items-center gap-3 cursor-pointer">
+                  <QrCode className="h-5 w-5 text-green-600" />
+                  <div>
+                    <div className="font-medium">PIX</div>
+                    <div className="text-sm text-muted-foreground">Aprovação em segundos</div>
+                  </div>
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted transition-colors">
+                <RadioGroupItem value="BOLETO" id="boleto" />
+                <Label htmlFor="boleto" className="flex-1 flex items-center gap-3 cursor-pointer">
+                  <FileText className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <div className="font-medium">Boleto Bancário</div>
+                    <div className="text-sm text-muted-foreground">Compensação em 1-2 dias úteis</div>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setIsCheckoutOpen(false)} className="flex-1">
+              Cancelar
+            </Button>
+            <Button onClick={processCheckout} disabled={isProcessing} className="flex-1">
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Continuar para Pagamento'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
