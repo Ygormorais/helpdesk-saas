@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response } from 'express';
-import { authenticate } from '../src/middlewares/auth.js';
-import { User } from '../src/models/index.js';
+import { authenticate } from './auth';
+import { User } from '../models/index';
 
 describe('Auth Middleware', () => {
   let req: Partial<Request>;

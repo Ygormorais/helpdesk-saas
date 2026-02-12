@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { emailTemplates } from '../src/services/emailService.js';
+import { emailTemplates } from './emailService';
 
 describe('Email Templates', () => {
   describe('ticketCreated', () => {
