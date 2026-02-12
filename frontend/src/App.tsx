@@ -23,6 +23,7 @@ import ChatPage from '@/pages/ChatPage';
 import SatisfactionPage from '@/pages/SatisfactionPage';
 import TimeReportsPage from '@/pages/TimeReportsPage';
 import PlansPage from '@/pages/PlansPage';
+import LandingPage from '@/pages/LandingPage';
 import { useAuth } from '@/contexts/AuthContext';
 
 const queryClient = new QueryClient({
@@ -53,9 +54,13 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
-        <Route
+      {/* Public Routes */}
+      <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
+      
+      {/* Protected Routes */}
+      <Route
         path="/"
         element={
           <ProtectedRoute>
@@ -67,7 +72,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="categories" element={<CategoriesPage />} />
