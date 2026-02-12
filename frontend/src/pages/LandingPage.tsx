@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import ClientCarousel from '@/components/sections/ClientCarousel';
 
 export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -132,6 +133,9 @@ export default function LandingPage() {
                 Ver Demo
               </Button>
             </div>
+
+            {/* Cliente Carousel – animado e centralizado */}
+            <ClientCarousel />
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto pt-8 border-t">

@@ -1,0 +1,25 @@
+{
+  "slides": [
+    {
+      "items": [
+        { "name": "TechNova Brasil", "color": "#3b82f6", "logo": "technova" },
+        { "name": "VivaLog Brasil", "color": "#10b981", "logo": "vivalog" },
+        { "name": "Solaris Labs", "color": "#f472b6", "logo": "solaris" }
+      ]
+    },
+    {
+      "items": [
+        { "name": "Nebula Finans", "color": "#8b5cf6", "logo": "nebula" },
+        { "name": "GreenWave SaaS", "color": "#14b8a6", "logo": "greenwave" },
+        { "name": "AeroSmart", "color": "#f59e0b", "logo": "aerosmart" }
+      ]
+    },
+    {
+      "items": [
+        { "name": "TechBridge", "color": "#3b82f6", "logo": "techbridge" },
+        { "name": "CidadeTech", "color": "#0e7490", "logo": "cidatech" },
+        { "name": "PulseSoft", "color": "#f472b6", "logo": "pulsesoft" }
+      ]
+    }
+  ]
+}
