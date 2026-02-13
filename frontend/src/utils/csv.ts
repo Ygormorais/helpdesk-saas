@@ -1,8 +1,20 @@
 // Simple CSV builder and downloader utilities
+
+function escapeCsvValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const s = String(value);
+  if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
 export function buildCSV(headers: string[], rows: any[][]): string {
-  const headerLine = headers.join(',')
-  const body = rows.map((r) => r.map((v) => String(v)).join(',')).join('\n')
-  return [headerLine, body].filter(Boolean).join('\n')
+  const headerLine = headers.map(escapeCsvValue).join(',');
+  const body = rows
+    .map((r) => (r || []).map((v) => escapeCsvValue(v)).join(','))
+    .join('\n');
+  return [headerLine, body].filter(Boolean).join('\n');
 }
 
 export function downloadCSV(headers: string[], rows: any[][], filename: string) {
@@ -19,7 +31,7 @@ export function downloadCSV(headers: string[], rows: any[][], filename: string) 
 }
 
 export function toCSVString(data: { [key: string]: any }[], keys: string[]) {
-  const header = keys.join(',')
-  const rows = data.map((row) => keys.map((k) => String(row[k] ?? '')))
+  const header = keys.map(escapeCsvValue).join(',')
+  const rows = data.map((row) => keys.map((k) => escapeCsvValue(row?.[k] ?? '')))
   return [header, ...rows.map((r) => r.join(','))].join('\n')
 }
