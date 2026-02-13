@@ -96,6 +96,7 @@ export default function ReportsPage() {
   const report = reportsQuery.data;
   const trend = report?.trend ?? [];
   const status = report?.status;
+  const slaTrend = report?.slaTrend ?? [];
 
   const statusPieData = useMemo(() => {
     const s = status ?? { open: 0, in_progress: 0, waiting_customer: 0, resolved: 0, closed: 0 };
@@ -110,6 +111,16 @@ export default function ReportsPage() {
     () => statusPieData.reduce((acc, item) => acc + (item.value || 0), 0),
     [statusPieData]
   );
+
+  const avgResolutionHours = useMemo(() => {
+    const ms = report?.kpis?.avgResolutionMs ?? 0;
+    return ms > 0 ? Math.round((ms / (1000 * 60 * 60)) * 10) / 10 : 0;
+  }, [report]);
+
+  const avgFirstResponseHours = useMemo(() => {
+    const ms = report?.kpis?.avgFirstResponseMs ?? 0;
+    return ms > 0 ? Math.round((ms / (1000 * 60 * 60)) * 10) / 10 : 0;
+  }, [report]);
 
   const slaPieData = useMemo(() => {
     const within = report?.sla.withinSla ?? 0;
@@ -213,9 +224,16 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPI title="Total de tickets (periodo)" value={totalTickets} />
+        <KPI title="Criados (periodo)" value={report?.kpis?.createdCount ?? totalTickets} />
+        <KPI title="Resolvidos (periodo)" value={report?.kpis?.resolvedCount ?? (status?.resolved ?? 0)} />
+        <KPI title="Backlog (agora)" value={report?.kpis?.backlogCount ?? 0} />
+        <KPI title="SLA (resolucao)" value={`${report?.sla?.withinRate ?? 0}%`} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KPI title="Tempo medio resolucao" value={`${avgResolutionHours}h`} />
+        <KPI title="Tempo medio 1a resposta" value={`${avgFirstResponseHours}h`} />
         <KPI title="Abertos" value={status?.open ?? 0} />
-        <KPI title="Resolvidos" value={status?.resolved ?? 0} />
         <KPI title="Dias no grafico" value={trend.length} />
       </div>
 
@@ -347,6 +365,23 @@ export default function ReportsPage() {
                 <Tooltip />
                 <Bar dataKey="resolved" fill="#10B981" />
               </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>SLA trend (dentro do prazo)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={slaTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Area type="monotone" dataKey="withinRate" stroke="#10B981" fill="#10B981" fillOpacity={0.18} name="% dentro" />
+              </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>

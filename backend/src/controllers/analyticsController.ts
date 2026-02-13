@@ -372,9 +372,23 @@ function toUtcDayStart(date: Date): Date {
 }
 
 function parseDay(value: string): Date {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) throw new Error('Invalid date');
-  return toUtcDayStart(d);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) throw new Error('Invalid date');
+
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const da = Number(m[3]);
+
+  const d = new Date(Date.UTC(y, mo - 1, da));
+  if (
+    d.getUTCFullYear() !== y ||
+    d.getUTCMonth() !== mo - 1 ||
+    d.getUTCDate() !== da
+  ) {
+    throw new Error('Invalid date');
+  }
+
+  return d;
 }
 
 export const getReports = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -445,8 +459,15 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
   ]);
 
   const trendMap = new Map<string, { date: string; created: number; resolved: number }>();
+
+  for (let t = start.getTime(); t < endExclusive.getTime(); t += 24 * 60 * 60 * 1000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    trendMap.set(day, { date: day, created: 0, resolved: 0 });
+  }
+
   for (const row of createdByDay) {
-    trendMap.set(row._id, { date: row._id, created: row.created ?? 0, resolved: 0 });
+    const prev = trendMap.get(row._id) ?? { date: row._id, created: 0, resolved: 0 };
+    trendMap.set(row._id, { ...prev, created: row.created ?? 0 });
   }
   for (const row of resolvedByDay) {
     const prev = trendMap.get(row._id) ?? { date: row._id, created: 0, resolved: 0 };
@@ -520,11 +541,100 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
     { $limit: agentLimit ?? 5 },
   ]);
 
+  const [createdCount, resolvedCount, backlogCount, avgTimesAgg, slaTrendAgg] = await Promise.all([
+    Ticket.countDocuments({ tenant: tenantId, createdAt: { $gte: start, $lt: endExclusive } }),
+    Ticket.countDocuments({ tenant: tenantId, 'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive } }),
+    Ticket.countDocuments({
+      tenant: tenantId,
+      status: { $in: ['open', 'in_progress', 'waiting_customer'] },
+    }),
+    Ticket.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          avgResolutionMs: { $avg: { $subtract: ['$sla.resolvedAt', '$createdAt'] } },
+          avgFirstResponseMs: {
+            $avg: {
+              $cond: [
+                { $ne: ['$sla.firstResponseAt', null] },
+                { $subtract: ['$sla.firstResponseAt', '$createdAt'] },
+                null,
+              ],
+            },
+          },
+        },
+      },
+    ]),
+    Ticket.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$sla.resolvedAt', timezone: 'UTC' },
+          },
+          totalResolved: { $sum: 1 },
+          withinSla: {
+            $sum: {
+              $cond: [{ $lte: ['$sla.resolvedAt', '$sla.resolutionDue'] }, 1, 0],
+            },
+          },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+  ]);
+
+  const avgRow = avgTimesAgg[0] || { avgResolutionMs: 0, avgFirstResponseMs: 0 };
+
+  const slaTrendMap = new Map<string, any>();
+  for (const row of slaTrendAgg) {
+    const outside = Math.max(0, (row.totalResolved || 0) - (row.withinSla || 0));
+    slaTrendMap.set(row._id, {
+      date: row._id,
+      totalResolved: row.totalResolved || 0,
+      withinSla: row.withinSla || 0,
+      outsideSla: outside,
+      withinRate: row.totalResolved > 0 ? Math.round((row.withinSla / row.totalResolved) * 100) : 0,
+    });
+  }
+
+  const slaTrend: any[] = [];
+  for (let t = start.getTime(); t < endExclusive.getTime(); t += 24 * 60 * 60 * 1000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    slaTrend.push(
+      slaTrendMap.get(day) || {
+        date: day,
+        totalResolved: 0,
+        withinSla: 0,
+        outsideSla: 0,
+        withinRate: 0,
+      }
+    );
+  }
+
   res.json({
     data: {
       range: {
         start: start.toISOString().slice(0, 10),
         end: end.toISOString().slice(0, 10),
+      },
+      kpis: {
+        createdCount,
+        resolvedCount,
+        backlogCount,
+        avgResolutionMs: Math.round(avgRow.avgResolutionMs || 0),
+        avgFirstResponseMs: Math.round(avgRow.avgFirstResponseMs || 0),
       },
       trend,
       status,
@@ -534,6 +644,7 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
         outsideSla,
         withinRate: slaRow.totalResolved > 0 ? Math.round((slaRow.withinSla / slaRow.totalResolved) * 100) : 0,
       },
+      slaTrend,
       agents: agentsAgg,
     },
   });

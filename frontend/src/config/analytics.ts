@@ -81,14 +81,32 @@ export interface ReportsAgentData {
   avgResolutionMs: number;
 }
 
+export interface ReportsKpis {
+  createdCount: number;
+  resolvedCount: number;
+  backlogCount: number;
+  avgResolutionMs: number;
+  avgFirstResponseMs: number;
+}
+
+export interface ReportsSlaTrendPoint {
+  date: string;
+  totalResolved: number;
+  withinSla: number;
+  outsideSla: number;
+  withinRate: number;
+}
+
 export interface ReportsData {
   range: {
     start: string;
     end: string;
   };
+  kpis: ReportsKpis;
   trend: ReportsTrendPoint[];
   status: TicketsByStatus;
   sla: ReportsSlaData;
+  slaTrend: ReportsSlaTrendPoint[];
   agents: ReportsAgentData[];
 }
 
