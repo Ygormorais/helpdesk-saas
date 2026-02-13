@@ -110,11 +110,17 @@ Acesse:
 ## 🐳 Docker
 
 ```bash
-# Executar todos os serviços
-docker-compose up -d
+# Executar todos os serviços (build de imagens)
+docker compose up -d --build
 
 # Parar serviços
-docker-compose down
+docker compose down
+```
+
+### Modo Dev (hot reload)
+
+```bash
+docker compose -f docker-compose.dev.yml up
 ```
 
 ## 📁 Estrutura
