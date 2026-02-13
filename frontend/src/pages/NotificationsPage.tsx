@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Bell, Check, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
 import { Button } from '@/components/ui/button';
@@ -13,11 +14,15 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [page, setPage] = useState(1);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const limit = 50;
+
   const listQuery = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', { page, limit, unreadOnly }],
     queryFn: async () => {
-      const res = await notificationsApi.list({ page: 1, limit: 50 });
-      return res.data.notifications;
+      const res = await notificationsApi.list({ page, limit, unreadOnly });
+      return res.data;
     },
   });
 
@@ -50,7 +55,8 @@ export default function NotificationsPage() {
     },
   });
 
-  const notifications = (listQuery.data || []) as NotificationDto[];
+  const notifications = (listQuery.data?.notifications || []) as NotificationDto[];
+  const pagination = listQuery.data?.pagination as undefined | { page: number; pages: number; total: number };
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
@@ -62,6 +68,15 @@ export default function NotificationsPage() {
         </div>
 
         <div className="flex gap-2">
+          <Button
+            variant={unreadOnly ? 'default' : 'outline'}
+            onClick={() => {
+              setPage(1);
+              setUnreadOnly((v) => !v);
+            }}
+          >
+            {unreadOnly ? 'Mostrando nao lidas' : 'Somente nao lidas'}
+          </Button>
           <Button
             variant="outline"
             onClick={() => markAllMutation.mutate()}
@@ -127,6 +142,28 @@ export default function NotificationsPage() {
               </Link>
             );
           })}
+
+          {pagination && pagination.pages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || listQuery.isLoading}
+              >
+                Anterior
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Pagina {page} de {pagination.pages}
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => (pagination ? Math.min(pagination.pages, p + 1) : p + 1))}
+                disabled={!!pagination && page >= pagination.pages}
+              >
+                Proxima
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
