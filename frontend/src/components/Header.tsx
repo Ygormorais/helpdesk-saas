@@ -1,7 +1,8 @@
-import { Bell, Search, Sun, Moon } from 'lucide-react';
+import { Search, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTheme } from '@/contexts/ThemeContext';
+import { NotificationBell } from './NotificationBell';
 
 export default function Header() {
   const { theme, setTheme } = useTheme();
@@ -30,9 +31,7 @@ export default function Header() {
             <Moon className="h-5 w-5" />
           )}
         </Button>
-        <Button variant="ghost" size="icon">
-          <Bell className="h-5 w-5" />
-        </Button>
+        <NotificationBell />
       </div>
     </header>
   );

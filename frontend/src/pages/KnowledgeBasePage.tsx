@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, BookOpen, Eye, ThumbsUp } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,78 +13,43 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const articles = [
-  {
-    id: '1',
-    slug: 'como-resetar-senha',
-    title: 'Como resetar sua senha',
-    excerpt: 'Aprenda passo a passo como recuperar o acesso à sua conta quando esquecer a senha.',
-    category: { name: 'Conta', color: '#3B82F6' },
-    views: 1250,
-    helpful: { yes: 45, no: 3 },
-    createdAt: '2024-01-10',
-  },
-  {
-    id: '2',
-    slug: 'integracao-api',
-    title: 'Guia de integração com API',
-    excerpt: 'Documentação completa para integrar seus sistemas com nossa API REST.',
-    category: { name: 'Desenvolvimento', color: '#10B981' },
-    views: 890,
-    helpful: { yes: 32, no: 5 },
-    createdAt: '2024-01-08',
-  },
-  {
-    id: '3',
-    slug: 'configuracao-webhook',
-    title: 'Configurando Webhooks',
-    excerpt: 'Aprenda a receber notificações em tempo real através de webhooks.',
-    category: { name: 'Desenvolvimento', color: '#10B981' },
-    views: 654,
-    helpful: { yes: 28, no: 2 },
-    createdAt: '2024-01-05',
-  },
-  {
-    id: '4',
-    slug: 'planos-precos',
-    title: 'Comparativo de planos',
-    description: 'Entenda as diferenças entre os planos e escolha o melhor para sua empresa.',
-    category: { name: 'Billing', color: '#F59E0B' },
-    views: 543,
-    helpful: { yes: 19, no: 1 },
-    createdAt: '2024-01-03',
-  },
-  {
-    id: '5',
-    slug: 'seguranca-dados',
-    title: 'Segurança e proteção de dados',
-    excerpt: 'Conheça nossas práticas de segurança e como protegemos suas informações.',
-    category: { name: 'Segurança', color: '#EF4444' },
-    views: 432,
-    helpful: { yes: 15, no: 0 },
-    createdAt: '2024-01-01',
-  },
-];
-
-const categories = [
-  { name: 'Todas', count: 5 },
-  { name: 'Conta', count: 1 },
-  { name: 'Desenvolvimento', count: 2 },
-  { name: 'Billing', count: 1 },
-  { name: 'Segurança', count: 1 },
-];
+import { articlesApi } from '@/api/articles';
 
 export default function KnowledgeBasePage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const filteredArticles = articles.filter((article) => {
-    const matchesSearch = article.title.toLowerCase().includes(search.toLowerCase()) ||
-      article.excerpt.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' ||
-      article.category.name === selectedCategory;
-    return matchesSearch && matchesCategory;
+  const listQuery = useQuery({
+    queryKey: ['articles', 'public', { search, selectedCategory }],
+    queryFn: async () => {
+      const res = await articlesApi.listPublic({
+        search: search.trim() ? search.trim() : undefined,
+        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+      });
+      return res.data.articles;
+    },
   });
+
+  const articles = listQuery.data || [];
+
+  const categories = useMemo(() => {
+    const counts = new Map<string, { name: string; color: string; count: number; id: string }>();
+    for (const a of articles) {
+      const c: any = a.category;
+      if (!c) continue;
+      const key = c._id;
+      const prev = counts.get(key);
+      counts.set(key, {
+        id: c._id,
+        name: c.name,
+        color: c.color,
+        count: (prev?.count || 0) + 1,
+      });
+    }
+
+    const list = Array.from(counts.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return [{ id: 'all', name: 'Todas', color: '#6B7280', count: articles.length }, ...list];
+  }, [articles]);
 
   return (
     <div className="space-y-6">
@@ -109,10 +75,10 @@ export default function KnowledgeBasePage() {
       <div className="flex gap-4 justify-center">
         {categories.map((cat) => (
           <Button
-            key={cat.name}
-            variant={selectedCategory === cat.name.toLowerCase() || (selectedCategory === 'all' && cat.name === 'Todas') ? 'default' : 'outline'}
+            key={cat.id}
+            variant={selectedCategory === cat.id ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setSelectedCategory(cat.name === 'Todas' ? 'all' : cat.name)}
+            onClick={() => setSelectedCategory(cat.id)}
           >
             {cat.name}
             <span className="ml-2 text-xs opacity-70">({cat.count})</span>
@@ -121,16 +87,16 @@ export default function KnowledgeBasePage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredArticles.map((article) => (
-          <Link key={article.id} to={`/knowledge/${article.slug}`}>
+        {articles.map((article: any) => (
+          <Link key={article._id} to={`/knowledge/${article.slug}`}>
             <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className="px-2 py-1 rounded-full text-xs font-medium text-white"
-                    style={{ backgroundColor: article.category.color }}
+                    style={{ backgroundColor: article.category?.color || '#6B7280' }}
                   >
-                    {article.category.name}
+                    {article.category?.name || 'Sem categoria'}
                   </span>
                 </div>
                 <CardTitle className="text-lg line-clamp-2">{article.title}</CardTitle>
@@ -142,13 +108,13 @@ export default function KnowledgeBasePage() {
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Eye className="h-3 w-3" />
-                    {article.views}
+                    {article.views || 0}
                   </div>
                   <div className="flex items-center gap-1">
                     <ThumbsUp className="h-3 w-3" />
-                    {article.helpful.yes}
+                    {article.helpful?.yes || 0}
                   </div>
-                  <span>{article.createdAt}</span>
+                  <span>{article.createdAt ? new Date(article.createdAt).toLocaleDateString('pt-BR') : ''}</span>
                 </div>
               </CardContent>
             </Card>
@@ -156,7 +122,7 @@ export default function KnowledgeBasePage() {
         ))}
       </div>
 
-      {filteredArticles.length === 0 && (
+      {!listQuery.isLoading && !listQuery.isError && articles.length === 0 && (
         <div className="text-center py-12">
           <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium">Nenhum artigo encontrado</h3>

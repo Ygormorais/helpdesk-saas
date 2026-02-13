@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Play, Trash, ExternalLink, Copy, Check } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { webhooksApi } from '@/api/webhooks';
+import { useToast } from '@/hooks/use-toast';
 
 const events = [
   'ticket.created',
@@ -33,16 +36,74 @@ const events = [
   'user.invited',
 ];
 
-const mockWebhooks = [
-  { id: '1', name: 'Slack Notifications', url: 'https://hooks.slack.com/services/xxx', events: ['ticket.created', 'ticket.resolved'], isActive: true, failureCount: 0, lastTriggeredAt: '2024-01-15 10:30' },
-  { id: '2', name: 'Zapier Integration', url: 'https://hooks.zapier.com/xxx', events: ['ticket.created'], isActive: true, failureCount: 0, lastTriggeredAt: '2024-01-15 09:00' },
-  { id: '3', name: 'CRM Webhook', url: 'https://api.crm.com/webhooks/xxx', events: ['ticket.created', 'ticket.status_changed'], isActive: false, failureCount: 3, lastTriggeredAt: '2024-01-14 15:00' },
-];
-
 export default function WebhooksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newWebhook, setNewWebhook] = useState({ name: '', url: '', events: [] as string[] });
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const listQuery = useQuery({
+    queryKey: ['webhooks'],
+    queryFn: async () => {
+      const res = await webhooksApi.list();
+      return res.data.webhooks;
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await webhooksApi.create({
+        name: newWebhook.name,
+        url: newWebhook.url,
+        events: newWebhook.events,
+      });
+      return res.data as any;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] });
+      setIsDialogOpen(false);
+      setNewWebhook({ name: '', url: '', events: [] });
+      if (data?.webhook?.secret) {
+        toast({ title: 'Webhook criado', description: `Secret: ${data.webhook.secret}` });
+      } else {
+        toast({ title: 'Webhook criado' });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao criar webhook',
+        description: error.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await webhooksApi.remove(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] });
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await webhooksApi.test(id);
+      return res.data as any;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data.success ? 'Webhook OK' : 'Webhook falhou',
+        description: data.success ? `Status ${data.status}` : data.error || 'Erro',
+        variant: data.success ? 'default' : 'destructive',
+      });
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] });
+    },
+  });
+
+  const webhooks = listQuery.data || [];
 
   const copyToClipboard = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -118,14 +179,22 @@ export default function WebhooksPage() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={() => setIsDialogOpen(false)}>Criar Webhook</Button>
+              <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Criando...' : 'Criar Webhook'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid gap-4">
-        {mockWebhooks.map((webhook) => (
+        {listQuery.isLoading && (
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        )}
+        {listQuery.isError && (
+          <p className="text-sm text-destructive">Erro ao carregar webhooks</p>
+        )}
+        {webhooks.map((webhook) => (
           <Card key={webhook.id}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -156,7 +225,12 @@ export default function WebhooksPage() {
                   <span className="text-sm text-muted-foreground">
                     {webhook.failureCount} falhas
                   </span>
-                  <Button variant="ghost" size="icon" title="Testar">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Testar"
+                    onClick={() => testMutation.mutate(webhook.id)}
+                  >
                     <Play className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" title="Copiar URL">
@@ -166,7 +240,16 @@ export default function WebhooksPage() {
                       <Copy className="h-4 w-4" onClick={() => copyToClipboard(webhook.url, webhook.id)} />
                     )}
                   </Button>
-                  <Button variant="ghost" size="icon" className="text-destructive">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => {
+                      if (window.confirm('Excluir este webhook?')) {
+                        deleteMutation.mutate(webhook.id);
+                      }
+                    }}
+                  >
                     <Trash className="h-4 w-4" />
                   </Button>
                 </div>

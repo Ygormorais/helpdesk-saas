@@ -3,25 +3,30 @@ import { LayoutDashboard, Ticket, FolderOpen, BookOpen, PenTool, Users, Webhook,
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
-const navigation = [
+type Role = 'admin' | 'manager' | 'agent' | 'client';
+
+const navigation: Array<{ name: string; href: string; icon: any; roles?: Role[] }> = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Tickets', href: '/tickets', icon: Ticket },
   { name: 'Chat', href: '/chat', icon: MessageCircle },
-  { name: 'Categorias', href: '/categories', icon: FolderOpen },
+  { name: 'Categorias', href: '/categories', icon: FolderOpen, roles: ['admin', 'manager', 'agent'] },
   { name: 'Base de Conhecimento', href: '/knowledge', icon: BookOpen },
-  { name: 'Equipe', href: '/team', icon: Users },
-  { name: 'Admin Artigos', href: '/admin/articles', icon: PenTool },
-  { name: 'Webhooks', href: '/webhooks', icon: Webhook },
-  { name: 'Satisfação', href: '/satisfaction', icon: Star },
-  { name: 'Tempo', href: '/time', icon: Clock },
-  { name: 'Planos', href: '/plans', icon: CreditCard },
-  { name: 'Audit Log', href: '/audit', icon: History },
+  { name: 'Equipe', href: '/team', icon: Users, roles: ['admin', 'manager'] },
+  { name: 'Admin Artigos', href: '/admin/articles', icon: PenTool, roles: ['admin', 'manager', 'agent'] },
+  { name: 'Webhooks', href: '/webhooks', icon: Webhook, roles: ['admin', 'manager'] },
+  { name: 'Satisfação', href: '/satisfaction', icon: Star, roles: ['admin', 'manager', 'agent'] },
+  { name: 'Tempo', href: '/time', icon: Clock, roles: ['admin', 'manager', 'agent'] },
+  { name: 'Planos', href: '/plans', icon: CreditCard, roles: ['admin', 'manager'] },
+  { name: 'Audit Log', href: '/audit', icon: History, roles: ['admin'] },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
   const { logout, user } = useAuth();
+
+  const role = (user?.role || 'client') as Role;
+  const items = navigation.filter((i) => !i.roles || i.roles.includes(role));
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
@@ -30,7 +35,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 p-4">
-        {navigation.map((item) => {
+        {items.map((item) => {
           const isActive = location.pathname === item.href ||
             (item.href !== '/' && location.pathname.startsWith(item.href));
           return (

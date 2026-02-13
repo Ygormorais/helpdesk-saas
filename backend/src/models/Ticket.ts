@@ -38,6 +38,18 @@ export interface ITicket extends Document {
     resolutionDue: Date;
     firstResponseAt?: Date;
     resolvedAt?: Date;
+    pausedAt?: Date;
+    pausedMs: number;
+  };
+
+  // OLA (internal agreement) - starts when ticket is owned/assigned
+  ola?: {
+    ownDue?: Date;
+    resolutionDue?: Date;
+    ownedAt?: Date;
+    resolvedAt?: Date;
+    pausedAt?: Date;
+    pausedMs: number;
   };
   satisfaction?: {
     rating: number;
@@ -123,6 +135,22 @@ const ticketSchema = new Schema<ITicket>(
       },
       firstResponseAt: Date,
       resolvedAt: Date,
+      pausedAt: Date,
+      pausedMs: {
+        type: Number,
+        default: 0,
+      },
+    },
+    ola: {
+      ownDue: Date,
+      resolutionDue: Date,
+      ownedAt: Date,
+      resolvedAt: Date,
+      pausedAt: Date,
+      pausedMs: {
+        type: Number,
+        default: 0,
+      },
     },
     satisfaction: {
       rating: {

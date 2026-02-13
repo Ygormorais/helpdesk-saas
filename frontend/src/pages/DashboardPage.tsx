@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -15,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { analyticsApi } from '@/config/analytics';
+import { ticketsApi } from '@/api/tickets';
 import {
   AreaChart,
   Area,
@@ -48,75 +50,42 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: '#10B981',
 };
 
-const mockStats = {
-  totalTickets: 156,
-  openTickets: 23,
-  inProgressTickets: 42,
-  resolvedTickets: 91,
-  ticketsThisMonth: 67,
-  totalAgents: 8,
-  avgResponseTime: 4.5,
-  satisfaction: 4.2,
+const formatShortDate = (iso: string) => {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}`;
 };
 
-const mockStatusData = [
-  { name: 'Aberto', value: 23, color: '#EF4444' },
-  { name: 'Em Andamento', value: 42, color: '#3B82F6' },
-  { name: 'Aguardando', value: 15, color: '#F59E0B' },
-  { name: 'Resolvido', value: 91, color: '#10B981' },
-  { name: 'Fechado', value: 35, color: '#6B7280' },
-];
+const statusLabel: Record<string, string> = {
+  open: 'Aberto',
+  in_progress: 'Em Andamento',
+  waiting_customer: 'Aguardando',
+  resolved: 'Resolvido',
+  closed: 'Fechado',
+};
 
-const mockPriorityData = [
-  { name: 'Urgente', value: 12, color: '#EF4444' },
-  { name: 'Alta', value: 35, color: '#F59E0B' },
-  { name: 'Média', value: 78, color: '#3B82F6' },
-  { name: 'Baixa', value: 31, color: '#10B981' },
-];
+const statusClass: Record<string, string> = {
+  open: 'bg-red-100 text-red-800',
+  in_progress: 'bg-blue-100 text-blue-800',
+  waiting_customer: 'bg-yellow-100 text-yellow-800',
+  resolved: 'bg-green-100 text-green-800',
+  closed: 'bg-gray-100 text-gray-800',
+};
 
-const mockTrendData = [
-  { date: '01/01', created: 12, resolved: 8 },
-  { date: '02/01', created: 15, resolved: 12 },
-  { date: '03/01', created: 8, resolved: 10 },
-  { date: '04/01', created: 20, resolved: 15 },
-  { date: '05/01', created: 18, resolved: 16 },
-  { date: '06/01', created: 25, resolved: 20 },
-  { date: '07/01', created: 22, resolved: 18 },
-  { date: '08/01', created: 16, resolved: 14 },
-  { date: '09/01', created: 28, resolved: 22 },
-  { date: '10/01', created: 24, resolved: 20 },
-  { date: '11/01', created: 19, resolved: 17 },
-  { date: '12/01', created: 30, resolved: 25 },
-];
+const priorityLabel: Record<string, string> = {
+  urgent: 'Urgente',
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baixa',
+};
 
-const mockCategoryData = [
-  { name: 'Técnico', count: 45 },
-  { name: 'Financeiro', count: 23 },
-  { name: 'Administrativo', count: 18 },
-  { name: 'Geral', count: 12 },
-  { name: 'Vendas', count: 8 },
-];
-
-const mockAgentData = [
-  { name: 'Carlos', resolved: 45, total: 52 },
-  { name: 'Maria', resolved: 38, total: 45 },
-  { name: 'Pedro', resolved: 32, total: 40 },
-  { name: 'Ana', resolved: 28, total: 35 },
-  { name: 'João', resolved: 22, total: 28 },
-];
-
-const mockSLAdata = [
-  { name: 'Dentro do SLA', value: 85, color: '#10B981' },
-  { name: 'Fora do SLA', value: 15, color: '#EF4444' },
-];
-
-const mockSatisfactionData = [
-  { rating: '5 estrelas', count: 45 },
-  { rating: '4 estrelas', count: 32 },
-  { rating: '3 estrelas', count: 12 },
-  { rating: '2 estrelas', count: 5 },
-  { rating: '1 estrela', count: 3 },
-];
+const priorityClass: Record<string, string> = {
+  urgent: 'bg-red-100 text-red-800',
+  high: 'bg-orange-100 text-orange-800',
+  medium: 'bg-yellow-100 text-yellow-800',
+  low: 'bg-green-100 text-green-800',
+};
 
 function StatCard({
   title,
@@ -158,16 +127,181 @@ function StatCard({
 }
 
 export default function DashboardPage() {
+  const [trendDays, setTrendDays] = useState(30);
+
+  const statsQuery = useQuery({
+    queryKey: ['analytics', 'dashboard'],
+    queryFn: async () => {
+      const res = await analyticsApi.getDashboardStats();
+      return res.data.stats;
+    },
+  });
+
+  const statusQuery = useQuery({
+    queryKey: ['analytics', 'tickets-by-status'],
+    queryFn: async () => {
+      const res = await analyticsApi.getTicketsByStatus();
+      return res.data.data;
+    },
+  });
+
+  const priorityQuery = useQuery({
+    queryKey: ['analytics', 'tickets-by-priority'],
+    queryFn: async () => {
+      const res = await analyticsApi.getTicketsByPriority();
+      return res.data.data;
+    },
+  });
+
+  const categoryQuery = useQuery({
+    queryKey: ['analytics', 'tickets-by-category'],
+    queryFn: async () => {
+      const res = await analyticsApi.getTicketsByCategory();
+      return res.data.data;
+    },
+  });
+
+  const trendQuery = useQuery({
+    queryKey: ['analytics', 'tickets-trend', trendDays],
+    queryFn: async () => {
+      const res = await analyticsApi.getTicketsTrend(trendDays);
+      return res.data.data;
+    },
+  });
+
+  const topAgentsQuery = useQuery({
+    queryKey: ['analytics', 'top-agents'],
+    queryFn: async () => {
+      const res = await analyticsApi.getTopAgents();
+      return res.data.data;
+    },
+  });
+
+  const slaQuery = useQuery({
+    queryKey: ['analytics', 'sla-compliance'],
+    queryFn: async () => {
+      const res = await analyticsApi.getSLACompliance();
+      return res.data.data;
+    },
+  });
+
+  const satisfactionQuery = useQuery({
+    queryKey: ['analytics', 'satisfaction'],
+    queryFn: async () => {
+      const res = await analyticsApi.getSatisfactionStats();
+      return res.data.data;
+    },
+  });
+
+  const recentTicketsQuery = useQuery({
+    queryKey: ['tickets', 'recent'],
+    queryFn: async () => {
+      const res = await ticketsApi.list({ page: 1, limit: 8 });
+      return res.data.tickets as any[];
+    },
+  });
+
+  const criticalTicketsQuery = useQuery({
+    queryKey: ['tickets', 'critical'],
+    queryFn: async () => {
+      const res = await ticketsApi.list({ page: 1, limit: 8, priority: 'urgent' });
+      return res.data.tickets as any[];
+    },
+  });
+
+  const pendingTicketsQuery = useQuery({
+    queryKey: ['tickets', 'pending'],
+    queryFn: async () => {
+      const res = await ticketsApi.list({ page: 1, limit: 8, status: 'open' });
+      return res.data.tickets as any[];
+    },
+  });
+
+  const stats = statsQuery.data || {
+    totalTickets: 0,
+    openTickets: 0,
+    inProgressTickets: 0,
+    resolvedTickets: 0,
+    ticketsThisMonth: 0,
+    totalAgents: 0,
+    avgResponseTime: 0,
+    satisfaction: 0,
+  };
+
+  const statusData = useMemo(() => {
+    const s = statusQuery.data || { open: 0, in_progress: 0, waiting_customer: 0, resolved: 0, closed: 0 };
+    return [
+      { name: 'Aberto', value: s.open, color: STATUS_COLORS.open },
+      { name: 'Em Andamento', value: s.in_progress, color: STATUS_COLORS.in_progress },
+      { name: 'Aguardando', value: s.waiting_customer, color: STATUS_COLORS.waiting_customer },
+      { name: 'Resolvido', value: s.resolved, color: STATUS_COLORS.resolved },
+      { name: 'Fechado', value: s.closed, color: STATUS_COLORS.closed },
+    ];
+  }, [statusQuery.data]);
+
+  const priorityData = useMemo(() => {
+    const p = priorityQuery.data || { urgent: 0, high: 0, medium: 0, low: 0 };
+    return [
+      { name: 'Urgente', value: p.urgent, color: PRIORITY_COLORS.urgent },
+      { name: 'Alta', value: p.high, color: PRIORITY_COLORS.high },
+      { name: 'Media', value: p.medium, color: PRIORITY_COLORS.medium },
+      { name: 'Baixa', value: p.low, color: PRIORITY_COLORS.low },
+    ];
+  }, [priorityQuery.data]);
+
+  const categoryData = useMemo(() => {
+    const items = categoryQuery.data || [];
+    return items.map((i: any) => ({ name: i._id, count: i.count }));
+  }, [categoryQuery.data]);
+
+  const trendData = useMemo(() => {
+    const items = trendQuery.data || [];
+    return items.map((i: any) => ({
+      date: formatShortDate(i._id),
+      created: i.created,
+      resolved: i.resolved,
+    }));
+  }, [trendQuery.data]);
+
+  const agentData = useMemo(() => {
+    const items = topAgentsQuery.data || [];
+    return items.map((i: any) => ({ name: i.name, total: i.total, resolved: i.resolved }));
+  }, [topAgentsQuery.data]);
+
+  const satisfactionData = useMemo(() => {
+    const dist = satisfactionQuery.data?.distribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    return [
+      { rating: '5 estrelas', count: dist[5] || 0 },
+      { rating: '4 estrelas', count: dist[4] || 0 },
+      { rating: '3 estrelas', count: dist[3] || 0 },
+      { rating: '2 estrelas', count: dist[2] || 0 },
+      { rating: '1 estrela', count: dist[1] || 0 },
+    ];
+  }, [satisfactionQuery.data]);
+
+  const slaData = useMemo(() => {
+    const breachRate = slaQuery.data?.breachRate || 0;
+    const okRate = Math.max(0, 100 - breachRate);
+    return [
+      { name: 'Dentro do SLA', value: okRate, color: '#10B981' },
+      { name: 'Fora do SLA', value: breachRate, color: '#EF4444' },
+    ];
+  }, [slaQuery.data]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <div className="flex gap-2">
-          <select className="px-3 py-2 border rounded-md text-sm">
-            <option>Últimos 30 dias</option>
-            <option>Últimos 7 dias</option>
-            <option>Último mês</option>
-            <option>Este ano</option>
+          <select
+            className="px-3 py-2 border rounded-md text-sm"
+            value={trendDays}
+            onChange={(e) => setTrendDays(parseInt(e.target.value, 10))}
+          >
+            <option value={7}>Ultimos 7 dias</option>
+            <option value={30}>Ultimos 30 dias</option>
+            <option value={90}>Ultimos 90 dias</option>
+            <option value={365}>Este ano</option>
           </select>
           <Link to="/tickets">
             <Button>Novo Ticket</Button>
@@ -178,28 +312,28 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total de Tickets"
-          value={mockStats.totalTickets}
+          value={stats.totalTickets}
           icon={Ticket}
           change="+12%"
           changeType="up"
         />
         <StatCard
           title="Em Aberto"
-          value={mockStats.openTickets}
+          value={stats.openTickets}
           icon={AlertCircle}
           change="-5%"
           changeType="up"
         />
         <StatCard
           title="Em Andamento"
-          value={mockStats.inProgressTickets}
+          value={stats.inProgressTickets}
           icon={Clock}
           change="+8%"
           changeType="up"
         />
         <StatCard
           title="Resolvidos"
-          value={mockStats.resolvedTickets}
+          value={stats.resolvedTickets}
           icon={CheckCircle}
           change="+15%"
           changeType="up"
@@ -209,24 +343,24 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Tickets Este Mês"
-          value={mockStats.ticketsThisMonth}
+          value={stats.ticketsThisMonth}
           icon={TrendingUp}
           change="+23%"
           changeType="up"
         />
         <StatCard
           title="Agentes Ativos"
-          value={mockStats.totalAgents}
+          value={stats.totalAgents}
           icon={Users}
         />
         <StatCard
           title="Tempo Médio Resposta"
-          value={`${mockStats.avgResponseTime}h`}
+          value={`${stats.avgResponseTime}h`}
           icon={Clock}
         />
         <StatCard
           title="Satisfação"
-          value={`${mockStats.satisfaction}/5`}
+          value={`${stats.satisfaction}/5`}
           icon={Star}
         />
       </div>
@@ -238,7 +372,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={mockTrendData}>
+              <AreaChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="date" className="text-xs" />
                 <YAxis className="text-xs" />
@@ -278,7 +412,7 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={mockStatusData}
+                  data={statusData}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -286,7 +420,7 @@ export default function DashboardPage() {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {mockStatusData.map((entry, index) => (
+                  {statusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -311,7 +445,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mockPriorityData} layout="vertical">
+              <BarChart data={priorityData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis type="number" className="text-xs" />
                 <YAxis dataKey="name" type="category" className="text-xs" width={60} />
@@ -334,7 +468,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mockCategoryData}>
+              <BarChart data={categoryData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" className="text-xs" />
                 <YAxis className="text-xs" />
@@ -357,7 +491,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mockAgentData}>
+              <BarChart data={agentData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" className="text-xs" />
                 <YAxis className="text-xs" />
@@ -384,7 +518,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mockSatisfactionData}>
+              <BarChart data={satisfactionData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="rating" className="text-xs" />
                 <YAxis className="text-xs" />
@@ -410,7 +544,7 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
-                    data={mockSLAdata}
+                    data={slaData}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -418,7 +552,7 @@ export default function DashboardPage() {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {mockSLAdata.map((entry, index) => (
+                    {slaData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -434,11 +568,11 @@ export default function DashboardPage() {
             </div>
             <div className="flex justify-center gap-6 mt-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">85%</div>
+                <div className="text-2xl font-bold text-green-500">{slaData[0]?.value || 0}%</div>
                 <div className="text-xs text-muted-foreground">Dentro do SLA</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-500">15%</div>
+                <div className="text-2xl font-bold text-red-500">{slaData[1]?.value || 0}%</div>
                 <div className="text-xs text-muted-foreground">Fora do SLA</div>
               </div>
             </div>
@@ -467,50 +601,53 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    { id: '1', ticketNumber: 'TKT-00001', title: 'Problema no login', status: 'open', priority: 'high', agent: 'Carlos', updated: '5 min atrás' },
-                    { id: '2', ticketNumber: 'TKT-00002', title: 'Dúvida sobre cobrança', status: 'in_progress', priority: 'medium', agent: 'Maria', updated: '15 min atrás' },
-                    { id: '3', ticketNumber: 'TKT-00003', title: 'Erro no sistema', status: 'waiting_customer', priority: 'urgent', agent: 'Pedro', updated: '30 min atrás' },
-                    { id: '4', ticketNumber: 'TKT-00004', title: 'Solicitação de acesso', status: 'resolved', priority: 'low', agent: 'Ana', updated: '1h atrás' },
-                    { id: '5', ticketNumber: 'TKT-00005', title: 'Feedback sobre atendimento', status: 'open', priority: 'low', agent: 'João', updated: '2h atrás' },
-                  ].map((ticket) => (
-                    <tr key={ticket.id} className="border-b last:border-0 hover:bg-muted/50">
+                  {recentTicketsQuery.isLoading && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={6}>
+                        Carregando...
+                      </td>
+                    </tr>
+                  )}
+                  {recentTicketsQuery.isError && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={6}>
+                        Erro ao carregar
+                      </td>
+                    </tr>
+                  )}
+                  {!recentTicketsQuery.isLoading && !recentTicketsQuery.isError && (recentTicketsQuery.data || []).length === 0 && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={6}>
+                        Nenhum ticket
+                      </td>
+                    </tr>
+                  )}
+                  {!recentTicketsQuery.isLoading && !recentTicketsQuery.isError && (recentTicketsQuery.data || []).map((ticket) => (
+                    <tr key={ticket._id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="px-4 py-3">
-                        <Link to={`/tickets/${ticket.id}`} className="font-medium text-primary hover:underline">
+                        <Link to={`/tickets/${ticket._id}`} className="font-medium text-primary hover:underline">
                           {ticket.ticketNumber}
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <Link to={`/tickets/${ticket.id}`} className="hover:underline">
+                        <Link to={`/tickets/${ticket._id}`} className="hover:underline">
                           {ticket.title}
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          ticket.status === 'open' ? 'bg-red-100 text-red-800' :
-                          ticket.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                          ticket.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {ticket.status === 'open' ? 'Aberto' :
-                           ticket.status === 'in_progress' ? 'Em Andamento' :
-                           ticket.status === 'resolved' ? 'Resolvido' : 'Aguardando'}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass[ticket.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {statusLabel[ticket.status] || ticket.status}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          ticket.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                          ticket.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                          ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {ticket.priority === 'urgent' ? 'Urgente' :
-                           ticket.priority === 'high' ? 'Alta' :
-                           ticket.priority === 'medium' ? 'Média' : 'Baixa'}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityClass[ticket.priority] || 'bg-gray-100 text-gray-800'}`}>
+                          {priorityLabel[ticket.priority] || ticket.priority}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm">{ticket.agent}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{ticket.updated}</td>
+                      <td className="px-4 py-3 text-sm">{ticket.assignedTo?.name || 'Nao atribuido'}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleString('pt-BR') : '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -520,23 +657,139 @@ export default function DashboardPage() {
         </TabsContent>
         <TabsContent value="critical">
           <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">Nenhum ticket crítico</h3>
-                <p className="text-muted-foreground">Todos os tickets estão dentro do prazo</p>
-              </div>
+            <CardContent className="p-0">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Titulo</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Prioridade</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Responsavel</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Atualizado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {criticalTicketsQuery.isLoading && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={6}>
+                        Carregando...
+                      </td>
+                    </tr>
+                  )}
+                  {criticalTicketsQuery.isError && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={6}>
+                        Erro ao carregar
+                      </td>
+                    </tr>
+                  )}
+                  {!criticalTicketsQuery.isLoading && !criticalTicketsQuery.isError && (criticalTicketsQuery.data || []).length === 0 && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={6}>
+                        Nenhum ticket critico
+                      </td>
+                    </tr>
+                  )}
+                  {!criticalTicketsQuery.isLoading && !criticalTicketsQuery.isError && (criticalTicketsQuery.data || []).map((ticket) => (
+                    <tr key={ticket._id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="px-4 py-3">
+                        <Link to={`/tickets/${ticket._id}`} className="font-medium text-primary hover:underline">
+                          {ticket.ticketNumber}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link to={`/tickets/${ticket._id}`} className="hover:underline">
+                          {ticket.title}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass[ticket.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {statusLabel[ticket.status] || ticket.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityClass[ticket.priority] || 'bg-gray-100 text-gray-800'}`}>
+                          {priorityLabel[ticket.priority] || ticket.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{ticket.assignedTo?.name || 'Nao atribuido'}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleString('pt-BR') : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="pending">
           <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">Tickets pendentes</h3>
-                <p className="text-muted-foreground">Ver tickets aguardando resposta</p>
-              </div>
+            <CardContent className="p-0">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Titulo</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Prioridade</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Responsavel</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Atualizado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingTicketsQuery.isLoading && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={6}>
+                        Carregando...
+                      </td>
+                    </tr>
+                  )}
+                  {pendingTicketsQuery.isError && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={6}>
+                        Erro ao carregar
+                      </td>
+                    </tr>
+                  )}
+                  {!pendingTicketsQuery.isLoading && !pendingTicketsQuery.isError && (pendingTicketsQuery.data || []).length === 0 && (
+                    <tr>
+                      <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={6}>
+                        Nenhum ticket pendente
+                      </td>
+                    </tr>
+                  )}
+                  {!pendingTicketsQuery.isLoading && !pendingTicketsQuery.isError && (pendingTicketsQuery.data || []).map((ticket) => (
+                    <tr key={ticket._id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="px-4 py-3">
+                        <Link to={`/tickets/${ticket._id}`} className="font-medium text-primary hover:underline">
+                          {ticket.ticketNumber}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link to={`/tickets/${ticket._id}`} className="hover:underline">
+                          {ticket.title}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass[ticket.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {statusLabel[ticket.status] || ticket.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityClass[ticket.priority] || 'bg-gray-100 text-gray-800'}`}>
+                          {priorityLabel[ticket.priority] || ticket.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{ticket.assignedTo?.name || 'Nao atribuido'}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleString('pt-BR') : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </CardContent>
           </Card>
         </TabsContent>

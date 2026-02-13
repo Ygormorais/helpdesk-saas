@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Star, ThumbsUp, MessageSquare, X } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -12,14 +12,12 @@ import {
 } from '@/components/ui/dialog';
 
 interface SatisfactionSurveyProps {
-  ticketId: string;
   ticketNumber: string;
   onClose: () => void;
   onSubmit: (rating: number, comment: string) => Promise<void>;
 }
 
 export default function SatisfactionSurvey({
-  ticketId,
   ticketNumber,
   onClose,
   onSubmit,
@@ -29,7 +27,7 @@ export default function SatisfactionSurvey({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
 
-  const labels = {
+  const labels: Record<number, string> = {
     1: 'Muito Insatisfeito',
     2: 'Insatisfeito',
     3: 'Neutro',
@@ -146,7 +144,7 @@ interface SatisfactionBadgeProps {
 }
 
 export function SatisfactionBadge({ rating, size = 'md' }: SatisfactionBadgeProps) {
-  const colors = {
+  const colors: Record<number, string> = {
     1: 'bg-red-100 text-red-800',
     2: 'bg-orange-100 text-orange-800',
     3: 'bg-yellow-100 text-yellow-800',

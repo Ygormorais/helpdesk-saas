@@ -7,7 +7,7 @@ export interface IWebhook extends Document {
   events: string[];
   tenant: mongoose.Types.ObjectId;
   isActive: boolean;
-  headers: Record<string, string>;
+  headers: Map<string, string>;
   failureCount: number;
   lastTriggeredAt?: Date;
   lastFailedAt?: Date;

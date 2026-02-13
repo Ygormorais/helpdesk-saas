@@ -1,9 +1,11 @@
 import { Response } from 'express';
 import { asaasService } from '../services/asaasService.js';
-import { planService, PLAN_LIMITS, PlanType } from '../services/planService.js';
-import { PlanLimit } from '../models/index.js';
+import { planService } from '../services/planService.js';
+import { PlanLimit, PlanType } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
+
+import type { AsaasSubscription } from '../services/asaasService.js';
 
 const PLAN_PRICES: Record<PlanType, number> = {
   free: 0,
@@ -34,6 +36,10 @@ export const createCheckout = async (
       planLimit = await PlanLimit.findOne({ tenant: user.tenant._id });
     }
 
+    if (!planLimit) {
+      throw new AppError('Plano do tenant nao encontrado', 500);
+    }
+
     // Criar ou buscar cliente no Asaas
     const customerData = {
       name: user.name,
@@ -44,9 +50,9 @@ export const createCheckout = async (
     const asaasCustomer = await asaasService.getOrCreateCustomer(customerData);
 
     // Criar assinatura no Asaas
-    const subscriptionData = {
+    const subscriptionData: AsaasSubscription = {
       customer: asaasCustomer.id,
-      billingType: billingType || 'CREDIT_CARD', // BOLETO, CREDIT_CARD, PIX
+      billingType: (billingType || 'CREDIT_CARD') as AsaasSubscription['billingType'], // BOLETO, CREDIT_CARD, PIX
       value: PLAN_PRICES[plan as PlanType],
       nextDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       cycle: 'MONTHLY',

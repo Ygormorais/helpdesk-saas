@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { Tenant, User, UserRole } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
@@ -22,8 +22,8 @@ const loginSchema = z.object({
 const generateToken = (userId: string, tenantId: string): string => {
   return jwt.sign(
     { userId, tenantId },
-    config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
+    config.jwt.secret as Secret,
+    { expiresIn: config.jwt.expiresIn as SignOptions['expiresIn'] }
   );
 };
 
@@ -101,7 +101,9 @@ export const login = async (
       throw new AppError('Account is inactive', 401);
     }
 
-    const token = generateToken(user._id.toString(), user.tenant._id.toString());
+    const tenant = user.tenant as any;
+
+    const token = generateToken(user._id.toString(), tenant._id.toString());
 
     res.json({
       message: 'Login successful',
@@ -113,9 +115,9 @@ export const login = async (
         role: user.role,
         avatar: user.avatar,
         tenant: {
-          id: user.tenant._id,
-          name: user.tenant.name,
-          slug: (user.tenant as any).slug,
+          id: tenant._id,
+          name: tenant.name,
+          slug: tenant.slug,
         },
       },
     });

@@ -63,8 +63,8 @@ export const getArticles = async (
 ): Promise<void> => {
   const user = req.user!;
   const {
-    page = 1,
-    limit = 20,
+    page = '1',
+    limit = '20',
     category,
     search,
     status,

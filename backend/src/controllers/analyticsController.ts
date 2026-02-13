@@ -329,7 +329,7 @@ export const getRecentActivity = async (
       .sort({ updatedAt: -1 })
       .limit(limit)
       .populate('createdBy', 'name')
-      .select('ticketNumber title status priority updatedAt createdBy'),
+      .select('ticketNumber title status priority updatedAt createdAt createdBy'),
     Comment.find({ tenant: tenantId })
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -340,7 +340,7 @@ export const getRecentActivity = async (
   const activity = [
     ...tickets.map((t) => ({
       type: 'ticket',
-      action: t.status === 'created' ? 'created' : 'updated',
+      action: t.createdAt?.getTime() === t.updatedAt?.getTime() ? 'created' : 'updated',
       ticket: t,
       timestamp: t.updatedAt,
     })),

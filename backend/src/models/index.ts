@@ -3,3 +3,12 @@ export * from './Tenant.js';
 export * from './Ticket.js';
 export * from './Comment.js';
 export * from './Category.js';
+
+export * from './Article.js';
+export * from './AuditLog.js';
+export * from './Chat.js';
+export * from './Invite.js';
+export * from './PlanLimit.js';
+export * from './TimeEntry.js';
+export * from './Webhook.js';
+export * from './Notification.js';

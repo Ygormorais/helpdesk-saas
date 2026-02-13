@@ -1,5 +1,6 @@
 import { Response } from 'express';
-import { planService, PLAN_LIMITS, PlanType } from '../services/planService.js';
+import { planService } from '../services/planService.js';
+import { PLAN_LIMITS, PlanType } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 

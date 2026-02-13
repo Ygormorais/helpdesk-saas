@@ -55,12 +55,10 @@ export const createInvite = async (
       expiresAt,
     });
 
-    await notificationService.notifyUserInvited(
-      data.email,
-      user,
-      user.tenant as Tenant,
-      data.role
-    );
+    const tenant = await Tenant.findById(user.tenant._id);
+    if (tenant) {
+      await notificationService.notifyUserInvited(data.email, user, tenant, data.role);
+    }
 
     res.status(201).json({
       message: 'Invite sent',

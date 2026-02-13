@@ -1,80 +1,85 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ThumbsUp, ThumbsDown, Eye, Clock, User, Share2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-
-const article = {
-  title: 'Como resetar sua senha',
-  slug: 'como-resetar-senha',
-  content: `
-# Como resetar sua senha
-
-Este guia explica passo a passo como recuperar o acesso à sua conta quando você esquecer sua senha.
-
-## Passo 1: Acessar a página de recuperação
-
-1. Acesse a página de login
-2. Clique em "Esqueceu sua senha?"
-3. Digite o email cadastrado na sua conta
-
-## Passo 2: Verificar email
-
-Após solicitar a recuperação, você receberá um email com um link de redefinição. Este link é válido por 24 horas.
-
-**Importante:** Verifique também sua pasta de spam se não encontrar o email na caixa de entrada.
-
-## Passo 3: Criar nova senha
-
-Clique no link recebido e você será direcionado para uma página onde poderá criar uma nova senha.
-
-### Requisitos da senha:
-- Mínimo de 8 caracteres
-- Pelo menos uma letra maiúscula
-- Pelo menos um número
-- Pelo menos um caractere especial
-
-## Passo 4: Fazer login
-
-Após criar a nova senha, faça login com suas credenciais atualizadas.
-
-## Problemas comuns
-
-### Não recebi o email
-- Verifique se o email está correto
-- Confirme que a conta existe
-- Tente solicitar novamente após 15 minutos
-
-### Link expirado
-Os links de recuperação expirem em 24 horas por segurança. Solicite um novo link se necessário.
-
-## Precisa de mais ajuda?
-
-Se você ainda estiver com dificuldades, entre em contato com nosso suporte.
-  `,
-  category: { name: 'Conta', color: '#3B82F6' },
-  author: { name: 'Equipe de Suporte', avatar: 'S' },
-  views: 1250,
-  helpful: { yes: 45, no: 3 },
-  createdAt: '2024-01-10',
-  updatedAt: '2024-01-10',
-  relatedArticles: [
-    { id: '2', title: 'Guia de integração com API', slug: 'integracao-api' },
-    { id: '4', title: 'Comparativo de planos', slug: 'planos-precos' },
-  ],
-};
+import { articlesApi } from '@/api/articles';
 
 export default function ArticleDetailPage() {
+  const { slug } = useParams();
+  const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<'yes' | 'no' | null>(null);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackComment, setFeedbackComment] = useState('');
 
+  const articleQuery = useQuery({
+    queryKey: ['article', slug],
+    enabled: !!slug,
+    queryFn: async () => {
+      const res = await articlesApi.getBySlug(slug!);
+      return res.data.article;
+    },
+  });
+
+  const article: any = articleQuery.data;
+
+  const html = useMemo(() => {
+    const content = article?.content || '';
+    return content
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+      .replace(/\n\n/g, '<br/><br/>');
+  }, [article?.content]);
+
+  const voteMutation = useMutation({
+    mutationFn: async (helpful: boolean) => {
+      if (!article?._id) return;
+      await articlesApi.vote(article._id, helpful);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['article', slug] });
+    },
+  });
+
   const handleFeedback = (type: 'yes' | 'no') => {
     setFeedback(type);
     setShowFeedbackForm(true);
+    voteMutation.mutate(type === 'yes');
   };
+
+  if (!slug) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <p className="text-muted-foreground">Slug invalido</p>
+      </div>
+    );
+  }
+
+  if (articleQuery.isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (articleQuery.isError || !article) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <p className="text-destructive">Erro ao carregar artigo</p>
+        <Link to="/knowledge">
+          <Button variant="outline">Voltar</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -87,9 +92,9 @@ export default function ArticleDetailPage() {
         <div className="flex-1">
           <span
             className="px-3 py-1 rounded-full text-xs font-medium text-white"
-            style={{ backgroundColor: article.category.color }}
+            style={{ backgroundColor: article.category?.color || '#6B7280' }}
           >
-            {article.category.name}
+            {article.category?.name || 'Sem categoria'}
           </span>
         </div>
         <Button variant="ghost" size="icon">
@@ -108,11 +113,11 @@ export default function ArticleDetailPage() {
         </div>
         <div className="flex items-center gap-1">
           <Clock className="h-4 w-4" />
-          <span>Atualizado em {article.updatedAt}</span>
+          <span>Atualizado em {article.updatedAt ? new Date(article.updatedAt).toLocaleDateString('pt-BR') : ''}</span>
         </div>
         <div className="flex items-center gap-1">
           <Eye className="h-4 w-4" />
-          <span>{article.views} visualizações</span>
+          <span>{article.views || 0} visualizações</span>
         </div>
       </div>
 
@@ -120,13 +125,8 @@ export default function ArticleDetailPage() {
         <CardContent className="pt-6 prose prose-sm max-w-none dark:prose-invert">
           <div dangerouslySetInnerHTML={{
             __html: article.content
-              .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-              .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-              .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-              .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-              .replace(/^- (.+)$/gm, '<li>$1</li>')
-              .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-              .replace(/\n\n/g, '<br/><br/>')
+              ? html
+              : ''
           }} />
         </CardContent>
       </Card>
@@ -175,34 +175,12 @@ export default function ArticleDetailPage() {
           )}
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground pt-4 border-t">
-            <span>{article.helpful.yes} pessoas acharam útil</span>
+            <span>{article.helpful?.yes || 0} pessoas acharam útil</span>
             <span>|</span>
-            <span>{article.helpful.no} pessoas não acharam útil</span>
+            <span>{article.helpful?.no || 0} pessoas não acharam útil</span>
           </div>
         </CardContent>
       </Card>
-
-      {article.relatedArticles.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Artigos relacionados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {article.relatedArticles.map((related) => (
-                <li key={related.id}>
-                  <Link
-                    to={`/knowledge/${related.slug}`}
-                    className="text-primary hover:underline"
-                  >
-                    {related.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="text-center py-8 border-t">
         <p className="text-muted-foreground mb-4">Ainda tem dúvidas?</p>

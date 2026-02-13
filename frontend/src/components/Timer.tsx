@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Play, Pause, Square, Clock, Plus } from 'lucide-react';
+import { Play, Square, Clock, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useTimeTracking } from '@/contexts/TimeTrackingContext';
 
 interface TimerProps {
   ticketId?: string;
@@ -23,7 +24,7 @@ export default function Timer({
   onTimerStart,
   onTimerStop,
 }: TimerProps) {
-  const { activeTimer, elapsedSeconds, isRunning, startTimer, stopTimer, formatElapsedTime } = useTimeTracking();
+  const { activeTimer, isRunning, startTimer, stopTimer, formatElapsedTime } = useTimeTracking();
   const [manualHours, setManualHours] = useState('');
   const [manualMinutes, setManualMinutes] = useState('');
   const [description, setDescription] = useState('');
@@ -77,12 +78,12 @@ export default function Timer({
     }
   };
 
-  const activeForTicket = activeTimer?.ticket._id === ticketId;
+  const activeForTicket = !!activeTimer && activeTimer.ticket._id === ticketId;
 
   if (variant === 'compact') {
     return (
       <div className="flex items-center gap-2">
-        {isRunning && activeForTicket ? (
+        {activeForTicket ? (
           <>
             <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full">
               <Clock className="h-4 w-4 animate-pulse" />
@@ -110,7 +111,7 @@ export default function Timer({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isRunning && activeForTicket ? (
+        {activeForTicket ? (
           <div className="text-center">
             <div className="text-4xl font-mono font-bold text-primary">
               {formatElapsedTime()}

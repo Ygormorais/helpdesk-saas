@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Edit, Trash, Eye, FileText } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,19 +23,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-
-const articles = [
-  { id: '1', title: 'Como resetar sua senha', status: 'published', category: 'Conta', author: 'Admin', views: 1250, createdAt: '2024-01-10' },
-  { id: '2', title: 'Guia de integração com API', status: 'published', category: 'Desenvolvimento', author: 'Admin', views: 890, createdAt: '2024-01-08' },
-  { id: '3', title: 'Configurando Webhooks', status: 'draft', category: 'Desenvolvimento', author: 'Admin', views: 0, createdAt: '2024-01-05' },
-  { id: '4', title: 'Comparativo de planos', status: 'published', category: 'Billing', author: 'Admin', views: 543, createdAt: '2024-01-03' },
-  { id: '5', title: 'Segurança e proteção de dados', status: 'draft', category: 'Segurança', author: 'Admin', views: 0, createdAt: '2024-01-01' },
-];
+import { articlesApi } from '@/api/articles';
+import { categoriesApi } from '@/api/categories';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminArticlesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [newArticle, setNewArticle] = useState({
     title: '',
     content: '',
@@ -43,17 +41,70 @@ export default function AdminArticlesPage() {
     tags: '',
   });
 
-  const filteredArticles = articles.filter((article) => {
-    const matchesSearch = article.title.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || article.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await categoriesApi.list();
+      return res.data.categories as Array<{ _id: string; name: string }>;
+    },
   });
 
-  const handleCreateArticle = () => {
-    console.log('Creating article:', newArticle);
-    setIsDialogOpen(false);
-    setNewArticle({ title: '', content: '', excerpt: '', category: '', tags: '' });
-  };
+  const listQuery = useQuery({
+    queryKey: ['articles', 'admin', { search, statusFilter }],
+    queryFn: async () => {
+      const res = await articlesApi.listAdmin({
+        page: 1,
+        limit: 50,
+        search: search.trim() ? search.trim() : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+      });
+      return res.data.articles;
+    },
+  });
+
+  const articles = listQuery.data || [];
+
+  const createMutation = useMutation({
+    mutationFn: async (isPublished: boolean) => {
+      const tags = newArticle.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      await articlesApi.create({
+        title: newArticle.title,
+        content: newArticle.content,
+        excerpt: newArticle.excerpt || undefined,
+        category: newArticle.category || undefined,
+        tags: tags.length ? tags : undefined,
+        isPublished,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['articles', 'admin'] });
+      queryClient.invalidateQueries({ queryKey: ['articles', 'public'] });
+      toast({ title: 'Artigo salvo' });
+      setIsDialogOpen(false);
+      setNewArticle({ title: '', content: '', excerpt: '', category: '', tags: '' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao salvar artigo',
+        description: error.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await articlesApi.remove(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['articles', 'admin'] });
+      queryClient.invalidateQueries({ queryKey: ['articles', 'public'] });
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -103,10 +154,11 @@ export default function AdminArticlesPage() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="conta">Conta</SelectItem>
-                      <SelectItem value="dev">Desenvolvimento</SelectItem>
-                      <SelectItem value="billing">Billing</SelectItem>
-                      <SelectItem value="seguranca">Segurança</SelectItem>
+                      {(categoriesQuery.data || []).map((c) => (
+                        <SelectItem key={c._id} value={c._id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -135,8 +187,16 @@ export default function AdminArticlesPage() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button variant="outline">Salvar Rascunho</Button>
-              <Button onClick={handleCreateArticle}>Publicar</Button>
+              <Button
+                variant="outline"
+                onClick={() => createMutation.mutate(false)}
+                disabled={createMutation.isPending}
+              >
+                Salvar Rascunho
+              </Button>
+              <Button onClick={() => createMutation.mutate(true)} disabled={createMutation.isPending}>
+                Publicar
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -172,8 +232,15 @@ export default function AdminArticlesPage() {
       </Card>
 
       <div className="grid gap-4">
-        {filteredArticles.map((article) => (
-          <Card key={article.id}>
+        {listQuery.isLoading && (
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        )}
+        {listQuery.isError && (
+          <p className="text-sm text-destructive">Erro ao carregar artigos</p>
+        )}
+
+        {articles.map((article: any) => (
+          <Card key={article._id}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -184,26 +251,26 @@ export default function AdminArticlesPage() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium">{article.title}</h3>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        article.status === 'published'
+                        article.isPublished
                           ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {article.status === 'published' ? 'Publicado' : 'Rascunho'}
+                        {article.isPublished ? 'Publicado' : 'Rascunho'}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                      <span>{article.category}</span>
+                      <span>{article.category?.name || 'Sem categoria'}</span>
                       <span>•</span>
-                      <span>{article.author}</span>
+                      <span>{article.author?.name || '-'}</span>
                       <span>•</span>
-                      <span>{article.views} visualizações</span>
+                      <span>{article.views || 0} visualizações</span>
                       <span>•</span>
-                      <span>{article.createdAt}</span>
+                      <span>{article.createdAt ? new Date(article.createdAt).toLocaleDateString('pt-BR') : ''}</span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Link to={`/knowledge/${article.id}`}>
+                  <Link to={`/knowledge/${article.slug}`}>
                     <Button variant="ghost" size="icon">
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -211,7 +278,16 @@ export default function AdminArticlesPage() {
                   <Button variant="ghost" size="icon">
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => {
+                      if (window.confirm('Excluir este artigo?')) {
+                        deleteMutation.mutate(article._id);
+                      }
+                    }}
+                  >
                     <Trash className="h-4 w-4" />
                   </Button>
                 </div>

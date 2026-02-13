@@ -1,38 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import clientData from '../../data/clients.json'
-import TechNovaLogo from '@/assets/logos/technova.svg'
-import VivaLogLogo from '@/assets/logos/vivalog.svg'
-import SolarisLogo from '@/assets/logos/solaris.svg'
-import NebulaLogo from '@/assets/logos/nebula.svg'
-import GreenWaveLogo from '@/assets/logos/greenwave.svg'
-import AeroSmartLogo from '@/assets/logos/aerosmart.svg'
-import TechBridgeLogo from '@/assets/logos/techbridge.svg'
-import CidadeTechLogo from '@/assets/logos/cidadetech.svg'
-import PulseSoftLogo from '@/assets/logos/pulsesoft.svg'
-
-type Cliente = {
-  name: string
-  color: string
-}
 
 type Slide = {
-  items: { name: string; color: string }[]
+  items: { name: string; color: string; logo?: string }[]
 }
 
 // Load client slides from external JSON
 const slides: Slide[] = (clientData as { slides?: Slide[] }).slides ?? []
 
-// Map logo identifiers to actual imported assets
+// Map logo identifiers to actual asset paths
 const logos: Record<string, string> = {
-  technova: TechNovaLogo,
-  vivalog: VivaLogLogo,
-  solaris: SolarisLogo,
-  nebula: NebulaLogo,
-  greenwave: GreenWaveLogo,
-  aerosmart: AeroSmartLogo,
-  techbridge: TechBridgeLogo,
-  cidadetech: CidadeTechLogo,
-  pulsesoft: PulseSoftLogo,
+  technova: '/assets/logos/technova.svg',
+  vivalog: '/assets/logos/vivalog.svg',
+  solaris: '/assets/logos/solaris.svg',
+  nebula: '/assets/logos/nebula.svg',
+  greenwave: '/assets/logos/greenwave.svg',
+  aerosmart: '/assets/logos/aerosmart.svg',
+  techbridge: '/assets/logos/techbridge.svg',
+  cidadetech: '/assets/logos/cidadetech.svg',
+  pulsesoft: '/assets/logos/pulsesoft.svg',
 }
 
 export const ClientCarousel: React.FC = () => {
@@ -49,6 +35,10 @@ export const ClientCarousel: React.FC = () => {
 
   const current = useMemo(() => slides[index], [index])
 
+  if (!current || slides.length === 0) {
+    return null
+  }
+
   return (
     <section className="py-12 bg-gradient-to-b from-white/60 to-white/40">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-6">
@@ -59,13 +49,13 @@ export const ClientCarousel: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-center items-center space-x-8 overflow-hidden py-6">
           {current.items.map((c, i) => {
-            const logoPath = (logos as any)[(c as any).logo]
+            const logoPath = c.logo ? logos[c.logo] : null
             return (
               <div key={i} className="flex flex-col items-center">
                 {logoPath ? (
                   <img src={logoPath} alt={c.name} className="w-20 h-20 object-contain" />
                 ) : (
-                  <div className="w-20 h-20 rounded-full shadow-md" style={{ background: (c as any).color }} />
+                  <div className="w-20 h-20 rounded-full shadow-md" style={{ background: c.color }} />
                 )}
                 <span className="mt-2 text-sm font-semibold text-gray-700">{c.name}</span>
               </div>

@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { PlanLimit, PLAN_LIMITS, PlanType, User, Ticket } from '../models/index.js';
+import { PlanLimit, PLAN_LIMITS, PlanType, User, Ticket, type IPlanLimit } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
@@ -27,12 +27,16 @@ export class PlanService {
     });
   }
 
-  async getPlanForTenant(tenantId: string) {
+  async getPlanForTenant(tenantId: string): Promise<IPlanLimit> {
     let planLimit = await PlanLimit.findOne({ tenant: tenantId });
     
     if (!planLimit) {
       await this.initializeTenantPlan(tenantId);
       planLimit = await PlanLimit.findOne({ tenant: tenantId });
+    }
+
+    if (!planLimit) {
+      throw new AppError('Plano do tenant nao encontrado', 500);
     }
 
     return planLimit;

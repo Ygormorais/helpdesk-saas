@@ -1,6 +1,5 @@
-import { Ticket, User, Comment, Tenant, IUser } from '../models/index.js';
+import { Tenant, User, type ITenant, type IUser, Notification, NotificationType } from '../models/index.js';
 import { emailTemplates, sendEmail } from './emailService.js';
-import { App } from '../index.js';
 
 interface NotificationPayload {
   type: string;
@@ -25,9 +24,47 @@ export class NotificationService {
     }
   }
 
-  async notifyTicketCreated(ticket: any, createdBy: IUser): Promise<void> {
-    const tenant = await Tenant.findById(ticket.tenant);
+  private async createAndEmit(args: {
+    tenantId: string;
+    type: NotificationType;
+    title: string;
+    message: string;
+    data: Record<string, any>;
+    ticketId?: string;
+    chatId?: string;
+    createdById?: string;
+  }): Promise<void> {
+    try {
+      const doc = await Notification.create({
+        tenant: args.tenantId,
+        type: args.type,
+        title: args.title,
+        message: args.message,
+        data: args.data,
+        ticket: args.ticketId,
+        chat: args.chatId,
+        createdBy: args.createdById,
+        readBy: [],
+      });
 
+      this.emitToTenant(args.tenantId, 'notification:created', {
+        id: doc._id,
+        type: doc.type,
+        title: doc.title,
+        message: doc.message,
+        data: doc.data,
+        ticketId: doc.ticket,
+        chatId: doc.chat,
+        createdBy: doc.createdBy,
+        createdAt: doc.createdAt,
+        read: false,
+      });
+    } catch {
+      // Notification persistence is best-effort; realtime events still work.
+    }
+  }
+
+  async notifyTicketCreated(ticket: any, createdBy: IUser): Promise<void> {
     const payload: NotificationPayload = {
       type: 'TICKET_CREATED',
       data: {
@@ -44,6 +81,15 @@ export class NotificationService {
     };
 
     this.emitToTenant(payload.tenantId, 'ticket:created', payload.data);
+    await this.createAndEmit({
+      tenantId: payload.tenantId,
+      type: NotificationType.TICKET_CREATED,
+      title: 'Novo Ticket',
+      message: `Ticket "${ticket.title}" foi criado por ${createdBy.name}`,
+      data: payload.data,
+      ticketId: ticket._id.toString(),
+      createdById: createdBy._id.toString(),
+    });
 
     const agents = await User.find({
       tenant: ticket.tenant,
@@ -106,6 +152,15 @@ export class NotificationService {
     };
 
     this.emitToTenant(payload.tenantId, 'ticket:updated', payload.data);
+    await this.createAndEmit({
+      tenantId: payload.tenantId,
+      type: NotificationType.TICKET_UPDATED,
+      title: 'Ticket Atualizado',
+      message: `Ticket "${ticket.title}" foi atualizado`,
+      data: payload.data,
+      ticketId: ticket._id.toString(),
+      createdById: updatedBy._id.toString(),
+    });
 
     if (ticket.assignedTo && updatedBy._id.toString() !== ticket.assignedTo.toString()) {
       const assignee = await User.findById(ticket.assignedTo);
@@ -121,6 +176,35 @@ export class NotificationService {
         });
       }
     }
+  }
+
+  async notifyTicketAssigned(
+    tenantId: string,
+    ticketId: string,
+    ticketTitle: string,
+    assignedToName: string,
+    assignedByName: string
+  ): Promise<void> {
+    const payload: NotificationPayload = {
+      type: 'TICKET_ASSIGNED',
+      data: {
+        ticketId,
+        title: ticketTitle,
+        assignedTo: assignedToName,
+        assignedBy: assignedByName,
+      },
+      tenantId,
+    };
+
+    this.emitToTenant(tenantId, 'ticket:assigned', payload.data);
+    await this.createAndEmit({
+      tenantId,
+      type: NotificationType.TICKET_ASSIGNED,
+      title: 'Ticket Atribuido',
+      message: `Ticket "${ticketTitle}" foi atribuido para ${assignedToName} por ${assignedByName}`,
+      data: payload.data,
+      ticketId,
+    });
   }
 
   async notifyNewComment(ticket: any, comment: any, author: IUser): Promise<void> {
@@ -140,6 +224,15 @@ export class NotificationService {
     };
 
     this.emitToTenant(payload.tenantId, 'comment:created', payload.data);
+    await this.createAndEmit({
+      tenantId: payload.tenantId,
+      type: NotificationType.COMMENT_CREATED,
+      title: 'Novo Comentario',
+      message: `${author.name} comentou no ticket "${ticket.title}"`,
+      data: payload.data,
+      ticketId: ticket._id.toString(),
+      createdById: author._id.toString(),
+    });
 
     const customer = await User.findById(ticket.createdBy);
     const assignee = ticket.assignedTo ? await User.findById(ticket.assignedTo) : null;
@@ -190,6 +283,15 @@ export class NotificationService {
     };
 
     this.emitToTenant(payload.tenantId, 'ticket:resolved', payload.data);
+    await this.createAndEmit({
+      tenantId: payload.tenantId,
+      type: NotificationType.TICKET_RESOLVED,
+      title: 'Ticket Resolvido',
+      message: `Ticket "${ticket.title}" foi resolvido`,
+      data: payload.data,
+      ticketId: ticket._id.toString(),
+      createdById: resolvedBy._id.toString(),
+    });
 
     const customer = await User.findById(ticket.createdBy);
     if (customer) {
@@ -205,7 +307,7 @@ export class NotificationService {
     }
   }
 
-  async notifyUserInvited(invitedEmail: string, inviter: IUser, tenant: Tenant, role: string): Promise<void> {
+  async notifyUserInvited(invitedEmail: string, inviter: IUser, tenant: ITenant, role: string): Promise<void> {
     await sendEmail({
       to: invitedEmail,
       ...emailTemplates.inviteUser({

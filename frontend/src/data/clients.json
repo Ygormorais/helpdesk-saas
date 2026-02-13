@@ -17,7 +17,7 @@
     {
       "items": [
         { "name": "TechBridge", "color": "#3b82f6", "logo": "techbridge" },
-        { "name": "CidadeTech", "color": "#0e7490", "logo": "cidatech" },
+        { "name": "CidadeTech", "color": "#0e7490", "logo": "cidadetech" },
         { "name": "PulseSoft", "color": "#f472b6", "logo": "pulsesoft" }
       ]
     }

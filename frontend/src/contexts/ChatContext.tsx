@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -55,6 +55,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState<{ userId: string; chatId: string } | null>(null);
 
+  const apiBaseUrl = useMemo(() => import.meta.env.VITE_API_URL || '/api', []);
+
   useEffect(() => {
     if (isAuthenticated && token) {
       const newSocket = io(SOCKET_URL, {
@@ -63,7 +65,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       newSocket.on('connect', () => {
         console.log('Socket connected');
-        newSocket.emit('authenticate', { token, tenantId: user?.tenant?._id });
+        newSocket.emit('authenticate', { token, tenantId: user?.tenant?.id || '' });
       });
 
       newSocket.on('authenticated', (data: { success: boolean }) => {
@@ -73,7 +75,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
 
       newSocket.on('new-message', (message: ChatMessage) => {
-        setMessages((prev) => [...prev, message]);
+        if (message.chat === currentChat?._id) {
+          setMessages((prev) => [...prev, message]);
+        }
         refreshChats();
       });
 
@@ -104,6 +108,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      newSocket.on('online-users', (users: string[]) => {
+        setOnlineUsers(users);
+      });
+
       setSocket(newSocket);
 
       return () => {
@@ -114,7 +122,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const refreshChats = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/chat`, {
+      const response = await fetch(`${apiBaseUrl}/chat`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -143,7 +151,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!currentChat) return;
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/chat/${currentChat._id}/messages`,
+        `${apiBaseUrl}/chat/${currentChat._id}/messages`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }

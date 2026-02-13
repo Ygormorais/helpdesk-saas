@@ -1,12 +1,13 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.js';
-import { auditService, AuditAction } from '../services/auditService.js';
+import { auditService } from '../services/auditService.js';
+import { AuditAction } from '../models/index.js';
 import { z } from 'zod';
 
 const querySchema = z.object({
   page: z.coerce.number().default(1),
   limit: z.coerce.number().default(50),
-  action: z.string().optional(),
+  action: z.nativeEnum(AuditAction).optional(),
   userId: z.string().optional(),
   resource: z.string().optional(),
   startDate: z.string().optional().transform((v) => (v ? new Date(v) : undefined)),

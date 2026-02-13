@@ -19,11 +19,10 @@ interface Chat {
 }
 
 export default function ChatPage() {
-  const { chats, currentChat, setCurrentChat, messages, sendMessage, isTyping } = useChat();
+  const { chats, currentChat, setCurrentChat, messages, sendMessage, isTyping, startTyping, stopTyping, markAsRead, onlineUsers } = useChat();
   const { user } = useAuth();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,6 +36,7 @@ export default function ChatPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
+    startTyping();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -45,6 +45,19 @@ export default function ChatPage() {
       handleSendMessage();
     }
   };
+
+  useEffect(() => {
+    if (currentChat) {
+      markAsRead();
+    }
+  }, [currentChat]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      stopTyping();
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [inputValue]);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -98,9 +111,10 @@ export default function ChatPage() {
             </div>
           ) : (
             <div className="space-y-1">
-              {chats.map((chat) => {
-                const otherParticipant = getOtherParticipant(chat);
-                return (
+                  {chats.map((chat) => {
+                    const otherParticipant = getOtherParticipant(chat);
+                    const isOnline = !!otherParticipant && onlineUsers.includes(otherParticipant._id);
+                    return (
                   <div
                     key={chat._id}
                     onClick={() => setCurrentChat(chat)}
@@ -108,14 +122,16 @@ export default function ChatPage() {
                       currentChat?._id === chat._id ? 'bg-primary/10' : 'hover:bg-muted'
                     }`}
                   >
-                    <div className="relative">
+                      <div className="relative">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={otherParticipant?.avatar} />
                         <AvatarFallback className="bg-primary/10 text-primary">
                           {otherParticipant ? getInitials(otherParticipant.name) : '??'}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+                      {isOnline && (
+                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -176,8 +192,8 @@ export default function ChatPage() {
                         .join(', ')}
                     </CardTitle>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
-                      Online
+                      <span className={`h-2 w-2 rounded-full ${onlineUsers.includes(getOtherParticipant(currentChat as any)?._id) ? 'bg-green-500' : 'bg-gray-400'}`} />
+                      {onlineUsers.includes(getOtherParticipant(currentChat as any)?._id) ? 'Online' : 'Offline'}
                     </p>
                   </div>
                 </div>

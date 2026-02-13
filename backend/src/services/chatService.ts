@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { Chat, Message, IChat } from '../models/index.js';
+import { Chat, Message, Notification, NotificationType } from '../models/index.js';
 
 interface ConnectedUser {
   socketId: string;
@@ -74,9 +74,16 @@ class ChatService {
 
       socket.join(`tenant:${decoded.tenantId}`);
       console.log(`User ${decoded.userId} authenticated on socket ${socket.id}`);
+
+      this.emitOnlineUsers(decoded.tenantId);
     } catch (error) {
       socket.emit('authenticated', { success: false, error: 'Invalid token' });
     }
+  }
+
+  private emitOnlineUsers(tenantId: string) {
+    const users = this.getOnlineUsers(tenantId).map((u) => u.userId);
+    this.io?.to(`tenant:${tenantId}`).emit('online-users', users);
   }
 
   private async handleNewMessage(socket: Socket, data: { chatId: string; content: string; senderId: string }) {
@@ -114,6 +121,37 @@ class ChatService {
         message,
       });
 
+       // Persist notification (best-effort)
+       try {
+         const doc = await Notification.create({
+           tenant: user.tenantId,
+           type: NotificationType.CHAT_MESSAGE,
+           title: 'Nova mensagem',
+           message: 'Voce recebeu uma nova mensagem no chat',
+           data: {
+             chatId: data.chatId,
+             messageId: message._id,
+           },
+           chat: data.chatId,
+           createdBy: data.senderId,
+           readBy: [data.senderId],
+         });
+
+         this.io?.to(`tenant:${user.tenantId}`).emit('notification:created', {
+           id: doc._id,
+           type: doc.type,
+           title: doc.title,
+           message: doc.message,
+           data: doc.data,
+           chatId: doc.chat,
+           createdBy: doc.createdBy,
+           createdAt: doc.createdAt,
+           read: false,
+         });
+       } catch {
+         // ignore
+       }
+
     } catch (error) {
       socket.emit('error', { message: 'Failed to send message' });
     }
@@ -143,6 +181,8 @@ class ChatService {
     if (user) {
       console.log(`User ${user.userId} disconnected`);
       this.connectedUsers.delete(socket.id);
+
+      this.emitOnlineUsers(user.tenantId);
     }
   }
 

@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ChatProvider } from '@/contexts/ChatContext';
 import { TimeTrackingProvider } from '@/contexts/TimeTrackingContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -12,6 +13,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import ReportsPage from '@/pages/ReportsPage';
 import TicketsPage from '@/pages/TicketsPage';
 import TicketDetailPage from '@/pages/TicketDetailPage';
+import TicketNewPage from '@/pages/TicketNewPage';
 import CategoriesPage from '@/pages/CategoriesPage';
 import KnowledgeBasePage from '@/pages/KnowledgeBasePage';
 import ArticleDetailPage from '@/pages/ArticleDetailPage';
@@ -25,6 +27,7 @@ import SatisfactionPage from '@/pages/SatisfactionPage';
 import TimeReportsPage from '@/pages/TimeReportsPage';
 import PlansPage from '@/pages/PlansPage';
 import LandingPage from '@/pages/LandingPage';
+import NotificationsPage from '@/pages/NotificationsPage';
 import { useAuth } from '@/contexts/AuthContext';
 
 const queryClient = new QueryClient({
@@ -62,20 +65,22 @@ function AppRoutes() {
       
       {/* Protected Routes */}
       <Route
-        path="/"
         element={
           <ProtectedRoute>
-            <TimeTrackingProvider>
-              <ChatProvider>
-                <Layout />
-              </ChatProvider>
-            </TimeTrackingProvider>
+            <NotificationProvider>
+              <TimeTrackingProvider>
+                <ChatProvider>
+                  <Layout />
+                </ChatProvider>
+              </TimeTrackingProvider>
+            </NotificationProvider>
           </ProtectedRoute>
         }
       >
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="tickets" element={<TicketsPage />} />
+        <Route path="tickets/new" element={<TicketNewPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="knowledge" element={<KnowledgeBasePage />} />
@@ -86,6 +91,7 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="chat" element={<ChatPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="satisfaction" element={<SatisfactionPage />} />
         <Route path="time" element={<TimeReportsPage />} />
         <Route path="plans" element={<PlansPage />} />

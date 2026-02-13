@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,14 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-const tickets = [
-  { id: '1', ticketNumber: 'TKT-00001', title: 'Problema no login', status: 'open', priority: 'high', category: 'Técnico', createdBy: 'João Silva', createdAt: '2024-01-15' },
-  { id: '2', ticketNumber: 'TKT-00002', title: 'Dúvida sobre cobrança', status: 'in_progress', priority: 'medium', category: 'Financeiro', createdBy: 'Maria Santos', createdAt: '2024-01-14' },
-  { id: '3', ticketNumber: 'TKT-00003', title: 'Erro no sistema', status: 'resolved', priority: 'urgent', category: 'Técnico', createdBy: 'Pedro Oliveira', createdAt: '2024-01-13' },
-  { id: '4', ticketNumber: 'TKT-00004', title: 'Solicitação de acesso', status: 'waiting_customer', priority: 'low', category: 'Administrativo', createdBy: 'Ana Costa', createdAt: '2024-01-12' },
-  { id: '5', ticketNumber: 'TKT-00005', title: 'Feedback sobre atendimento', status: 'open', priority: 'low', category: 'Geral', createdBy: 'Lucas Mendes', createdAt: '2024-01-11' },
-];
+import { ticketsApi } from '@/api/tickets';
 
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -67,13 +61,24 @@ export default function TicketsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
 
-  const filteredTickets = tickets.filter((ticket) => {
-    const matchesSearch = ticket.title.toLowerCase().includes(search.toLowerCase()) ||
-      ticket.ticketNumber.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['tickets', { search, statusFilter, priorityFilter }],
+    queryFn: async () => {
+      const res = await ticketsApi.list({
+        page: 1,
+        limit: 50,
+        search: search.trim() ? search.trim() : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+      });
+      return res.data as {
+        tickets: Array<any>;
+        pagination: { page: number; limit: number; total: number; pages: number };
+      };
+    },
   });
+
+  const tickets = useMemo(() => data?.tickets || [], [data]);
 
   return (
     <div className="space-y-6">
@@ -145,23 +150,46 @@ export default function TicketsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredTickets.map((ticket) => (
-                <tr key={ticket.id} className="border-b last:border-0 hover:bg-muted/50">
+              {isLoading && (
+                <tr>
+                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={7}>
+                    Carregando tickets...
+                  </td>
+                </tr>
+              )}
+              {isError && (
+                <tr>
+                  <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={7}>
+                    Erro ao carregar tickets
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !isError && tickets.length === 0 && (
+                <tr>
+                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={7}>
+                    Nenhum ticket encontrado
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !isError && tickets.map((ticket) => (
+                <tr key={ticket._id} className="border-b last:border-0 hover:bg-muted/50">
                   <td className="px-4 py-3">
-                    <Link to={`/tickets/${ticket.id}`} className="font-medium text-primary hover:underline">
+                    <Link to={`/tickets/${ticket._id}`} className="font-medium text-primary hover:underline">
                       {ticket.ticketNumber}
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <Link to={`/tickets/${ticket.id}`} className="hover:underline">
+                    <Link to={`/tickets/${ticket._id}`} className="hover:underline">
                       {ticket.title}
                     </Link>
                   </td>
                   <td className="px-4 py-3">{getStatusBadge(ticket.status)}</td>
                   <td className="px-4 py-3">{getPriorityBadge(ticket.priority)}</td>
-                  <td className="px-4 py-3 text-sm">{ticket.category}</td>
-                  <td className="px-4 py-3 text-sm">{ticket.createdBy}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{ticket.createdAt}</td>
+                  <td className="px-4 py-3 text-sm">{ticket.category?.name || '-'}</td>
+                  <td className="px-4 py-3 text-sm">{ticket.createdBy?.name || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                    {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('pt-BR') : '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>

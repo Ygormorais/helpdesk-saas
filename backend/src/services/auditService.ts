@@ -82,7 +82,7 @@ export class AuditService {
         user: log.user,
         resource: log.resource,
         resourceId: log.resourceId,
-        details: Object.fromEntries(log.details || {}),
+        details: Object.fromEntries(log.details ? log.details.entries() : []),
         ip: log.ip,
         userAgent: log.userAgent,
         createdAt: log.createdAt,

@@ -11,7 +11,6 @@ const createChatSchema = z.object({
 });
 
 const sendMessageSchema = z.object({
-  chatId: z.string(),
   content: z.string().min(1),
 });
 
@@ -95,11 +94,12 @@ export const sendMessage = async (
   res: Response
 ): Promise<void> => {
   try {
+    const { id } = req.params;
     const data = sendMessageSchema.parse(req.body);
     const user = req.user!;
 
     const chat = await Chat.findOne({
-      _id: data.chatId,
+      _id: id,
       participants: user._id,
       status: 'active',
     });
@@ -109,7 +109,7 @@ export const sendMessage = async (
     }
 
     const message = await Message.create({
-      chat: data.chatId,
+      chat: id,
       sender: user._id,
       content: data.content,
       readBy: [user._id],

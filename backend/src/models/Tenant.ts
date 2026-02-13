@@ -16,6 +16,10 @@ export interface ITenant extends Document {
     };
     slaResponseTime: number;
     slaResolutionTime: number;
+
+    // OLA (internal agreement) - optional, defaults to SLA values
+    olaOwnTime?: number;
+    olaResolutionTime?: number;
   };
   subscription: {
     plan: 'free' | 'starter' | 'professional' | 'enterprise';
@@ -82,6 +86,12 @@ const tenantSchema = new Schema<ITenant>(
         type: Number,
         default: 24,
       },
+      olaOwnTime: {
+        type: Number,
+      },
+      olaResolutionTime: {
+        type: Number,
+      },
     },
     subscription: {
       plan: {
@@ -105,8 +115,5 @@ const tenantSchema = new Schema<ITenant>(
     timestamps: true,
   }
 );
-
-tenantSchema.index({ slug: 1 });
-tenantSchema.index({ domain: 1 });
 
 export const Tenant = mongoose.model<ITenant>('Tenant', tenantSchema);

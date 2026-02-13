@@ -4,7 +4,17 @@ import path from 'path';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
+  plugins: [
+    react({
+      include: '**/*.{jsx,js,tsx,ts}',
+    }),
+    tsconfigPaths()
+  ],
+  esbuild: {
+    include: /\.[jt]sx?$/,
+    exclude: [],
+    loader: 'tsx',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -16,11 +26,11 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/socket.io': {
         target: 'http://localhost:3000',
         ws: true,
+        changeOrigin: true,
       },
     },
   },

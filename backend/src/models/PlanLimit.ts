@@ -39,7 +39,15 @@ export interface IPlanLimit extends Document {
   updatedAt: Date;
 }
 
-export const PLAN_LIMITS: Record<PlanType, Omit<IPlanLimit, '_id' | 'tenant' | 'currentUsage' | 'subscription' | 'createdAt' | 'updatedAt'>> = {
+export interface PlanLimitConfig {
+  plan: PlanType;
+  maxAgents: number;
+  maxTickets: number;
+  maxStorage: number;
+  features: IPlanLimit['features'];
+}
+
+export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
   [PlanType.FREE]: {
     plan: PlanType.FREE,
     maxAgents: 1,
