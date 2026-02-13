@@ -4,9 +4,13 @@ import { AuthRequest } from '../middlewares/auth.js';
 import { z } from 'zod';
 
 const listQuerySchema = z.object({
-  page: z.coerce.number().default(1),
-  limit: z.coerce.number().default(50),
-  unreadOnly: z.coerce.boolean().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  unreadOnly: z.preprocess((v) => {
+    if (v === 'true' || v === '1' || v === true) return true;
+    if (v === 'false' || v === '0' || v === false) return false;
+    return v;
+  }, z.boolean().optional()),
 });
 
 export const listNotifications = async (req: AuthRequest, res: Response): Promise<void> => {

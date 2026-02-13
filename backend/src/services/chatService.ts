@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { Chat, Message, Notification, NotificationType } from '../models/index.js';
+import { Chat, Message, Notification, NotificationType, User } from '../models/index.js';
 
 interface ConnectedUser {
   socketId: string;
@@ -18,33 +18,50 @@ class ChatService {
     io.on('connection', (socket: Socket) => {
       console.log(`Client connected: ${socket.id}`);
 
-      socket.on('authenticate', async (data: { token: string; tenantId: string }) => {
+      socket.on('authenticate', async (data: { token: string; tenantId?: string }) => {
         await this.handleAuthentication(socket, data);
       });
 
-      socket.on('join-chat', (chatId: string) => {
+      socket.on('join-chat', async (chatId: string) => {
+        const user = this.connectedUsers.get(socket.id);
+        if (!user) return socket.emit('error', { message: 'Not authenticated' });
+
+        const chat = await Chat.findOne({
+          _id: chatId,
+          tenant: user.tenantId,
+          participants: user.userId,
+          status: 'active',
+        }).select('_id');
+
+        if (!chat) return socket.emit('error', { message: 'Forbidden' });
+
         socket.join(`chat:${chatId}`);
-        console.log(`Socket ${socket.id} joined chat:${chatId}`);
       });
 
       socket.on('leave-chat', (chatId: string) => {
         socket.leave(`chat:${chatId}`);
       });
 
-      socket.on('send-message', async (data: { chatId: string; content: string; senderId: string }) => {
+      socket.on('send-message', async (data: { chatId: string; content: string }) => {
         await this.handleNewMessage(socket, data);
       });
 
-      socket.on('typing-start', (data: { chatId: string; userId: string }) => {
-        socket.to(`chat:${data.chatId}`).emit('user-typing', data);
+      socket.on('typing-start', (data: { chatId: string }) => {
+        const user = this.connectedUsers.get(socket.id);
+        if (!user) return;
+        socket.to(`chat:${data.chatId}`).emit('user-typing', { chatId: data.chatId, userId: user.userId });
       });
 
-      socket.on('typing-stop', (data: { chatId: string; userId: string }) => {
-        socket.to(`chat:${data.chatId}`).emit('user-stopped-typing', data);
+      socket.on('typing-stop', (data: { chatId: string }) => {
+        const user = this.connectedUsers.get(socket.id);
+        if (!user) return;
+        socket.to(`chat:${data.chatId}`).emit('user-stopped-typing', { chatId: data.chatId, userId: user.userId });
       });
 
-      socket.on('mark-read', async (data: { chatId: string; userId: string }) => {
-        await this.markMessagesAsRead(data.chatId, data.userId);
+      socket.on('mark-read', async (data: { chatId: string }) => {
+        const user = this.connectedUsers.get(socket.id);
+        if (!user) return socket.emit('error', { message: 'Not authenticated' });
+        await this.markMessagesAsRead(data.chatId, user.userId, user.tenantId);
       });
 
       socket.on('disconnect', () => {
@@ -53,7 +70,7 @@ class ChatService {
     });
   }
 
-  private async handleAuthentication(socket: Socket, data: { token: string; tenantId: string }) {
+  private async handleAuthentication(socket: Socket, data: { token: string; tenantId?: string }) {
     try {
       const jwt = await import('jsonwebtoken');
       const { config } = await import('../config/index.js');
@@ -62,6 +79,15 @@ class ChatService {
         userId: string;
         tenantId: string;
       };
+
+      const dbUser = await User.findById(decoded.userId).select('_id tenant isActive');
+      if (!dbUser || !dbUser.isActive) {
+        throw new Error('unauthorized');
+      }
+
+      if (String(dbUser.tenant) !== decoded.tenantId) {
+        throw new Error('tenant-mismatch');
+      }
 
       this.connectedUsers.set(socket.id, {
         socketId: socket.id,
@@ -86,7 +112,7 @@ class ChatService {
     this.io?.to(`tenant:${tenantId}`).emit('online-users', users);
   }
 
-  private async handleNewMessage(socket: Socket, data: { chatId: string; content: string; senderId: string }) {
+  private async handleNewMessage(socket: Socket, data: { chatId: string; content: string }) {
     try {
       const user = this.connectedUsers.get(socket.id);
       if (!user) {
@@ -94,24 +120,34 @@ class ChatService {
         return;
       }
 
+      const chat = await Chat.findOne({
+        _id: data.chatId,
+        tenant: user.tenantId,
+        participants: user.userId,
+        status: 'active',
+      });
+
+      if (!chat) {
+        socket.emit('error', { message: 'Forbidden' });
+        return;
+      }
+
       const message = await Message.create({
         chat: data.chatId,
-        sender: data.senderId,
+        sender: user.userId,
         content: data.content,
-        readBy: [data.senderId],
+        readBy: [user.userId],
       });
 
       await message.populate('sender', 'name email avatar');
 
-      const chat = await Chat.findById(data.chatId);
-      if (chat) {
-        chat.lastMessage = message;
-        chat.unreadCount.set(
-          chat.participants.find(p => p.toString() !== data.senderId)?.toString() || '',
-          (chat.unreadCount.get(chat.participants.find(p => p.toString() !== data.senderId)?.toString() || '') || 0) + 1
-        );
-        await chat.save();
+      chat.lastMessage = message;
+      const other = chat.participants.find((p) => p.toString() !== user.userId);
+      if (other) {
+        const k = other.toString();
+        chat.unreadCount.set(k, (chat.unreadCount.get(k) || 0) + 1);
       }
+      await chat.save();
 
       this.io?.to(`chat:${data.chatId}`).emit('new-message', message);
 
@@ -123,19 +159,19 @@ class ChatService {
 
        // Persist notification (best-effort)
        try {
-         const doc = await Notification.create({
-           tenant: user.tenantId,
-           type: NotificationType.CHAT_MESSAGE,
-           title: 'Nova mensagem',
-           message: 'Voce recebeu uma nova mensagem no chat',
-           data: {
-             chatId: data.chatId,
-             messageId: message._id,
-           },
-           chat: data.chatId,
-           createdBy: data.senderId,
-           readBy: [data.senderId],
-         });
+          const doc = await Notification.create({
+            tenant: user.tenantId,
+            type: NotificationType.CHAT_MESSAGE,
+            title: 'Nova mensagem',
+            message: 'Voce recebeu uma nova mensagem no chat',
+            data: {
+              chatId: data.chatId,
+              messageId: message._id,
+            },
+            chat: data.chatId,
+            createdBy: user.userId,
+            readBy: [user.userId],
+          });
 
          this.io?.to(`tenant:${user.tenantId}`).emit('notification:created', {
            id: doc._id,
@@ -157,18 +193,17 @@ class ChatService {
     }
   }
 
-  private async markMessagesAsRead(chatId: string, userId: string) {
+  private async markMessagesAsRead(chatId: string, userId: string, tenantId: string) {
     try {
+      const chat = await Chat.findOne({ _id: chatId, tenant: tenantId, participants: userId }).select('_id');
+      if (!chat) return;
+
       await Message.updateMany(
         { chat: chatId, sender: { $ne: userId }, readBy: { $ne: userId } },
         { $addToSet: { readBy: userId } }
       );
 
-      const chat = await Chat.findById(chatId);
-      if (chat) {
-        chat.unreadCount.set(userId, 0);
-        await chat.save();
-      }
+      await Chat.updateOne({ _id: chatId }, { $set: { [`unreadCount.${userId}`]: 0 } });
 
       this.io?.to(`chat:${chatId}`).emit('messages-read', { chatId, userId });
     } catch (error) {

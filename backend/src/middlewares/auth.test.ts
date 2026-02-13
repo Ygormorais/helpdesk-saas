@@ -39,6 +39,7 @@ describe('Auth Middleware', () => {
   it('should call next if token is valid', async () => {
     const mockUser = {
       _id: 'user123',
+      tenant: 'tenant123',
       isActive: true,
       role: 'admin',
     };

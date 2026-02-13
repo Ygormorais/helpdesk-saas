@@ -5,7 +5,7 @@ import {
   cancelSubscription,
   getBillingPortal,
 } from '../controllers/billingController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = Router();
 
@@ -14,8 +14,8 @@ router.post('/webhook', handleWebhook);
 
 // Rotas protegidas
 router.use(authenticate);
-router.post('/checkout', createCheckout);
-router.post('/cancel', cancelSubscription);
-router.get('/portal', getBillingPortal);
+router.post('/checkout', authorize('admin', 'manager'), createCheckout);
+router.post('/cancel', authorize('admin', 'manager'), cancelSubscription);
+router.get('/portal', authorize('admin', 'manager'), getBillingPortal);
 
 export default router;

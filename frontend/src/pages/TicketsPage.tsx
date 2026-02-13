@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,16 +58,24 @@ const getPriorityBadge = (priority: string) => {
 
 export default function TicketsPage() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
 
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [search]);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['tickets', { search, statusFilter, priorityFilter }],
+    queryKey: ['tickets', { search: debouncedSearch, statusFilter, priorityFilter }],
     queryFn: async () => {
       const res = await ticketsApi.list({
         page: 1,
         limit: 50,
-        search: search.trim() ? search.trim() : undefined,
+        search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         priority: priorityFilter !== 'all' ? priorityFilter : undefined,
       });
@@ -76,6 +84,8 @@ export default function TicketsPage() {
         pagination: { page: number; limit: number; total: number; pages: number };
       };
     },
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 
   const tickets = useMemo(() => data?.tickets || [], [data]);

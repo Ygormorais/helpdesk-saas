@@ -122,7 +122,8 @@ export const getTicketsTrend = async (
 ): Promise<void> => {
   const user = req.user!;
   const tenantId = user.tenant._id;
-  const days = parseInt(req.query.days as string) || 30;
+  const daysRaw = parseInt(req.query.days as string, 10) || 30;
+  const days = Math.min(365, Math.max(1, daysRaw));
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -322,7 +323,8 @@ export const getRecentActivity = async (
 ): Promise<void> => {
   const user = req.user!;
   const tenantId = user.tenant._id;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const limitRaw = parseInt(req.query.limit as string, 10) || 10;
+  const limit = Math.min(50, Math.max(1, limitRaw));
 
   const [tickets, comments] = await Promise.all([
     Ticket.find({ tenant: tenantId })

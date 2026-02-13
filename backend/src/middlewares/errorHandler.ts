@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
+import { ZodError } from 'zod';
 
 export class AppError extends Error {
   statusCode: number;
@@ -21,6 +22,14 @@ export const errorHandler = (
   _next: NextFunction
 ): void => {
   console.error(err);
+
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      message: 'Validation error',
+      errors: err.errors,
+    });
+    return;
+  }
 
   if (err instanceof mongoose.Error.ValidationError) {
     res.status(400).json({

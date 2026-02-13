@@ -238,7 +238,8 @@ export const getPopularArticles = async (
   res: Response
 ): Promise<void> => {
   const user = req.user!;
-  const limit = parseInt(req.query.limit as string) || 5;
+  const limitRaw = parseInt(req.query.limit as string, 10) || 5;
+  const limit = Math.min(50, Math.max(1, limitRaw));
 
   const articles = await Article.find({
     tenant: user.tenant._id,

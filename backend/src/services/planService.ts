@@ -49,7 +49,10 @@ export class PlanService {
 
   async checkAgentLimit(tenantId: string): Promise<{ allowed: boolean; current: number; max: number }> {
     const planLimit = await this.getPlanForTenant(tenantId);
-    const currentAgents = await User.countDocuments({ tenant: tenantId });
+    const currentAgents = await User.countDocuments({
+      tenant: tenantId,
+      role: { $in: ['admin', 'manager', 'agent'] },
+    });
     
     planLimit.currentUsage.agents = currentAgents;
     await planLimit.save();

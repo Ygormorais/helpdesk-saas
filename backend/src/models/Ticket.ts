@@ -70,7 +70,6 @@ const ticketSchema = new Schema<ITicket>(
     ticketNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     title: {
       type: String,
@@ -176,7 +175,7 @@ const ticketSchema = new Schema<ITicket>(
   }
 );
 
-ticketSchema.index({ tenant: 1, ticketNumber: 1 });
+ticketSchema.index({ tenant: 1, ticketNumber: 1 }, { unique: true });
 ticketSchema.index({ tenant: 1, status: 1 });
 ticketSchema.index({ tenant: 1, createdBy: 1 });
 ticketSchema.index({ assignedTo: 1 });

@@ -11,10 +11,12 @@ import {
 } from '../controllers/articleController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/auth.js';
+import { requireFeature } from '../services/planService.js';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(requireFeature('knowledgeBase'));
 
 router.get('/', getArticles);
 router.get('/public', getPublicArticles);

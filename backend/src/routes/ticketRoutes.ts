@@ -8,6 +8,7 @@ import {
 } from '../controllers/ticketController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/auth.js';
+import { checkPlanLimit } from '../services/planService.js';
 
 const router = Router();
 
@@ -73,7 +74,7 @@ router.get('/', getTickets);
  *       201:
  *         description: Ticket criado
  */
-router.post('/', createTicket);
+router.post('/', checkPlanLimit('ticket'), createTicket);
 
 /**
  * @swagger

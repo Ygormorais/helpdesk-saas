@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Ticket, TicketStatus, Comment, CommentType, User } from '../models/index.js';
+import { Ticket, TicketStatus, Comment, CommentType, User, TicketCounter } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
@@ -8,6 +8,7 @@ import { addBusinessMs, businessMsBetween, type BusinessCalendar } from '../util
 
 const hoursToMs = (hours: number): number => Math.round(hours * 60 * 60 * 1000);
 const addMs = (date: Date, ms: number): Date => new Date(date.getTime() + ms);
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function getCalendarFromTenant(tenant: any): BusinessCalendar {
   return {
@@ -66,13 +67,17 @@ export const createTicket = async (
     const { title, description, priority, category } = createTicketSchema.parse(req.body);
     const user = req.user!;
 
-    const ticketCount = await Ticket.countDocuments({
-      tenant: user.tenant._id,
-    });
-
     const tenant = user.tenant as any;
     const calendar = getCalendarFromTenant(tenant);
-    const ticketNumber = `${tenant.settings.ticketPrefix}-${String(ticketCount + 1).padStart(5, '0')}`;
+
+    const counter = await TicketCounter.findOneAndUpdate(
+      { tenant: user.tenant._id },
+      { $inc: { seq: 1 } },
+      { upsert: true, new: true }
+    );
+
+    const prefix = tenant.settings?.ticketPrefix || 'TCK';
+    const ticketNumber = `${prefix}-${String(counter.seq).padStart(5, '0')}`;
 
     const now = new Date();
     const responseMs = hoursToMs(Number(tenant.settings.slaResponseTime || 4));
@@ -137,20 +142,27 @@ export const getTickets = async (
 
   const query: Record<string, any> = { tenant: user.tenant._id };
 
+  if (user.role === 'client') {
+    query.createdBy = user._id;
+  }
+
   if (status) query.status = status;
   if (priority) query.priority = priority;
   if (category) query.category = category;
   if (assignedTo) query.assignedTo = assignedTo;
 
   if (search) {
+    const q = escapeRegex(search);
     query.$or = [
-      { title: { $regex: search, $options: 'i' } },
-      { ticketNumber: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
+      { title: { $regex: q, $options: 'i' } },
+      { ticketNumber: { $regex: q, $options: 'i' } },
+      { description: { $regex: q, $options: 'i' } },
     ];
   }
 
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+  const skip = (pageNum - 1) * limitNum;
 
   const [tickets, total] = await Promise.all([
     Ticket.find(query)
@@ -159,17 +171,17 @@ export const getTickets = async (
       .populate('assignedTo', 'name email avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit)),
+      .limit(limitNum),
     Ticket.countDocuments(query),
   ]);
 
   res.json({
     tickets,
     pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit),
+      page: pageNum,
+      limit: limitNum,
       total,
-      pages: Math.ceil(total / parseInt(limit)),
+      pages: Math.ceil(total / limitNum),
     },
   });
 };
@@ -181,10 +193,15 @@ export const getTicketById = async (
   const user = req.user!;
   const { id } = req.params;
 
-  const ticket = await Ticket.findOne({
+  const ticketQuery: any = {
     _id: id,
     tenant: user.tenant._id,
-  })
+  };
+  if (user.role === 'client') {
+    ticketQuery.createdBy = user._id;
+  }
+
+  const ticket = await Ticket.findOne(ticketQuery)
     .populate('createdBy', 'name email avatar')
     .populate('category', 'name color')
     .populate('assignedTo', 'name email avatar');
@@ -193,7 +210,12 @@ export const getTicketById = async (
     throw new AppError('Ticket not found', 404);
   }
 
-  const comments = await Comment.find({ ticket: ticket._id })
+  const commentQuery: any = { ticket: ticket._id, tenant: user.tenant._id };
+  if (user.role === 'client') {
+    commentQuery.isInternal = { $ne: true };
+  }
+
+  const comments = await Comment.find(commentQuery)
     .populate('author', 'name email avatar')
     .sort({ createdAt: -1 });
 
@@ -331,12 +353,17 @@ export const addComment = async (
   const { id } = req.params;
   const { content, isInternal } = addCommentSchema.parse(req.body);
 
+  if (user.role === 'client' && isInternal) {
+    throw new AppError('Internal comments are not allowed', 403);
+  }
+
   const now = new Date();
 
-  const ticket = await Ticket.findOne({
-    _id: id,
-    tenant: user.tenant._id,
-  });
+  const ticketQuery: any = { _id: id, tenant: user.tenant._id };
+  if (user.role === 'client') {
+    ticketQuery.createdBy = user._id;
+  }
+  const ticket = await Ticket.findOne(ticketQuery);
 
   if (!ticket) {
     throw new AppError('Ticket not found', 404);

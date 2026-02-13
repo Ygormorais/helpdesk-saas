@@ -1,6 +1,7 @@
 export * from './User.js';
 export * from './Tenant.js';
 export * from './Ticket.js';
+export * from './TicketCounter.js';
 export * from './Comment.js';
 export * from './Category.js';
 
@@ -12,3 +13,4 @@ export * from './PlanLimit.js';
 export * from './TimeEntry.js';
 export * from './Webhook.js';
 export * from './Notification.js';
+export * from './WebhookEvent.js';

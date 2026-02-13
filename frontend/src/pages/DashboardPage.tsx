@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   Ticket,
@@ -135,6 +135,7 @@ export default function DashboardPage() {
       const res = await analyticsApi.getDashboardStats();
       return res.data.stats;
     },
+    staleTime: 60_000,
   });
 
   const statusQuery = useQuery({
@@ -143,6 +144,7 @@ export default function DashboardPage() {
       const res = await analyticsApi.getTicketsByStatus();
       return res.data.data;
     },
+    staleTime: 60_000,
   });
 
   const priorityQuery = useQuery({
@@ -151,6 +153,7 @@ export default function DashboardPage() {
       const res = await analyticsApi.getTicketsByPriority();
       return res.data.data;
     },
+    staleTime: 60_000,
   });
 
   const categoryQuery = useQuery({
@@ -159,6 +162,7 @@ export default function DashboardPage() {
       const res = await analyticsApi.getTicketsByCategory();
       return res.data.data;
     },
+    staleTime: 60_000,
   });
 
   const trendQuery = useQuery({
@@ -167,6 +171,8 @@ export default function DashboardPage() {
       const res = await analyticsApi.getTicketsTrend(trendDays);
       return res.data.data;
     },
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
 
   const topAgentsQuery = useQuery({
@@ -175,6 +181,7 @@ export default function DashboardPage() {
       const res = await analyticsApi.getTopAgents();
       return res.data.data;
     },
+    staleTime: 60_000,
   });
 
   const slaQuery = useQuery({
@@ -183,6 +190,7 @@ export default function DashboardPage() {
       const res = await analyticsApi.getSLACompliance();
       return res.data.data;
     },
+    staleTime: 60_000,
   });
 
   const satisfactionQuery = useQuery({
@@ -191,6 +199,7 @@ export default function DashboardPage() {
       const res = await analyticsApi.getSatisfactionStats();
       return res.data.data;
     },
+    staleTime: 60_000,
   });
 
   const recentTicketsQuery = useQuery({
@@ -199,6 +208,7 @@ export default function DashboardPage() {
       const res = await ticketsApi.list({ page: 1, limit: 8 });
       return res.data.tickets as any[];
     },
+    staleTime: 30_000,
   });
 
   const criticalTicketsQuery = useQuery({
@@ -207,6 +217,7 @@ export default function DashboardPage() {
       const res = await ticketsApi.list({ page: 1, limit: 8, priority: 'urgent' });
       return res.data.tickets as any[];
     },
+    staleTime: 30_000,
   });
 
   const pendingTicketsQuery = useQuery({
@@ -215,6 +226,7 @@ export default function DashboardPage() {
       const res = await ticketsApi.list({ page: 1, limit: 8, status: 'open' });
       return res.data.tickets as any[];
     },
+    staleTime: 30_000,
   });
 
   const stats = statsQuery.data || {

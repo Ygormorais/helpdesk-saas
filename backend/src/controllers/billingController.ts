@@ -1,9 +1,10 @@
 import { Response } from 'express';
 import { asaasService } from '../services/asaasService.js';
 import { planService } from '../services/planService.js';
-import { PlanLimit, PlanType } from '../models/index.js';
+import { PlanLimit, PlanType, WebhookEvent } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
+import { config } from '../config/index.js';
 
 import type { AsaasSubscription } from '../services/asaasService.js';
 
@@ -78,6 +79,7 @@ export const createCheckout = async (
         value: PLAN_PRICES[plan as PlanType],
         dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         description: `DeskFlow - Primeiro pagamento ${plan}`,
+        externalReference: `${user.tenant._id}-${plan}`,
       });
       paymentUrl = payment.invoiceUrl;
     } else if (billingType === 'PIX') {
@@ -87,6 +89,7 @@ export const createCheckout = async (
         value: PLAN_PRICES[plan as PlanType],
         dueDate: new Date().toISOString().split('T')[0],
         description: `DeskFlow - Pagamento ${plan}`,
+        externalReference: `${user.tenant._id}-${plan}`,
       });
       const pixData = await asaasService.getPixQrCode(payment.id);
       paymentUrl = payment.invoiceUrl;
@@ -104,6 +107,7 @@ export const createCheckout = async (
 
   } catch (error: any) {
     console.error('Checkout error:', error);
+    if (error instanceof AppError) throw error;
     throw new AppError(error.message || 'Erro ao criar checkout', 500);
   }
 };
@@ -113,6 +117,28 @@ export const handleWebhook = async (
   res: Response
 ): Promise<void> => {
   try {
+    if (config.asaasWebhookSecret) {
+      const token = req.headers['asaas-access-token'];
+      if (!token || token !== config.asaasWebhookSecret) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+    }
+
+    const eventId = req.body?.id ? String(req.body.id) : '';
+    if (eventId) {
+      try {
+        await WebhookEvent.create({ provider: 'asaas', eventId });
+      } catch (e: any) {
+        if (e?.code === 11000) {
+          // Duplicate event (at-least-once delivery)
+          res.status(200).json({ received: true, duplicate: true });
+          return;
+        }
+        throw e;
+      }
+    }
+
     const { event, payment, subscription } = req.body;
 
     console.log('Asaas webhook received:', event);
@@ -156,6 +182,7 @@ export const handleWebhook = async (
 async function handlePaymentReceived(payment: any) {
   const externalRef = payment.externalReference || '';
   const tenantId = externalRef.split('-')[0];
+  const plan = externalRef.split('-')[1];
   
   if (!tenantId) return;
 
@@ -171,6 +198,10 @@ async function handlePaymentReceived(payment: any) {
   planLimit.subscription.currentPeriodEnd = periodEnd;
   
   await planLimit.save();
+
+  if (plan && Object.values(PlanType).includes(plan)) {
+    await planService.upgradePlan(tenantId, plan as PlanType);
+  }
 
   // Aqui você pode enviar email de confirmação
   console.log(`Payment received for tenant ${tenantId}`);
@@ -201,6 +232,13 @@ async function handleSubscriptionUpdated(subscription: any) {
   // Atualizar status baseado na resposta do Asaas
   if (subscription.status === 'ACTIVE') {
     planLimit.subscription.status = 'active';
+  }
+
+  const ext = subscription.externalReference || '';
+  const tenantId = ext.split('-')[0];
+  const plan = ext.split('-')[1];
+  if (tenantId && plan && Object.values(PlanType).includes(plan)) {
+    await planService.upgradePlan(tenantId, plan as PlanType);
   }
   
   await planLimit.save();

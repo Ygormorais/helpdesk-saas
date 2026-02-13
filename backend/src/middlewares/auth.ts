@@ -34,6 +34,15 @@ export const authenticate = async (
       return;
     }
 
+    const userTenantId = (user.tenant as any)?._id
+      ? String((user.tenant as any)._id)
+      : String(user.tenant as any);
+
+    if (decoded.tenantId && userTenantId !== decoded.tenantId) {
+      res.status(401).json({ message: 'Invalid token' });
+      return;
+    }
+
     req.user = user;
     next();
   } catch (error) {

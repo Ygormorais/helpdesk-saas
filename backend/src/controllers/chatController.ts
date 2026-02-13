@@ -73,6 +73,7 @@ export const getChatMessages = async (
 
   const chat = await Chat.findOne({
     _id: id,
+    tenant: user.tenant._id,
     participants: user._id,
   });
 
@@ -82,8 +83,8 @@ export const getChatMessages = async (
 
   const result = await chatService.getChatMessages(
     id,
-    parseInt(page as string),
-    parseInt(limit as string)
+    Math.max(1, parseInt(page as string, 10) || 1),
+    Math.min(100, Math.max(1, parseInt(limit as string, 10) || 50))
   );
 
   res.json(result);
@@ -100,6 +101,7 @@ export const sendMessage = async (
 
     const chat = await Chat.findOne({
       _id: id,
+      tenant: user.tenant._id,
       participants: user._id,
       status: 'active',
     });
@@ -148,6 +150,7 @@ export const closeChat = async (
 
   const chat = await Chat.findOne({
     _id: id,
+    tenant: user.tenant._id,
     participants: user._id,
   });
 

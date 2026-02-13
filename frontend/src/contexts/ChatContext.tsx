@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -55,7 +55,46 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState<{ userId: string; chatId: string } | null>(null);
 
+  const currentChatIdRef = useRef<string | null>(null);
+  const prevChatIdRef = useRef<string | null>(null);
+
   const apiBaseUrl = useMemo(() => import.meta.env.VITE_API_URL || '/api', []);
+
+  useEffect(() => {
+    currentChatIdRef.current = currentChat?._id || null;
+  }, [currentChat]);
+
+  const refreshChats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${apiBaseUrl}/chat`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error(`Failed to fetch chats (${response.status})`);
+      const data = await response.json();
+      setChats(data.chats || []);
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+    }
+  }, [apiBaseUrl, token]);
+
+  const fetchMessages = useCallback(async (chatId: string) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${apiBaseUrl}/chat/${chatId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error(`Failed to fetch messages (${response.status})`);
+      const data = await response.json();
+      if (currentChatIdRef.current === chatId) {
+        setMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  }, [apiBaseUrl, token]);
 
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -75,14 +114,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
 
       newSocket.on('new-message', (message: ChatMessage) => {
-        if (message.chat === currentChat?._id) {
+        if (message.chat === currentChatIdRef.current) {
           setMessages((prev) => [...prev, message]);
         }
         refreshChats();
       });
 
       newSocket.on('user-typing', (data: { userId: string; chatId: string }) => {
-        if (data.chatId === currentChat?._id) {
+        if (data.chatId === currentChatIdRef.current) {
           setIsTyping(data);
         }
       });
@@ -92,7 +131,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
 
       newSocket.on('messages-read', ({ chatId, userId }: { chatId: string; userId: string }) => {
-        if (chatId === currentChat?._id) {
+        if (chatId === currentChatIdRef.current) {
           setMessages((prev) =>
             prev.map((msg) => ({
               ...msg,
@@ -118,57 +157,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         newSocket.disconnect();
       };
     }
-  }, [isAuthenticated, token]);
-
-  const refreshChats = async () => {
-    try {
-      const response = await fetch(`${apiBaseUrl}/chat`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      setChats(data.chats || []);
-    } catch (error) {
-      console.error('Error fetching chats:', error);
-    }
-  };
+  }, [isAuthenticated, token, user?.tenant?.id, refreshChats]);
 
   useEffect(() => {
     if (isAuthenticated) {
       refreshChats();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, refreshChats]);
 
   useEffect(() => {
     if (currentChat && socket) {
+      if (prevChatIdRef.current && prevChatIdRef.current !== currentChat._id) {
+        socket.emit('leave-chat', prevChatIdRef.current);
+      }
+      prevChatIdRef.current = currentChat._id;
       socket.emit('join-chat', currentChat._id);
-      fetchMessages();
+      fetchMessages(currentChat._id);
     }
-  }, [currentChat, socket]);
-
-  const fetchMessages = async () => {
-    if (!currentChat) return;
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/chat/${currentChat._id}/messages`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const data = await response.json();
-      setMessages(data.messages || []);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  };
+  }, [currentChat, socket, fetchMessages]);
 
   const sendMessage = (content: string) => {
     if (!currentChat || !socket) return;
     socket.emit('send-message', {
       chatId: currentChat._id,
       content,
-      senderId: user?.id,
     });
   };
 
@@ -176,7 +188,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!currentChat || !socket) return;
     socket.emit('typing-start', {
       chatId: currentChat._id,
-      userId: user?.id,
     });
   };
 
@@ -184,7 +195,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!currentChat || !socket) return;
     socket.emit('typing-stop', {
       chatId: currentChat._id,
-      userId: user?.id,
     });
   };
 
@@ -192,7 +202,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!currentChat || !socket) return;
     socket.emit('mark-read', {
       chatId: currentChat._id,
-      userId: user?.id,
     });
   };
 

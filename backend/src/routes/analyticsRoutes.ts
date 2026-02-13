@@ -10,11 +10,12 @@ import {
   getSatisfactionStats,
   getRecentActivity,
 } from '../controllers/analyticsController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(authorize('admin', 'manager', 'agent'));
 
 router.get('/dashboard', getDashboardStats);
 router.get('/tickets-by-status', getTicketsByStatus);

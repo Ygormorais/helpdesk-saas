@@ -11,10 +11,12 @@ import {
   getTimeStats,
 } from '../controllers/timeTrackingController.js';
 import { authenticate } from '../middlewares/auth.js';
+import { requireFeature } from '../services/planService.js';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(requireFeature('timeTracking'));
 
 router.post('/start', startTimer);
 router.post('/stop/:id', stopTimer);
