@@ -8,6 +8,7 @@ import {
   voteArticle,
   getPublicArticles,
   getPopularArticles,
+  searchArticlesAi,
 } from '../controllers/articleController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/auth.js';
@@ -21,6 +22,7 @@ router.use(requireFeature('knowledgeBase'));
 router.get('/', getArticles);
 router.get('/public', getPublicArticles);
 router.get('/popular', getPopularArticles);
+router.get('/search', searchArticlesAi);
 router.get('/:slug', getArticleBySlug);
 
 router.post('/', authorize('admin', 'manager', 'agent'), createArticle);

@@ -31,4 +31,21 @@ export const config = {
 
   asaasApiKey: process.env.ASAAS_API_KEY || '',
   asaasWebhookSecret: process.env.ASAAS_WEBHOOK_SECRET || '',
+
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+    embeddingModel: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+  },
+
+  ollama: {
+    baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+    embeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
+  },
+
+  aiEmbeddingsProvider: (process.env.AI_EMBEDDINGS_PROVIDER || '').toLowerCase() as
+    | 'openai'
+    | 'ollama'
+    | 'none'
+    | '',
 };

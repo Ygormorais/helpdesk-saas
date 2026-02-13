@@ -20,6 +20,12 @@ export interface IArticle extends Document {
     metaTitle?: string;
     metaDescription?: string;
   };
+
+  ai?: {
+    embedding?: number[];
+    embeddingModel?: string;
+    embeddedAt?: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,6 +95,12 @@ const articleSchema = new Schema<IArticle>(
       metaTitle: String,
       metaDescription: String,
     },
+
+    ai: {
+      embedding: [{ type: Number }],
+      embeddingModel: { type: String, trim: true },
+      embeddedAt: Date,
+    },
   },
   {
     timestamps: true,
@@ -109,5 +121,6 @@ articleSchema.index({ tenant: 1, slug: 1 });
 articleSchema.index({ tenant: 1, isPublished: 1 });
 articleSchema.index({ category: 1 });
 articleSchema.index({ tags: 1 });
+articleSchema.index({ 'ai.embeddingModel': 1 });
 
 export const Article = mongoose.model<IArticle>('Article', articleSchema);

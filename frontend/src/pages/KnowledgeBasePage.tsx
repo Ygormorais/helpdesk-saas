@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, BookOpen, Eye, ThumbsUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -17,20 +17,37 @@ import { articlesApi } from '@/api/articles';
 
 export default function KnowledgeBasePage() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(id);
+  }, [search]);
+
+  const isAiSearch = debouncedSearch.trim().length >= 2;
+
   const listQuery = useQuery({
-    queryKey: ['articles', 'public', { search, selectedCategory }],
+    queryKey: ['articles', isAiSearch ? 'ai' : 'public', { q: debouncedSearch, selectedCategory }],
     queryFn: async () => {
+      const q = debouncedSearch.trim();
+      const category = selectedCategory !== 'all' ? selectedCategory : undefined;
+
+      if (q.length >= 2) {
+        const res = await articlesApi.searchAi({ q, category, limit: 30 });
+        return { articles: res.data.results, mode: res.data.mode as 'ai' | 'fallback' };
+      }
+
       const res = await articlesApi.listPublic({
-        search: search.trim() ? search.trim() : undefined,
-        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        search: q ? q : undefined,
+        category,
       });
-      return res.data.articles;
+      return { articles: res.data.articles, mode: 'public' as const };
     },
   });
 
-  const articles = listQuery.data || [];
+  const articles = listQuery.data?.articles || [];
+  const searchMode = listQuery.data?.mode;
 
   const categories = useMemo(() => {
     const counts = new Map<string, { name: string; color: string; count: number; id: string }>();
@@ -70,6 +87,15 @@ export default function KnowledgeBasePage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {isAiSearch ? (
+          <div className="mt-2 text-center text-xs text-muted-foreground">
+            {searchMode === 'ai' ? 'Busca com IA (semantica).' : null}
+            {searchMode === 'fallback' ? 'IA indisponivel no momento; usando busca basica.' : null}
+            {!searchMode ? 'Buscando...' : null}
+          </div>
+        ) : (
+          <div className="mt-2 text-center text-xs text-muted-foreground">Digite 2+ caracteres para busca com IA.</div>
+        )}
       </div>
 
       <div className="flex gap-4 justify-center">

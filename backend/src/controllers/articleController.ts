@@ -3,6 +3,7 @@ import { Article } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
+import { aiArticleSearchService } from '../services/aiArticleSearchService.js';
 
 const createArticleSchema = z.object({
   title: z.string().min(5),
@@ -158,6 +159,31 @@ export const getPublicArticles = async (
     .sort({ views: -1, createdAt: -1 });
 
   res.json({ articles });
+};
+
+const searchAiSchema = z.object({
+  q: z.string().min(2),
+  category: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+
+export const searchArticlesAi = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const parsed = searchAiSchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    return;
+  }
+
+  const { q, category, limit } = parsed.data;
+  const out = await aiArticleSearchService.searchPublishedArticles({
+    tenantId: user.tenant._id,
+    query: q,
+    categoryId: category,
+    limit,
+  });
+
+  res.json(out);
 };
 
 export const updateArticle = async (

@@ -27,6 +27,9 @@ export const articlesApi = {
   listPublic: (params?: { category?: string; search?: string }) =>
     api.get<{ articles: ArticleListItem[] }>('/articles/public', { params }),
 
+  searchAi: (params: { q: string; category?: string; limit?: number }) =>
+    api.get<{ mode: 'ai' | 'fallback'; results: Array<ArticleListItem & { score: number }> }>('/articles/search', { params }),
+
   getBySlug: (slug: string) => api.get<{ article: ArticleDetail }>(`/articles/${slug}`),
 
   create: (data: { title: string; content: string; excerpt?: string; category?: string; tags?: string[]; isPublished?: boolean }) =>
