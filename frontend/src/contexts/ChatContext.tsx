@@ -110,7 +110,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       newSocket.on('authenticated', (data: { success: boolean }) => {
         if (data.success) {
           console.log('Socket authenticated');
+          refreshChats();
+          const chatId = currentChatIdRef.current;
+          if (chatId) {
+            newSocket.emit('join-chat', chatId);
+            fetchMessages(chatId);
+            newSocket.emit('mark-read', { chatId });
+          }
         }
+      });
+
+      newSocket.on('disconnect', () => {
+        setOnlineUsers([]);
+        setIsTyping(null);
       });
 
       newSocket.on('new-message', (message: ChatMessage) => {
@@ -157,7 +169,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         newSocket.disconnect();
       };
     }
-  }, [isAuthenticated, token, user?.tenant?.id, refreshChats]);
+  }, [isAuthenticated, token, user?.tenant?.id, refreshChats, fetchMessages]);
 
   useEffect(() => {
     if (isAuthenticated) {

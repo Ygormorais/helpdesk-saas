@@ -23,10 +23,19 @@ export default function ChatPage() {
   const { user } = useAuth();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
 
   useEffect(() => {
+    if (!shouldAutoScrollRef.current) return;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    // When switching chats, always jump to bottom.
+    shouldAutoScrollRef.current = true;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, [currentChat?._id]);
 
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
@@ -212,7 +221,16 @@ export default function ChatPage() {
             </CardHeader>
 
             <CardContent className="flex-1 flex flex-col p-0">
-              <ScrollArea className="flex-1 p-4">
+              <ScrollArea
+                ref={scrollRef}
+                className="flex-1 p-4"
+                onScroll={() => {
+                  const el = scrollRef.current;
+                  if (!el) return;
+                  const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+                  shouldAutoScrollRef.current = remaining < 120;
+                }}
+              >
                 <div className="space-y-4">
                   {messages.map((message, index) => {
                     const isOwnMessage = message.sender._id === user?.id;
