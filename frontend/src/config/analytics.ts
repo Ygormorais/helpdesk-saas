@@ -61,6 +61,37 @@ export interface SatisfactionData {
   totalResponses: number;
 }
 
+export interface ReportsTrendPoint {
+  date: string;
+  created: number;
+  resolved: number;
+}
+
+export interface ReportsSlaData {
+  totalResolved: number;
+  withinSla: number;
+  outsideSla: number;
+  withinRate: number;
+}
+
+export interface ReportsAgentData {
+  _id: string;
+  name: string;
+  resolved: number;
+  avgResolutionMs: number;
+}
+
+export interface ReportsData {
+  range: {
+    start: string;
+    end: string;
+  };
+  trend: ReportsTrendPoint[];
+  status: TicketsByStatus;
+  sla: ReportsSlaData;
+  agents: ReportsAgentData[];
+}
+
 export const analyticsApi = {
   getDashboardStats: () => api.get<{ stats: DashboardStats }>('/analytics/dashboard'),
   getTicketsByStatus: () => api.get<{ data: TicketsByStatus }>('/analytics/tickets-by-status'),
@@ -71,4 +102,6 @@ export const analyticsApi = {
   getSLACompliance: () => api.get<{ data: SLAData }>('/analytics/sla-compliance'),
   getSatisfactionStats: () => api.get<{ data: SatisfactionData }>('/analytics/satisfaction'),
   getRecentActivity: (limit = 10) => api.get(`/analytics/recent-activity?limit=${limit}`),
+  getReports: (params?: { startDate?: string; endDate?: string; days?: number; agentLimit?: number }) =>
+    api.get<{ data: ReportsData }>('/analytics/reports', { params }),
 };

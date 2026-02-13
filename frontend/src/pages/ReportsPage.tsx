@@ -1,208 +1,303 @@
-import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { useMemo, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
-  ResponsiveContainer,
-  AreaChart,
   Area,
-  XAxis,
-  YAxis,
+  AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
-  Tooltip,
-  PieChart,
-  Pie,
   Cell,
   Legend,
-  BarChart,
-  Bar,
-} from 'recharts'
-// Local demo analytics data (will be overridden by API data when available)
-// no star icon needed here
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { analyticsApi } from '@/config/analytics';
+import { downloadCSV } from '@/utils/csv';
 
-// Simple KPI card used in the reports page
- function KPI({ title, value }: { title: string; value: string | number }) {
+function KPI({ title, value }: { title: string; value: string | number }) {
   return (
     <Card className="bg-white">
-      <CardHeader><CardTitle className="text-sm">{title}</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
       <CardContent className="text-2xl font-bold">{value}</CardContent>
     </Card>
-  )
+  );
 }
- 
- // New: filter controls and data state for reports
-const _unused = 0
 
-const mockTrendData = [
-  { date: '01', created: 12, resolved: 8 },
-  { date: '02', created: 15, resolved: 12 },
-  { date: '03', created: 8,  resolved: 10 },
-  { date: '04', created: 20, resolved: 15 },
-  { date: '05', created: 18, resolved: 16 },
-  { date: '06', created: 25, resolved: 20 },
-]
-
-// API data integration (fallback to mock data above) - skipped for now
-
- const mockStatusData = [
-  { name: 'Aberto', value: 23, color: '#EF4444' },
-  { name: 'Em Andamento', value: 42, color: '#3B82F6' },
-  { name: 'Resolvido', value: 91, color: '#10B981' },
-  { name: 'Fechado', value: 15, color: '#6B7280' },
-]
-
-// Mock SLA data for demonstration
-const mockSLAdata = [
-  { name: 'Dentro do SLA', value: 85, color: '#10B981' },
-  { name: 'Fora do SLA', value: 15, color: '#EF4444' },
-]
-
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
+const STATUS_META: Array<{ key: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'; label: string; color: string }> = [
+  { key: 'open', label: 'Aberto', color: '#EF4444' },
+  { key: 'in_progress', label: 'Em andamento', color: '#3B82F6' },
+  { key: 'waiting_customer', label: 'Aguardando cliente', color: '#F59E0B' },
+  { key: 'resolved', label: 'Resolvido', color: '#10B981' },
+  { key: 'closed', label: 'Fechado', color: '#6B7280' },
+];
 
 export default function ReportsPage() {
-  // helper to set quick date ranges (months window)
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const setDateRangeMonths = (monthsBack: number) => {
-    const today = new Date()
-    const past = new Date(today)
-    past.setMonth(today.getMonth() - monthsBack)
-    const fmt = (d: Date) => d.toISOString().slice(0, 10)
-    setStartDate(fmt(past))
-    setEndDate(fmt(today))
-  }
-  const [reportData, setReportData] = useState<any>(null)
-  useEffect(() => {
-    fetch('/api/analytics/reports')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data) setReportData(data)
-      })
-      .catch(() => {
-        // ignore errors, fallback to mocks
-      })
-  }, [])
-  const [startDate, setStartDate] = useState<string>('')
-  const [endDate, setEndDate] = useState<string>('')
-  // filtered trend based on date range (using mockTrendData as fallback)
-  const filteredTrend = mockTrendData.filter((d) => {
-    if (!startDate && !endDate) return true
-    const s = startDate ? new Date(startDate).getTime() : new Date('2000-01-01').getTime()
-    const e = endDate ? new Date(endDate).getTime() : new Date('2099-12-31').getTime()
-    const dDate = new Date(d.date).getTime()
-    return dDate >= s && dDate <= e
-  })
-  const totalTickets = filteredTrend.reduce((a, b) => a + b.created, 0)
+    const today = new Date();
+    const past = new Date(today);
+    past.setMonth(today.getMonth() - monthsBack);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    setStartDate(fmt(past));
+    setEndDate(fmt(today));
+  };
 
-  const statusData = reportData?.status ?? mockStatusData
-  const exportCSV = () => {
-    const header = 'date,created,resolved'
-    const rows = filteredTrend.map((r) => `${r.date},${r.created},${r.resolved}`)
-    const csv = [header, ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'reports.csv'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
+  const reportsQuery = useQuery({
+    queryKey: ['analytics-reports', { startDate, endDate }],
+    queryFn: async () => {
+      const res = await analyticsApi.getReports({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      });
+      return res.data.data;
+    },
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
 
-  // New CSV exporters for additional datasets
+  const priorityQuery = useQuery({
+    queryKey: ['analytics-priority'],
+    queryFn: async () => {
+      const res = await analyticsApi.getTicketsByPriority();
+      return res.data.data;
+    },
+    staleTime: 60_000,
+  });
+
+  const satisfactionQuery = useQuery({
+    queryKey: ['analytics-satisfaction'],
+    queryFn: async () => {
+      const res = await analyticsApi.getSatisfactionStats();
+      return res.data.data;
+    },
+    staleTime: 60_000,
+  });
+
+  const categoryQuery = useQuery({
+    queryKey: ['analytics-category'],
+    queryFn: async () => {
+      const res = await analyticsApi.getTicketsByCategory();
+      return res.data.data;
+    },
+    staleTime: 60_000,
+  });
+
+  const report = reportsQuery.data;
+  const trend = report?.trend ?? [];
+  const status = report?.status;
+
+  const statusPieData = useMemo(() => {
+    const s = status ?? { open: 0, in_progress: 0, waiting_customer: 0, resolved: 0, closed: 0 };
+    return STATUS_META.map((m) => ({
+      name: m.label,
+      value: s[m.key] ?? 0,
+      color: m.color,
+    }));
+  }, [status]);
+
+  const totalTickets = useMemo(
+    () => statusPieData.reduce((acc, item) => acc + (item.value || 0), 0),
+    [statusPieData]
+  );
+
+  const slaPieData = useMemo(() => {
+    const within = report?.sla.withinSla ?? 0;
+    const outside = report?.sla.outsideSla ?? 0;
+    return [
+      { name: 'Dentro do SLA', value: within, color: '#10B981' },
+      { name: 'Fora do SLA', value: outside, color: '#EF4444' },
+    ];
+  }, [report]);
+
+  const agentsBarData = useMemo(() => {
+    return (report?.agents ?? []).map((a) => ({
+      name: a.name,
+      resolved: a.resolved,
+    }));
+  }, [report]);
+
+  const priorityBarData = useMemo(() => {
+    const p = priorityQuery.data;
+    if (!p) return [];
+    return [
+      { name: 'Urgente', value: p.urgent },
+      { name: 'Alta', value: p.high },
+      { name: 'Média', value: p.medium },
+      { name: 'Baixa', value: p.low },
+    ];
+  }, [priorityQuery.data]);
+
+  const satisfactionBarData = useMemo(() => {
+    const s = satisfactionQuery.data;
+    if (!s) return [];
+    return Object.entries(s.distribution)
+      .map(([rating, value]) => ({ rating, value }))
+      .sort((a, b) => Number(b.rating) - Number(a.rating));
+  }, [satisfactionQuery.data]);
+
+  const categoryBarData = useMemo(() => {
+    const c = categoryQuery.data;
+    if (!c) return [];
+    return c.map((row) => ({ category: row._id, value: row.count }));
+  }, [categoryQuery.data]);
+
   const exportCSV_Tickets = () => {
-    const headers = ['date','created','resolved']
-    const rows = filteredTrend.map(r => [r.date, r.created, r.resolved])
-    // use shared CSV util
-    import('@/utils/csv').then((m) => m.downloadCSV(headers, rows, 'tickets.csv'))
-  }
- 
+    downloadCSV(
+      ['date', 'created', 'resolved'],
+      trend.map((r) => [r.date, r.created, r.resolved]),
+      'tickets-trend.csv'
+    );
+  };
+
   const exportCSV_Status = () => {
-    const headers = ['status','count']
-    const rows = (reportData?.status ?? mockStatusData).map((s: any) => [s.name, s.value])
-    import('@/utils/csv').then((m) => m.downloadCSV(headers, rows, 'status.csv'))
-  }
+    downloadCSV(
+      ['status', 'count'],
+      statusPieData.map((s) => [s.name, s.value]),
+      'tickets-status.csv'
+    );
+  };
+
   const exportCSV_SLA = () => {
-    const headers = ['label','value']
-    const rows = (reportData?.sla ?? mockSLAdata).map((s: any) => [s.name, s.value])
-    import('@/utils/csv').then((m) => m.downloadCSV(headers, rows, 'sla.csv'))
-  }
+    downloadCSV(
+      ['label', 'value'],
+      slaPieData.map((s) => [s.name, s.value]),
+      'sla.csv'
+    );
+  };
 
   const exportCSV_Agents = () => {
-    const headers = ['name','resolved','total']
-    const rows = (reportData?.agents ?? mockAgentData).map((a: any) => [a.name, a.resolved, a.total])
-    import('@/utils/csv').then((m) => m.downloadCSV(headers, rows, 'agents.csv'))
-  }
-
-  const mockAgentData = [
-    { name: 'Carlos', resolved: 45, total: 52 },
-    { name: 'Maria', resolved: 38, total: 45 },
-    { name: 'Pedro', resolved: 32, total: 40 },
-  ]
+    downloadCSV(
+      ['name', 'resolved', 'avgResolutionHours'],
+      (report?.agents ?? []).map((a) => [a.name, a.resolved, Math.round((a.avgResolutionMs || 0) / (1000 * 60 * 60))]),
+      'agents.csv'
+    );
+  };
 
   const exportAllCSVs = () => {
     exportCSV_Tickets();
     exportCSV_Status();
     exportCSV_SLA();
     exportCSV_Agents();
-  }
+  };
 
   return (
     <div className="space-y-6 p-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Relatórios</h1>
-        <Link to="/dashboard">
-          <Button>Voltar ao Dashboard</Button>
-        </Link>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold">Relatorios</h1>
+          {report?.range ? (
+            <div className="text-sm text-muted-foreground">
+              Periodo: {report.range.start} a {report.range.end}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={exportAllCSVs} disabled={!report}>
+            Exportar CSVs
+          </Button>
+          <Link to="/dashboard">
+            <Button>Voltar ao Dashboard</Button>
+          </Link>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI title="Total de Tickets" value={156} />
-        <KPI title="Tickets Abertos" value={23} />
-        <KPI title="Tickets Resolvidos" value={91} />
-        <KPI title="Carga de Trabalhos" value={`${filteredTrend.length} dias`} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KPI title="Total de tickets (periodo)" value={totalTickets} />
+        <KPI title="Abertos" value={status?.open ?? 0} />
+        <KPI title="Resolvidos" value={status?.resolved ?? 0} />
+        <KPI title="Dias no grafico" value={trend.length} />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-4">
-        <span className="text-sm text-muted-foreground">Presets:</span>
-        <button onClick={() => setDateRangeMonths(2)} className="px-3 py-1 bg-gray-100 rounded">Últimos 2 meses</button>
-        <button onClick={() => setDateRangeMonths(3)} className="px-3 py-1 bg-gray-100 rounded">Últimos 3 meses</button>
-        <button onClick={() => { setStartDate(''); setEndDate(''); }} className="px-3 py-1 bg-gray-100 rounded">Todos</button>
-      <label className="text-sm text-muted-foreground">Filtrar mês:</label>
-        <input type="date" value={startDate} onChange={(e)=>setStartDate(e.target.value)} className="border rounded px-2 py-1"/>
-        <span> até </span>
-        <input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} className="border rounded px-2 py-1"/>
-        <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={exportCSV_Tickets}>Export Tickets CSV</button>
-        <button className="ml-2 px-3 py-1 bg-gray-200 rounded" onClick={exportAllCSVs}>Export All CSVs</button>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">Inicio</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="border rounded px-2 py-1"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">Fim</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="border rounded px-2 py-1"
+            />
+          </div>
+          <Button variant="secondary" onClick={() => setDateRangeMonths(2)}>
+            Ultimos 2 meses
+          </Button>
+          <Button variant="secondary" onClick={() => setDateRangeMonths(3)}>
+            Ultimos 3 meses
+          </Button>
+          <Button variant="ghost" onClick={() => {
+            setStartDate('');
+            setEndDate('');
+          }}>
+            Limpar
+          </Button>
+          <Button variant="secondary" onClick={exportCSV_Tickets} disabled={!report}>
+            Exportar trend
+          </Button>
+        </CardContent>
+      </Card>
+
+      {reportsQuery.isError ? (
+        <div className="text-sm text-red-600">Falha ao carregar relatorios.</div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Tickets por Dia</CardTitle>
+          <CardHeader className="flex items-center justify-between sm:flex-row">
+            <CardTitle>Tickets por dia</CardTitle>
+            <Button variant="secondary" onClick={exportCSV_Tickets} disabled={!report}>
+              CSV
+            </Button>
           </CardHeader>
-        <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={filteredTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={trend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip />
-                <Area type="monotone" dataKey="created" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} name="Criados" />
+                <Area type="monotone" dataKey="created" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.25} name="Criados" />
+                <Area type="monotone" dataKey="resolved" stroke="#10B981" fill="#10B981" fillOpacity={0.18} name="Resolvidos" />
               </AreaChart>
             </ResponsiveContainer>
-            <div className="flex justify-end p-2">
-              <button className="px-3 py-1 bg-gray-200 rounded" onClick={exportCSV_SLA}>Export SLA CSV</button>
-            </div>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader>
-            <CardTitle>Estado de Tickets</CardTitle>
+          <CardHeader className="flex items-center justify-between sm:flex-row">
+            <CardTitle>Status de tickets</CardTitle>
+            <Button variant="secondary" onClick={exportCSV_Status} disabled={!report}>
+              CSV
+            </Button>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={statusData} dataKey="value" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
-                  {statusData.map((entry: any, index: number) => (
+                <Pie data={statusPieData} dataKey="value" cx="50%" cy="50%" outerRadius={84} label>
+                  {statusPieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -211,15 +306,22 @@ export default function ReportsPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader>
-            <CardTitle>SLA Compliance</CardTitle>
+          <CardHeader className="flex items-center justify-between sm:flex-row">
+            <CardTitle>SLA (resolucao)</CardTitle>
+            <Button variant="secondary" onClick={exportCSV_SLA} disabled={!report}>
+              CSV
+            </Button>
           </CardHeader>
           <CardContent>
+            <div className="text-sm text-muted-foreground mb-2">
+              Dentro do SLA: {report?.sla.withinRate ?? 0}% (base: {report?.sla.totalResolved ?? 0} tickets)
+            </div>
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={reportData?.sla ?? mockSLAdata} dataKey="value" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
-                  {(reportData?.sla ?? mockSLAdata).map((entry: any, idx: number) => (
+                <Pie data={slaPieData} dataKey="value" cx="50%" cy="50%" outerRadius={84} label>
+                  {slaPieData.map((entry, idx) => (
                     <Cell key={`sla-${idx}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -228,14 +330,17 @@ export default function ReportsPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader className="flex items-center justify-between">
-            <CardTitle>Top Agentes</CardTitle>
-            <button className="px-3 py-1 bg-gray-200 rounded" onClick={exportCSV_Agents}>Export CSV</button>
+          <CardHeader className="flex items-center justify-between sm:flex-row">
+            <CardTitle>Top agentes (resolvidos)</CardTitle>
+            <Button variant="secondary" onClick={exportCSV_Agents} disabled={!report}>
+              CSV
+            </Button>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={reportData?.agents ?? mockAgentData}>
+              <BarChart data={agentsBarData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
@@ -247,19 +352,14 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Tickets por Prioridade</CardTitle>
+            <CardTitle>Tickets por prioridade</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={[
-                { name: 'Urgente', value: 12 },
-                { name: 'Alta', value: 35 },
-                { name: 'Média', value: 78 },
-                { name: 'Baixa', value: 31 },
-              ]}>
+              <BarChart data={priorityBarData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
@@ -271,15 +371,12 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Satisfação</CardTitle>
+            <CardTitle>Satisfacao</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="text-sm text-muted-foreground mb-2">Media: {satisfactionQuery.data?.average ?? 0}</div>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={[
-                { rating: '5', value: 45 },
-                { rating: '4', value: 32 },
-                { rating: '3', value: 12 },
-              ]}>
+              <BarChart data={satisfactionBarData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="rating" />
                 <YAxis />
@@ -291,15 +388,11 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Tickets por Categoria</CardTitle>
+            <CardTitle>Tickets por categoria</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={[
-                { category: 'Técnico', value: 45 },
-                { category: 'Financeiro', value: 23 },
-                { category: 'Administrativo', value: 18 },
-              ]}>
+              <BarChart data={categoryBarData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="category" />
                 <YAxis />
@@ -311,5 +404,5 @@ export default function ReportsPage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

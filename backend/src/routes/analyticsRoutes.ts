@@ -9,6 +9,7 @@ import {
   getSLACompliance,
   getSatisfactionStats,
   getRecentActivity,
+  getReports,
 } from '../controllers/analyticsController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
 
@@ -26,5 +27,6 @@ router.get('/top-agents', getTopAgents);
 router.get('/sla-compliance', getSLACompliance);
 router.get('/satisfaction', getSatisfactionStats);
 router.get('/recent-activity', getRecentActivity);
+router.get('/reports', getReports);
 
 export default router;

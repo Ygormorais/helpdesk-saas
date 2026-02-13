@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { Ticket, User, Comment } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
+import { z } from 'zod';
 
 export const getDashboardStats = async (
   req: AuthRequest,
@@ -357,6 +358,185 @@ export const getRecentActivity = async (
     .slice(0, limit);
 
   res.json({ data: activity });
+};
+
+const reportsQuerySchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  days: z.coerce.number().int().min(1).max(365).optional(),
+  agentLimit: z.coerce.number().int().min(1).max(50).optional(),
+});
+
+function toUtcDayStart(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function parseDay(value: string): Date {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) throw new Error('Invalid date');
+  return toUtcDayStart(d);
+}
+
+export const getReports = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const tenantId = user.tenant._id;
+
+  const parsed = reportsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid query', errors: parsed.error.errors });
+    return;
+  }
+
+  const { startDate, endDate, days, agentLimit } = parsed.data;
+
+  const now = new Date();
+  const defaultDays = days ?? 30;
+
+  let start: Date;
+  let end: Date;
+  try {
+    start = startDate
+      ? parseDay(startDate)
+      : toUtcDayStart(new Date(now.getTime() - defaultDays * 24 * 60 * 60 * 1000));
+    end = endDate ? parseDay(endDate) : toUtcDayStart(now);
+  } catch {
+    res.status(400).json({ message: 'Invalid date (use YYYY-MM-DD)' });
+    return;
+  }
+
+  if (end.getTime() < start.getTime()) {
+    res.status(400).json({ message: 'endDate must be >= startDate' });
+    return;
+  }
+
+  // end is inclusive day; use [start, endExclusive)
+  const endExclusive = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+
+  const [createdByDay, resolvedByDay] = await Promise.all([
+    Ticket.aggregate([
+      { $match: { tenant: tenantId, createdAt: { $gte: start, $lt: endExclusive } } },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' },
+          },
+          created: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    Ticket.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$sla.resolvedAt', timezone: 'UTC' },
+          },
+          resolved: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+  ]);
+
+  const trendMap = new Map<string, { date: string; created: number; resolved: number }>();
+  for (const row of createdByDay) {
+    trendMap.set(row._id, { date: row._id, created: row.created ?? 0, resolved: 0 });
+  }
+  for (const row of resolvedByDay) {
+    const prev = trendMap.get(row._id) ?? { date: row._id, created: 0, resolved: 0 };
+    trendMap.set(row._id, { ...prev, resolved: row.resolved ?? 0 });
+  }
+  const trend = Array.from(trendMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  const statusAgg = await Ticket.aggregate([
+    { $match: { tenant: tenantId, createdAt: { $gte: start, $lt: endExclusive } } },
+    { $group: { _id: '$status', count: { $sum: 1 } } },
+  ]);
+
+  const status: Record<string, number> = {
+    open: 0,
+    in_progress: 0,
+    waiting_customer: 0,
+    resolved: 0,
+    closed: 0,
+  };
+  for (const s of statusAgg) status[String(s._id)] = s.count;
+
+  const slaAgg = await Ticket.aggregate([
+    {
+      $match: {
+        tenant: tenantId,
+        'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalResolved: { $sum: 1 },
+        withinSla: {
+          $sum: {
+            $cond: [{ $lte: ['$sla.resolvedAt', '$sla.resolutionDue'] }, 1, 0],
+          },
+        },
+      },
+    },
+  ]);
+
+  const slaRow = slaAgg[0] || { totalResolved: 0, withinSla: 0 };
+  const outsideSla = Math.max(0, slaRow.totalResolved - slaRow.withinSla);
+
+  const agentsAgg = await Ticket.aggregate([
+    {
+      $match: {
+        tenant: tenantId,
+        assignedTo: { $ne: null },
+        'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive },
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'assignedTo',
+        foreignField: '_id',
+        as: 'agent',
+      },
+    },
+    { $unwind: '$agent' },
+    {
+      $group: {
+        _id: '$agent._id',
+        name: { $first: '$agent.name' },
+        resolved: { $sum: 1 },
+        avgResolutionMs: { $avg: { $subtract: ['$sla.resolvedAt', '$createdAt'] } },
+      },
+    },
+    { $sort: { resolved: -1 } },
+    { $limit: agentLimit ?? 5 },
+  ]);
+
+  res.json({
+    data: {
+      range: {
+        start: start.toISOString().slice(0, 10),
+        end: end.toISOString().slice(0, 10),
+      },
+      trend,
+      status,
+      sla: {
+        totalResolved: slaRow.totalResolved,
+        withinSla: slaRow.withinSla,
+        outsideSla,
+        withinRate: slaRow.totalResolved > 0 ? Math.round((slaRow.withinSla / slaRow.totalResolved) * 100) : 0,
+      },
+      agents: agentsAgg,
+    },
+  });
 };
 
 async function getAverageResponseTime(tenantId: any): Promise<number> {
