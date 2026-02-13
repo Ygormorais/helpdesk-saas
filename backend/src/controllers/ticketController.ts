@@ -5,6 +5,8 @@ import { AppError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
 import { notificationService } from '../services/notificationService.js';
 import { addBusinessMs, businessMsBetween, type BusinessCalendar } from '../utils/businessTime.js';
+import { csvLine } from '../utils/csv.js';
+import { once } from 'events';
 
 const hoursToMs = (hours: number): number => Math.round(hours * 60 * 60 * 1000);
 const addMs = (date: Date, ms: number): Date => new Date(date.getTime() + ms);
@@ -58,6 +60,32 @@ const addCommentSchema = z.object({
   content: z.string().min(1),
   isInternal: z.boolean().optional(),
 });
+
+const exportTicketsQuerySchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  status: z.enum(['open', 'in_progress', 'waiting_customer', 'resolved', 'closed']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  category: z.string().optional(),
+  assignedTo: z.string().optional(),
+  search: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(50_000).optional(),
+});
+
+function parseDayStrict(value: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) throw new Error('Invalid date');
+
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const da = Number(m[3]);
+
+  const d = new Date(Date.UTC(y, mo - 1, da));
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== da) {
+    throw new Error('Invalid date');
+  }
+  return d;
+}
 
 export const createTicket = async (
   req: AuthRequest,
@@ -428,4 +456,142 @@ export const addComment = async (
   await notificationService.notifyNewComment(ticket, comment, user);
 
   res.status(201).json({ message: 'Comment added', comment });
+};
+
+export const exportTicketsCsv = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const parsed = exportTicketsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid query', errors: parsed.error.errors });
+    return;
+  }
+
+  const { startDate, endDate, status, priority, category, assignedTo, search, limit } = parsed.data;
+
+  let start: Date | undefined;
+  let endExclusive: Date | undefined;
+  try {
+    if (startDate) start = parseDayStrict(startDate);
+    if (endDate) {
+      const end = parseDayStrict(endDate);
+      endExclusive = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+    }
+  } catch {
+    res.status(400).json({ message: 'Invalid date (use YYYY-MM-DD)' });
+    return;
+  }
+
+  if (start && endExclusive && endExclusive.getTime() < start.getTime()) {
+    res.status(400).json({ message: 'endDate must be >= startDate' });
+    return;
+  }
+
+  const query: Record<string, any> = { tenant: user.tenant._id };
+
+  if (status) query.status = status;
+  if (priority) query.priority = priority;
+  if (category) query.category = category;
+  if (assignedTo) query.assignedTo = assignedTo;
+
+  if (search) {
+    const q = escapeRegex(search);
+    query.$or = [
+      { title: { $regex: q, $options: 'i' } },
+      { ticketNumber: { $regex: q, $options: 'i' } },
+      { description: { $regex: q, $options: 'i' } },
+    ];
+  }
+
+  if (start || endExclusive) {
+    query.createdAt = {
+      ...(start ? { $gte: start } : null),
+      ...(endExclusive ? { $lt: endExclusive } : null),
+    };
+  }
+
+  // Clients can only export their own tickets.
+  if (user.role === 'client') {
+    query.createdBy = user._id;
+  }
+
+  const limitNum = limit ?? 5000;
+
+  const filename = `tickets-${startDate || 'all'}_to_${endDate || 'all'}.csv`;
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.status(200);
+  (res as any).flushHeaders?.();
+
+  // UTF-8 BOM helps Excel.
+  res.write('\ufeff');
+
+  const header = [
+    'ticketNumber',
+    'title',
+    'status',
+    'priority',
+    'category',
+    'createdBy',
+    'assignedTo',
+    'createdAt',
+    'updatedAt',
+    'firstResponseAt',
+    'resolvedAt',
+    'responseDue',
+    'resolutionDue',
+  ];
+
+  res.write(csvLine(header));
+
+  let written = 0;
+  const cursor = Ticket.find(query)
+    .sort({ createdAt: -1 })
+    .limit(limitNum)
+    .populate('createdBy', 'name email')
+    .populate('assignedTo', 'name email')
+    .populate('category', 'name')
+    .select('ticketNumber title status priority category createdBy assignedTo createdAt updatedAt sla')
+    .lean()
+    .cursor();
+
+  const onClose = () => {
+    try {
+      cursor.close();
+    } catch {
+      // ignore
+    }
+  };
+
+  req.on('close', onClose);
+
+  try {
+    for await (const t of cursor as any) {
+      written += 1;
+      const line = csvLine([
+        t.ticketNumber,
+        t.title,
+        t.status,
+        t.priority,
+        t.category?.name || '',
+        t.createdBy?.name || '',
+        t.assignedTo?.name || '',
+        t.createdAt ? new Date(t.createdAt).toISOString() : '',
+        t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
+        t.sla?.firstResponseAt ? new Date(t.sla.firstResponseAt).toISOString() : '',
+        t.sla?.resolvedAt ? new Date(t.sla.resolvedAt).toISOString() : '',
+        t.sla?.responseDue ? new Date(t.sla.responseDue).toISOString() : '',
+        t.sla?.resolutionDue ? new Date(t.sla.resolutionDue).toISOString() : '',
+      ]);
+
+      if (!res.write(line)) {
+        await once(res as any, 'drain');
+      }
+    }
+  } finally {
+    req.off('close', onClose);
+  }
+
+  // If request was aborted, don't try to end response.
+  if ((req as any).aborted) return;
+  res.end();
 };

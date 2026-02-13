@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Download, Plus, Search } from 'lucide-react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ticketsApi } from '@/api/tickets';
+import { useAuth } from '@/contexts/AuthContext';
 
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -57,10 +58,14 @@ const getPriorityBadge = (priority: string) => {
 };
 
 export default function TicketsPage() {
+  const { user, token } = useAuth();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [isExporting, setIsExporting] = useState(false);
+
+  const apiBaseUrl = useMemo(() => import.meta.env.VITE_API_URL || '/api', []);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -90,16 +95,58 @@ export default function TicketsPage() {
 
   const tickets = useMemo(() => data?.tickets || [], [data]);
 
+  const canExport = user?.role !== 'client';
+
+  const exportCsv = async () => {
+    if (!token) return;
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter);
+      params.set('limit', '50000');
+
+      const response = await fetch(`${apiBaseUrl}/tickets/export/csv?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tickets.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Tickets</h1>
-        <Link to="/tickets/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Ticket
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {canExport ? (
+            <Button variant="secondary" onClick={exportCsv} disabled={isExporting}>
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? 'Exportando...' : 'Exportar CSV'}
+            </Button>
+          ) : null}
+          <Link to="/tickets/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Ticket
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card>

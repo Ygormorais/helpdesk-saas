@@ -5,6 +5,7 @@ import {
   getTicketById,
   updateTicket,
   addComment,
+  exportTicketsCsv,
 } from '../controllers/ticketController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/auth.js';
@@ -44,6 +45,8 @@ router.use(authenticate);
  *         description: Lista de tickets
  */
 router.get('/', getTickets);
+
+router.get('/export/csv', authorize('admin', 'manager', 'agent'), exportTicketsCsv);
 
 /**
  * @swagger
