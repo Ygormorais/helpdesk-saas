@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -7,28 +8,29 @@ import { ChatProvider } from '@/contexts/ChatContext';
 import { TimeTrackingProvider } from '@/contexts/TimeTrackingContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import Layout from '@/components/Layout';
-import LoginPage from '@/pages/LoginPage';
-import RegisterPage from '@/pages/RegisterPage';
-import DashboardPage from '@/pages/DashboardPage';
-import ReportsPage from '@/pages/ReportsPage';
-import TicketsPage from '@/pages/TicketsPage';
-import TicketDetailPage from '@/pages/TicketDetailPage';
-import TicketNewPage from '@/pages/TicketNewPage';
-import CategoriesPage from '@/pages/CategoriesPage';
-import KnowledgeBasePage from '@/pages/KnowledgeBasePage';
-import ArticleDetailPage from '@/pages/ArticleDetailPage';
-import AdminArticlesPage from '@/pages/AdminArticlesPage';
-import AuditLogsPage from '@/pages/AuditLogsPage';
-import WebhooksPage from '@/pages/WebhooksPage';
-import SettingsPage from '@/pages/SettingsPage';
-import TeamPage from '@/pages/TeamPage';
-import ChatPage from '@/pages/ChatPage';
-import SatisfactionPage from '@/pages/SatisfactionPage';
-import TimeReportsPage from '@/pages/TimeReportsPage';
-import PlansPage from '@/pages/PlansPage';
-import LandingPage from '@/pages/LandingPage';
-import NotificationsPage from '@/pages/NotificationsPage';
 import { useAuth } from '@/contexts/AuthContext';
+
+const LoginPage = lazy(() => import('@/pages/LoginPage'));
+const RegisterPage = lazy(() => import('@/pages/RegisterPage'));
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
+const TicketsPage = lazy(() => import('@/pages/TicketsPage'));
+const TicketDetailPage = lazy(() => import('@/pages/TicketDetailPage'));
+const TicketNewPage = lazy(() => import('@/pages/TicketNewPage'));
+const CategoriesPage = lazy(() => import('@/pages/CategoriesPage'));
+const KnowledgeBasePage = lazy(() => import('@/pages/KnowledgeBasePage'));
+const ArticleDetailPage = lazy(() => import('@/pages/ArticleDetailPage'));
+const AdminArticlesPage = lazy(() => import('@/pages/AdminArticlesPage'));
+const AuditLogsPage = lazy(() => import('@/pages/AuditLogsPage'));
+const WebhooksPage = lazy(() => import('@/pages/WebhooksPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const TeamPage = lazy(() => import('@/pages/TeamPage'));
+const ChatPage = lazy(() => import('@/pages/ChatPage'));
+const SatisfactionPage = lazy(() => import('@/pages/SatisfactionPage'));
+const TimeReportsPage = lazy(() => import('@/pages/TimeReportsPage'));
+const PlansPage = lazy(() => import('@/pages/PlansPage'));
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,50 +55,56 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RouteLoader() {
+  return <div className="flex h-screen items-center justify-center">Loading...</div>;
+}
+
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
-      
-      {/* Protected Routes */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <NotificationProvider>
-              <TimeTrackingProvider>
-                <ChatProvider>
-                  <Layout />
-                </ChatProvider>
-              </TimeTrackingProvider>
-            </NotificationProvider>
-          </ProtectedRoute>
-        }
-      >
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="tickets" element={<TicketsPage />} />
-        <Route path="tickets/new" element={<TicketNewPage />} />
-        <Route path="tickets/:id" element={<TicketDetailPage />} />
-        <Route path="categories" element={<CategoriesPage />} />
-        <Route path="knowledge" element={<KnowledgeBasePage />} />
-        <Route path="knowledge/:slug" element={<ArticleDetailPage />} />
-        <Route path="admin/articles" element={<AdminArticlesPage />} />
-        <Route path="audit" element={<AuditLogsPage />} />
-        <Route path="webhooks" element={<WebhooksPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="team" element={<TeamPage />} />
-        <Route path="chat" element={<ChatPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="satisfaction" element={<SatisfactionPage />} />
-        <Route path="time" element={<TimeReportsPage />} />
-        <Route path="plans" element={<PlansPage />} />
-      </Route>
-    </Routes>
+    <Suspense fallback={<RouteLoader />}>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+        <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
+
+        {/* Protected Routes */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <NotificationProvider>
+                <TimeTrackingProvider>
+                  <ChatProvider>
+                    <Layout />
+                  </ChatProvider>
+                </TimeTrackingProvider>
+              </NotificationProvider>
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="tickets" element={<TicketsPage />} />
+          <Route path="tickets/new" element={<TicketNewPage />} />
+          <Route path="tickets/:id" element={<TicketDetailPage />} />
+          <Route path="categories" element={<CategoriesPage />} />
+          <Route path="knowledge" element={<KnowledgeBasePage />} />
+          <Route path="knowledge/:slug" element={<ArticleDetailPage />} />
+          <Route path="admin/articles" element={<AdminArticlesPage />} />
+          <Route path="audit" element={<AuditLogsPage />} />
+          <Route path="webhooks" element={<WebhooksPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="team" element={<TeamPage />} />
+          <Route path="chat" element={<ChatPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="satisfaction" element={<SatisfactionPage />} />
+          <Route path="time" element={<TimeReportsPage />} />
+          <Route path="plans" element={<PlansPage />} />
+        </Route>
+      </Routes>
+    </Suspense>
   );
 }
 
