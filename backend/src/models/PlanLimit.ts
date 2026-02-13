@@ -156,7 +156,6 @@ const planLimitSchema = new Schema<IPlanLimit>(
   }
 );
 
-planLimitSchema.index({ tenant: 1 });
 planLimitSchema.index({ 'subscription.stripeCustomerId': 1 });
 
 export const PlanLimit = mongoose.model<IPlanLimit>('PlanLimit', planLimitSchema);

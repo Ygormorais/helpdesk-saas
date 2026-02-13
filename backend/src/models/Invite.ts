@@ -55,7 +55,6 @@ const inviteSchema = new Schema<IInvite>(
   }
 );
 
-inviteSchema.index({ token: 1 });
 inviteSchema.index({ email: 1, tenant: 1 });
 
 export const Invite = mongoose.model<IInvite>('Invite', inviteSchema);
