@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, token } = useAuth();
   const { toast } = useToast();
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -39,6 +39,29 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Calcular contagem de não lidas
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const showNotification = useCallback((notification: Notification) => {
+    setNotifications(prev => [notification, ...prev].slice(0, 50));
+
+    const icons = {
+      TICKET_CREATED: <Ticket className="h-4 w-4" />,
+      TICKET_UPDATED: <AlertCircle className="h-4 w-4" />,
+      TICKET_ASSIGNED: <Bell className="h-4 w-4" />,
+      TICKET_RESOLVED: <CheckCircle className="h-4 w-4" />,
+      COMMENT_CREATED: <MessageSquare className="h-4 w-4" />,
+    };
+
+    toast({
+      title: (
+        <div className="flex items-center gap-2">
+          {icons[notification.type as keyof typeof icons] || <Bell className="h-4 w-4" />}
+          <span>{notification.title}</span>
+        </div>
+      ),
+      description: notification.message,
+      duration: 5000,
+    });
+  }, [toast]);
 
   // Load persisted notifications
   useEffect(() => {
@@ -72,11 +95,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Conectar ao socket quando autenticado
   useEffect(() => {
     if (!isAuthenticated || !user || !user.tenant || !token) {
-      if (socket) {
-        socket.disconnect();
-        setSocket(null);
-        setIsConnected(false);
-      }
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+      setIsConnected(false);
       return;
     }
 
@@ -85,14 +106,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     });
 
     newSocket.on('connect', () => {
-      console.log('Socket connected:', newSocket.id);
       setIsConnected(true);
 
       newSocket.emit('authenticate', { token, tenantId: user.tenant?.id || '' });
     });
 
     newSocket.on('disconnect', () => {
-      console.log('Socket disconnected');
       setIsConnected(false);
     });
 
@@ -109,37 +128,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       });
     });
 
-    setSocket(newSocket);
+    socketRef.current = newSocket;
 
     return () => {
       newSocket.disconnect();
+      if (socketRef.current === newSocket) {
+        socketRef.current = null;
+      }
+      setIsConnected(false);
     };
-  }, [isAuthenticated, user, token]);
-
-  const showNotification = useCallback((notification: Notification) => {
-    // Adicionar à lista
-    setNotifications(prev => [notification, ...prev].slice(0, 50)); // Manter últimas 50
-
-    // Mostrar toast
-    const icons = {
-      TICKET_CREATED: <Ticket className="h-4 w-4" />,
-      TICKET_UPDATED: <AlertCircle className="h-4 w-4" />,
-      TICKET_ASSIGNED: <Bell className="h-4 w-4" />,
-      TICKET_RESOLVED: <CheckCircle className="h-4 w-4" />,
-      COMMENT_CREATED: <MessageSquare className="h-4 w-4" />,
-    };
-
-    toast({
-      title: (
-        <div className="flex items-center gap-2">
-          {icons[notification.type as keyof typeof icons] || <Bell className="h-4 w-4" />}
-          <span>{notification.title}</span>
-        </div>
-      ),
-      description: notification.message,
-      duration: 5000,
-    });
-  }, [toast]);
+  }, [isAuthenticated, user, token, socketUrl, showNotification]);
 
   const markAsRead = useCallback((id: string) => {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
