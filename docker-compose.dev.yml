@@ -20,15 +20,14 @@ services:
       - redis_data:/data
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: node:20-alpine
     container_name: helpdesk-backend
     restart: unless-stopped
+    working_dir: /app
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=3000
       - MONGODB_URI=mongodb://mongodb:27017/helpdesk
       - REDIS_URL=redis://redis:6379
@@ -37,17 +36,27 @@ services:
     depends_on:
       - mongodb
       - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "npm ci && npm run dev"
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: node:20-alpine
     container_name: helpdesk-frontend
     restart: unless-stopped
+    working_dir: /app
     ports:
-      - "5173:80"
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3000}
     depends_on:
       - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
 
 volumes:
   mongodb_data:
