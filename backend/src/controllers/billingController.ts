@@ -5,6 +5,7 @@ import { PlanLimit, PlanType, WebhookEvent } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { config } from '../config/index.js';
+import { timingSafeEqual } from 'crypto';
 
 import type { AsaasSubscription } from '../services/asaasService.js';
 
@@ -117,29 +118,58 @@ export const handleWebhook = async (
   res: Response
 ): Promise<void> => {
   try {
+    const { event, payment, subscription } = req.body || {};
+
     if (config.asaasWebhookSecret) {
-      const token = req.headers['asaas-access-token'];
-      if (!token || token !== config.asaasWebhookSecret) {
+      const token = String(req.headers['asaas-access-token'] || '');
+      const secret = String(config.asaasWebhookSecret || '');
+      const a = Buffer.from(token);
+      const b = Buffer.from(secret);
+
+      if (!token || a.length !== b.length || !timingSafeEqual(a, b)) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
     }
 
     const eventId = req.body?.id ? String(req.body.id) : '';
+    const extRef = String(payment?.externalReference || subscription?.externalReference || '');
+    const tenantId = extRef ? extRef.split('-')[0] : '';
+    const resourceId = String(payment?.id || subscription?.id || '');
+
+    let webhookEventDocId: any = null;
     if (eventId) {
       try {
-        await WebhookEvent.create({ provider: 'asaas', eventId });
+        const doc = await WebhookEvent.create({
+          provider: 'asaas',
+          eventId,
+          tenant: tenantId || undefined,
+          event: event ? String(event) : undefined,
+          resourceId: resourceId || undefined,
+          status: 'received',
+          receivedAt: new Date(),
+        });
+        webhookEventDocId = doc._id;
       } catch (e: any) {
         if (e?.code === 11000) {
           // Duplicate event (at-least-once delivery)
+          await WebhookEvent.updateOne(
+            { provider: 'asaas', eventId },
+            {
+              $set: {
+                status: 'duplicate',
+                event: event ? String(event) : undefined,
+                tenant: tenantId || undefined,
+                resourceId: resourceId || undefined,
+              },
+            }
+          ).catch(() => undefined);
           res.status(200).json({ received: true, duplicate: true });
           return;
         }
         throw e;
       }
     }
-
-    const { event, payment, subscription } = req.body;
 
     console.log('Asaas webhook received:', event);
 
@@ -172,11 +202,46 @@ export const handleWebhook = async (
         console.log('Unhandled webhook event:', event);
     }
 
+    if (webhookEventDocId) {
+      await WebhookEvent.updateOne(
+        { _id: webhookEventDocId },
+        { $set: { status: 'processed', processedAt: new Date() } }
+      ).catch(() => undefined);
+    }
+
     res.status(200).json({ received: true });
   } catch (error: any) {
     console.error('Webhook error:', error);
+
+    const eventId = req.body?.id ? String(req.body.id) : '';
+    if (eventId) {
+      await WebhookEvent.updateOne(
+        { provider: 'asaas', eventId },
+        {
+          $set: {
+            status: 'error',
+            error: String(error?.message || error),
+            processedAt: new Date(),
+          },
+        }
+      ).catch(() => undefined);
+    }
+
     res.status(500).json({ error: error.message });
   }
+};
+
+export const listWebhookEvents = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const limitRaw = parseInt(String(req.query.limit || '50'), 10) || 50;
+  const limit = Math.min(200, Math.max(1, limitRaw));
+
+  const events = await WebhookEvent.find({ provider: 'asaas', tenant: user.tenant._id })
+    .sort({ receivedAt: -1 })
+    .limit(limit)
+    .select('provider eventId event resourceId status error receivedAt processedAt createdAt');
+
+  res.json({ data: events });
 };
 
 async function handlePaymentReceived(payment: any) {

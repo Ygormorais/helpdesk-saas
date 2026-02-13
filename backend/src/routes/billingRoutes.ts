@@ -4,6 +4,7 @@ import {
   handleWebhook,
   cancelSubscription,
   getBillingPortal,
+  listWebhookEvents,
 } from '../controllers/billingController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
 
@@ -17,5 +18,6 @@ router.use(authenticate);
 router.post('/checkout', authorize('admin', 'manager'), createCheckout);
 router.post('/cancel', authorize('admin', 'manager'), cancelSubscription);
 router.get('/portal', authorize('admin', 'manager'), getBillingPortal);
+router.get('/webhook-events', authorize('admin', 'manager'), listWebhookEvents);
 
 export default router;
