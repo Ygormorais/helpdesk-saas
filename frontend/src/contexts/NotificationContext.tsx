@@ -11,6 +11,7 @@ export interface Notification {
   title: string;
   message: string;
   ticketId?: string;
+  chatId?: string;
   userId?: string;
   createdAt: Date;
   read: boolean;
@@ -49,6 +50,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       TICKET_ASSIGNED: <Bell className="h-4 w-4" />,
       TICKET_RESOLVED: <CheckCircle className="h-4 w-4" />,
       COMMENT_CREATED: <MessageSquare className="h-4 w-4" />,
+      CHAT_MESSAGE: <MessageSquare className="h-4 w-4" />,
     };
 
     toast({
@@ -81,6 +83,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             title: n.title,
             message: n.message,
             ticketId: n.ticketId,
+            chatId: n.chatId,
             userId: n.createdBy,
             createdAt: new Date(n.createdAt),
             read: n.read,
@@ -122,6 +125,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         title: String(n.title),
         message: String(n.message),
         ticketId: n.ticketId ? String(n.ticketId) : undefined,
+        chatId: n.chatId ? String(n.chatId) : undefined,
         userId: n.createdBy ? String(n.createdBy) : undefined,
         createdAt: new Date(n.createdAt),
         read: false,

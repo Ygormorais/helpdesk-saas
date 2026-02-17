@@ -22,6 +22,11 @@ interface Chat {
   participants: any[];
   lastMessage?: ChatMessage;
   unreadCount: number;
+  ticket?: string;
+  scope?: 'ticket' | 'internal';
+  type?: 'dm' | 'channel';
+  name?: string;
+  channelKey?: string;
   status: 'active' | 'closed';
   createdAt: string;
   updatedAt: string;
@@ -34,12 +39,16 @@ interface ChatContextType {
   messages: ChatMessage[];
   onlineUsers: string[];
   isTyping: { userId: string; chatId: string } | null;
+  isLoadingChats: boolean;
+  isLoadingMessages: boolean;
+  scope: 'all' | 'internal' | 'ticket';
+  setScope: (scope: 'all' | 'internal' | 'ticket') => void;
   setCurrentChat: (chat: Chat | null) => void;
   sendMessage: (content: string) => void;
   startTyping: () => void;
   stopTyping: () => void;
   markAsRead: () => void;
-  refreshChats: () => void;
+  refreshChats: (scopeOverride?: 'all' | 'internal' | 'ticket') => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -54,6 +63,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState<{ userId: string; chatId: string } | null>(null);
+  const [scope, setScope] = useState<'all' | 'internal' | 'ticket'>('all');
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const currentChatIdRef = useRef<string | null>(null);
   const prevChatIdRef = useRef<string | null>(null);
@@ -64,10 +76,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     currentChatIdRef.current = currentChat?._id || null;
   }, [currentChat]);
 
-  const refreshChats = useCallback(async () => {
+  const refreshChats = useCallback(async (scopeOverride?: 'all' | 'internal' | 'ticket') => {
     if (!token) return;
     try {
-      const response = await fetch(`${apiBaseUrl}/chat`, {
+      setIsLoadingChats(true);
+      const effectiveScope = scopeOverride || scope;
+      const qs = effectiveScope === 'all' ? '' : `?scope=${encodeURIComponent(effectiveScope)}`;
+      const response = await fetch(`${apiBaseUrl}/chat${qs}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -77,12 +92,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setChats(data.chats || []);
     } catch (error) {
       console.error('Error fetching chats:', error);
+    } finally {
+      setIsLoadingChats(false);
     }
-  }, [apiBaseUrl, token]);
+  }, [apiBaseUrl, token, scope]);
 
   const fetchMessages = useCallback(async (chatId: string) => {
     if (!token) return;
     try {
+      setIsLoadingMessages(true);
       const response = await fetch(`${apiBaseUrl}/chat/${chatId}/messages`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -93,6 +111,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
     }
   }, [apiBaseUrl, token]);
 
@@ -175,7 +195,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated) {
       refreshChats();
     }
-  }, [isAuthenticated, refreshChats]);
+  }, [isAuthenticated, refreshChats, scope]);
 
   useEffect(() => {
     if (currentChat && socket) {
@@ -185,6 +205,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       prevChatIdRef.current = currentChat._id;
       socket.emit('join-chat', currentChat._id);
       fetchMessages(currentChat._id);
+      return;
+    }
+
+    if (!currentChat && socket) {
+      if (prevChatIdRef.current) {
+        socket.emit('leave-chat', prevChatIdRef.current);
+      }
+      prevChatIdRef.current = null;
+      setMessages([]);
+      setIsTyping(null);
     }
   }, [currentChat, socket, fetchMessages]);
 
@@ -226,6 +256,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         messages,
         onlineUsers,
         isTyping,
+        isLoadingChats,
+        isLoadingMessages,
+        scope,
+        setScope,
         setCurrentChat,
         sendMessage,
         startTyping,

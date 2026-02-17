@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, Plus, Search } from 'lucide-react';
+import { Download, MessageCircle, Plus, Search } from 'lucide-react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ticketsApi } from '@/api/tickets';
+import { chatApi } from '@/api/chat';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -59,11 +62,14 @@ const getPriorityBadge = (priority: string) => {
 
 export default function TicketsPage() {
   const { user, token } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [isExporting, setIsExporting] = useState(false);
+  const [openingChatId, setOpeningChatId] = useState<string | null>(null);
 
   const apiBaseUrl = useMemo(() => import.meta.env.VITE_API_URL || '/api', []);
 
@@ -96,6 +102,39 @@ export default function TicketsPage() {
   const tickets = useMemo(() => data?.tickets || [], [data]);
 
   const canExport = user?.role !== 'client';
+
+  const openTicketChat = async (ticket: any) => {
+    try {
+      if (!user) return;
+      setOpeningChatId(String(ticket._id));
+
+      const createdById = (ticket.createdBy?._id || ticket.createdBy?.id) as string | undefined;
+      const assigneeId = (ticket.assignedTo?._id || ticket.assignedTo?.id) as string | undefined;
+
+      let participantId: string | undefined;
+      if (user.role === 'client') participantId = assigneeId;
+      else participantId = createdById;
+
+      if (!participantId) {
+        throw new Error('missing-participant');
+      }
+
+      const res = await chatApi.create({ participantId, ticketId: String(ticket._id) });
+      const chat = res.data.chat;
+      if (chat?._id) {
+        navigate(`/chat?chatId=${encodeURIComponent(String(chat._id))}`);
+      }
+    } catch (error: any) {
+      const msg = error?.response?.data?.message;
+      toast({
+        title: 'Nao foi possivel abrir o chat',
+        description: msg || (user?.role === 'client' ? 'Ticket sem agente atribuido' : 'Tente novamente'),
+        variant: 'destructive',
+      });
+    } finally {
+      setOpeningChatId(null);
+    }
+  };
 
   const exportCsv = async () => {
     if (!token) return;
@@ -204,26 +243,27 @@ export default function TicketsPage() {
                 <th className="px-4 py-3 text-left text-sm font-medium">Categoria</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Criado por</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                <th className="px-4 py-3 text-right text-sm font-medium">Chat</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={7}>
+                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={8}>
                     Carregando tickets...
                   </td>
                 </tr>
               )}
               {isError && (
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={7}>
+                  <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={8}>
                     Erro ao carregar tickets
                   </td>
                 </tr>
               )}
               {!isLoading && !isError && tickets.length === 0 && (
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={7}>
+                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={8}>
                     Nenhum ticket encontrado
                   </td>
                 </tr>
@@ -246,6 +286,18 @@ export default function TicketsPage() {
                   <td className="px-4 py-3 text-sm">{ticket.createdBy?.name || '-'}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">
                     {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('pt-BR') : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openTicketChat(ticket)}
+                      disabled={openingChatId === String(ticket._id)}
+                      title="Abrir chat do ticket"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
                   </td>
                 </tr>
               ))}

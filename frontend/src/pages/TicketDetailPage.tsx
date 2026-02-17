@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, User, Send } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Clock, MessageCircle, User, Send } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 
 import Timer from '@/components/Timer';
 import { ticketsApi } from '@/api/tickets';
+import { chatApi } from '@/api/chat';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -68,6 +69,7 @@ const getPriorityBadge = (priority: string) => {
 
 export default function TicketDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -145,6 +147,46 @@ export default function TicketDetailPage() {
     if (!content || !id) return;
     addCommentMutation.mutate(content);
   };
+
+  const openChatMutation = useMutation({
+    mutationFn: async () => {
+      if (!user || !ticket || !id) {
+        throw new Error('missing-context');
+      }
+
+      const createdById = (ticket.createdBy?._id || ticket.createdBy?.id) as string | undefined;
+      const assigneeId = (ticket.assignedTo?._id || ticket.assignedTo?.id) as string | undefined;
+
+      let participantId: string | undefined;
+      if (user.role === 'client') {
+        participantId = assigneeId;
+      } else {
+        participantId = createdById;
+      }
+
+      if (!participantId) {
+        throw new Error('missing-participant');
+      }
+
+      const res = await chatApi.create({ participantId, ticketId: id });
+      return res.data.chat as any;
+    },
+    onSuccess: (chat: any) => {
+      if (!chat?._id) return;
+      navigate(`/chat?chatId=${encodeURIComponent(String(chat._id))}`);
+    },
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message;
+      const fallback = user?.role === 'client'
+        ? 'Esse ticket ainda nao tem um agente atribuido'
+        : 'Nao foi possivel abrir o chat';
+      toast({
+        title: 'Erro ao abrir chat',
+        description: msg || fallback,
+        variant: 'destructive',
+      });
+    },
+  });
 
   if (!id) {
     return (
@@ -227,7 +269,18 @@ export default function TicketDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Conversa</CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Conversa</CardTitle>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => openChatMutation.mutate()}
+                  disabled={openChatMutation.isPending}
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  {openChatMutation.isPending ? 'Abrindo...' : 'Abrir chat'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {comments.length === 0 && (

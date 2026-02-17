@@ -142,10 +142,11 @@ class ChatService {
       await message.populate('sender', 'name email avatar');
 
       chat.lastMessage = message;
-      const other = chat.participants.find((p) => p.toString() !== user.userId);
-      if (other) {
-        const k = other.toString();
-        chat.unreadCount.set(k, (chat.unreadCount.get(k) || 0) + 1);
+
+      for (const p of chat.participants) {
+        const pid = p.toString();
+        if (pid === user.userId) continue;
+        chat.unreadCount.set(pid, (chat.unreadCount.get(pid) || 0) + 1);
       }
       await chat.save();
 
@@ -237,11 +238,72 @@ class ChatService {
       tenant: tenantId,
       participants: participantIds,
       ticket: ticketId,
+      scope: ticketId ? 'ticket' : 'internal',
+      type: 'dm',
     });
   }
 
-  async getUserChats(userId: string, tenantId: string) {
-    return Chat.find({ tenant: tenantId, participants: userId, status: 'active' })
+  async ensureDefaultInternalChannels(tenantId: string) {
+    const staff = await User.find({ tenant: tenantId, isActive: true, role: { $ne: 'client' } }).select('_id');
+    const staffIds = staff.map((u) => u._id);
+
+    const defaults = [
+      { channelKey: 'sales', name: 'Vendas' },
+      { channelKey: 'support', name: 'Suporte' },
+      { channelKey: 'cs', name: 'CS' },
+    ];
+
+    await Promise.all(
+      defaults.map(async (d) => {
+        const existing = await Chat.findOne({
+          tenant: tenantId,
+          scope: 'internal',
+          type: 'channel',
+          channelKey: d.channelKey,
+          status: 'active',
+        }).select('_id participants');
+
+        if (!existing) {
+          await Chat.create({
+            tenant: tenantId,
+            participants: staffIds,
+            scope: 'internal',
+            type: 'channel',
+            channelKey: d.channelKey,
+            name: d.name,
+            isDefault: true,
+          });
+          return;
+        }
+
+        if (staffIds.length > 0) {
+          await Chat.updateOne(
+            { _id: existing._id },
+            { $addToSet: { participants: { $each: staffIds } } }
+          );
+        }
+      })
+    );
+  }
+
+  async getUserChats(userId: string, tenantId: string, scope: 'all' | 'internal' | 'ticket' = 'all') {
+    const query: Record<string, any> = { tenant: tenantId, participants: userId, status: 'active' };
+
+    if (scope === 'internal') {
+      query.$or = [
+        { scope: 'internal' },
+        { scope: { $exists: false }, ticket: { $exists: false } },
+      ];
+    }
+
+    if (scope === 'ticket') {
+      query.$or = [
+        { scope: 'ticket' },
+        { ticket: { $exists: true } },
+      ];
+    }
+
+    return Chat.find(query)
       .populate('participants', 'name email avatar role')
       .populate('lastMessage')
       .sort({ updatedAt: -1 });

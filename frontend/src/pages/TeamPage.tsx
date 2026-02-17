@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Plus, Mail, UserPlus, Clock, Check, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Mail, UserPlus, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { usersApi } from '@/api/users';
+import { invitesApi, type InviteDto } from '@/api/invites';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const roles = [
   { value: 'admin', label: 'Administrador', desc: 'Acesso completo ao sistema' },
@@ -22,17 +27,15 @@ const roles = [
   { value: 'client', label: 'Cliente', desc: 'Acesso limitado' },
 ];
 
-const mockInvites = [
-  { id: '1', email: 'joao@empresa.com', role: 'agent', status: 'pending', sentAt: '2024-01-15 10:00', expiresAt: '2024-01-17 10:00' },
-  { id: '2', email: 'maria@empresa.com', role: 'manager', status: 'pending', sentAt: '2024-01-14 15:00', expiresAt: '2024-01-16 15:00' },
-  { id: '3', email: 'pedro@empresa.com', role: 'agent', status: 'accepted', sentAt: '2024-01-10 09:00', acceptedAt: '2024-01-10 09:30' },
-];
-
-const mockTeamMembers = [
-  { id: '1', name: 'Admin Sistema', email: 'admin@empresa.com', role: 'admin', avatar: 'A', lastActive: '2024-01-15 10:30' },
-  { id: '2', name: 'Carlos Tech', email: 'carlos@empresa.com', role: 'agent', avatar: 'C', lastActive: '2024-01-15 10:25' },
-  { id: '3', name: 'Ana Silva', email: 'ana@empresa.com', role: 'agent', avatar: 'A', lastActive: '2024-01-15 09:45' },
-];
+const getInitials = (name: string) =>
+  String(name || '')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
 const getRoleBadge = (role: string) => {
   const styles: Record<string, string> = {
@@ -55,8 +58,72 @@ const getRoleBadge = (role: string) => {
 };
 
 export default function TeamPage() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useAuth();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newInvite, setNewInvite] = useState({ email: '', role: 'agent' as string });
+
+  const canManageInvites = user?.role === 'admin' || user?.role === 'manager';
+
+  const membersQuery = useQuery({
+    queryKey: ['team-members'],
+    queryFn: async () => {
+      const res = await usersApi.listStaff();
+      return res.data.users;
+    },
+  });
+
+  const invitesQuery = useQuery({
+    queryKey: ['invites'],
+    queryFn: async () => {
+      const res = await invitesApi.list();
+      return (res.data.invites || []) as InviteDto[];
+    },
+  });
+
+  const pendingInvites = useMemo(
+    () => (invitesQuery.data || []).filter((i) => i.status === 'pending'),
+    [invitesQuery.data]
+  );
+
+  const createInviteMutation = useMutation({
+    mutationFn: async () => {
+      const email = newInvite.email.trim().toLowerCase();
+      const role = newInvite.role as InviteDto['role'];
+      if (!email) throw new Error('email');
+      return invitesApi.create({ email, role });
+    },
+    onSuccess: () => {
+      toast({ title: 'Convite enviado' });
+      setNewInvite({ email: '', role: 'agent' });
+      setIsDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['invites'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao enviar convite',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const cancelInviteMutation = useMutation({
+    mutationFn: async (id: string) => invitesApi.cancel(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invites'] });
+      toast({ title: 'Convite cancelado' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao cancelar convite',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -65,61 +132,66 @@ export default function TeamPage() {
           <h1 className="text-3xl font-bold">Equipe</h1>
           <p className="text-muted-foreground">Gerencie membros e convites</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Convidar Membro
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Convidar Novo Membro</DialogTitle>
-              <DialogDescription>
-                Envie um convite para adicionar alguém à sua equipe.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="pessoa@empresa.com"
-                  value={newInvite.email}
-                  onChange={(e) => setNewInvite({ ...newInvite, email: e.target.value })}
-                />
+        {canManageInvites ? (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Convidar Membro
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Convidar Novo Membro</DialogTitle>
+                <DialogDescription>
+                  Envie um convite para adicionar alguém à sua equipe.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="pessoa@empresa.com"
+                    value={newInvite.email}
+                    onChange={(e) => setNewInvite({ ...newInvite, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Função</Label>
+                  <Select
+                    value={newInvite.role}
+                    onValueChange={(value) => setNewInvite({ ...newInvite, role: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role.value} value={role.value}>
+                          {role.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Função</Label>
-                <Select
-                  value={newInvite.role}
-                  onValueChange={(value) => setNewInvite({ ...newInvite, role: value })}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => createInviteMutation.mutate()}
+                  disabled={createInviteMutation.isPending || !newInvite.email.trim()}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role.value} value={role.value}>
-                        {role.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={() => setIsDialogOpen(false)}>
-                <Mail className="mr-2 h-4 w-4" />
-                Enviar Convite
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                  <Mail className="mr-2 h-4 w-4" />
+                  {createInviteMutation.isPending ? 'Enviando...' : 'Enviar Convite'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
 
       <div className="grid gap-6">
@@ -130,26 +202,32 @@ export default function TeamPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockTeamMembers.map((member) => (
-                <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">{member.avatar}</span>
+              {membersQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">Carregando membros...</p>
+              ) : membersQuery.isError ? (
+                <p className="text-sm text-destructive">Erro ao carregar membros</p>
+              ) : (membersQuery.data || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum membro encontrado</p>
+              ) : (
+                (membersQuery.data || []).map((member) => (
+                  <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-medium text-primary">
+                          {getInitials(member.name)}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{member.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">{member.email}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{member.name}</p>
-                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                    <div className="flex items-center gap-4">
+                      {getRoleBadge(member.role)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    {getRoleBadge(member.role)}
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>Último acesso: {member.lastActive}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -160,28 +238,41 @@ export default function TeamPage() {
             <CardDescription>Convites enviados aguardando resposta</CardDescription>
           </CardHeader>
           <CardContent>
-            {mockInvites.filter((i) => i.status === 'pending').length > 0 ? (
+            {invitesQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Carregando convites...</p>
+            ) : invitesQuery.isError ? (
+              <p className="text-sm text-destructive">Erro ao carregar convites</p>
+            ) : pendingInvites.length > 0 ? (
               <div className="space-y-4">
-                {mockInvites.filter((i) => i.status === 'pending').map((invite) => (
-                  <div key={invite.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                {pendingInvites.map((invite) => (
+                  <div key={invite._id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                         <Mail className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <div>
-                        <p className="font-medium">{invite.email}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>Enviado: {invite.sentAt}</span>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{invite.email}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                          <span>Enviado: {invite.createdAt ? new Date(invite.createdAt).toLocaleString('pt-BR') : '-'}</span>
                           <span>•</span>
-                          <span>Expira: {invite.expiresAt}</span>
+                          <span>Expira: {invite.expiresAt ? new Date(invite.expiresAt).toLocaleString('pt-BR') : '-'}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {getRoleBadge(invite.role)}
-                      <Button variant="ghost" size="icon" className="text-destructive">
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {canManageInvites ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => cancelInviteMutation.mutate(invite._id)}
+                          disabled={cancelInviteMutation.isPending}
+                          title="Cancelar convite"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 ))}

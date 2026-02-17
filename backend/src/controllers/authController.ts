@@ -33,8 +33,9 @@ export const register = async (
 ): Promise<void> => {
   try {
     const { email, password, name, tenantName } = registerSchema.parse(req.body);
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       throw new AppError('Email already registered', 400);
     }
@@ -48,7 +49,7 @@ export const register = async (
     await planService.initializeTenantPlan(tenant._id.toString());
 
     const user = await User.create({
-      email,
+      email: normalizedEmail,
       password,
       name,
       role: UserRole.ADMIN,
@@ -86,8 +87,9 @@ export const login = async (
 ): Promise<void> => {
   try {
     const { email, password } = loginSchema.parse(req.body);
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const user = await User.findOne({ email }).populate('tenant');
+    const user = await User.findOne({ email: normalizedEmail }).populate('tenant');
     if (!user) {
       throw new AppError('Invalid credentials', 401);
     }

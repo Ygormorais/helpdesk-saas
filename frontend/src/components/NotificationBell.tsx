@@ -24,6 +24,8 @@ export function NotificationBell() {
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'COMMENT_CREATED':
         return <MessageSquare className="h-4 w-4 text-indigo-500" />;
+      case 'CHAT_MESSAGE':
+        return <MessageSquare className="h-4 w-4 text-indigo-500" />;
       default:
         return <Bell className="h-4 w-4" />;
     }
@@ -52,8 +54,8 @@ export function NotificationBell() {
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm max-h-[80vh] p-0">
-        <DialogHeader className="px-4 py-3 border-b">
+        <DialogContent className="max-w-sm max-h-[80vh] p-0">
+        <DialogHeader className="px-4 py-3 border-b pr-12">
           <div className="flex items-center justify-between">
             <DialogTitle>Notificações</DialogTitle>
             <div className="flex gap-1">
@@ -98,11 +100,15 @@ export function NotificationBell() {
                     !notification.read ? 'bg-muted/50' : ''
                   }`}
                 >
-                  <Link
-                    to={notification.ticketId ? `/tickets/${notification.ticketId}` : '#'}
-                    onClick={() => handleNotificationClick(notification)}
-                    className="w-full"
-                  >
+                   <Link
+                     to={notification.ticketId
+                       ? `/tickets/${notification.ticketId}`
+                       : notification.chatId
+                         ? `/chat?chatId=${encodeURIComponent(notification.chatId)}`
+                         : '#'}
+                     onClick={() => handleNotificationClick(notification)}
+                     className="w-full"
+                   >
                     <div className="flex items-start gap-3 w-full">
                       <div className="mt-0.5">{getIcon(notification.type)}</div>
                       <div className="flex-1 min-w-0">

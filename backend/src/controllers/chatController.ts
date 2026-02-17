@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Chat, Message } from '../models/index.js';
+import { Chat, Message, Ticket, User } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { chatService } from '../services/chatService.js';
@@ -21,6 +21,51 @@ export const createChat = async (
   try {
     const data = createChatSchema.parse(req.body);
     const user = req.user!;
+
+    const participant = await User.findOne({
+      _id: data.participantId,
+      tenant: (user.tenant as any)?._id || user.tenant,
+      isActive: true,
+    }).select('_id role');
+
+    if (!participant) {
+      throw new AppError('Participant not found', 404);
+    }
+
+    if (!data.ticketId) {
+      if (user.role === 'client') {
+        throw new AppError('Forbidden', 403);
+      }
+      if (participant.role === 'client') {
+        throw new AppError('Internal chat can only be created with staff', 400);
+      }
+    }
+
+    if (data.ticketId) {
+      const ticketQuery: any = {
+        _id: data.ticketId,
+        tenant: (user.tenant as any)?._id || user.tenant,
+      };
+      if (user.role === 'client') {
+        ticketQuery.createdBy = user._id;
+      }
+
+      const ticket = await Ticket.findOne(ticketQuery)
+        .select('_id createdBy assignedTo');
+
+      if (!ticket) {
+        throw new AppError('Ticket not found', 404);
+      }
+
+      const createdById = ticket.createdBy?.toString();
+      const assignedToId = ticket.assignedTo?.toString();
+      const pid = participant._id.toString();
+
+      const allowed = pid === createdById || (assignedToId && pid === assignedToId);
+      if (!allowed) {
+        throw new AppError('Participant must belong to the ticket', 400);
+      }
+    }
 
     const chat = await chatService.createChat(
       user.tenant._id.toString(),
@@ -46,9 +91,20 @@ export const getMyChats = async (
 ): Promise<void> => {
   const user = req.user!;
 
+  const scopeRaw = String((req.query as any).scope || 'all');
+  const scope = (scopeRaw === 'internal' || scopeRaw === 'ticket') ? scopeRaw : 'all';
+
+  if (scope === 'internal') {
+    if (user.role === 'client') {
+      throw new AppError('Forbidden', 403);
+    }
+    await chatService.ensureDefaultInternalChannels(user.tenant._id.toString());
+  }
+
   const chats = await chatService.getUserChats(
     user._id.toString(),
-    user.tenant._id.toString()
+    user.tenant._id.toString(),
+    scope
   );
 
   const chatsWithUnread = chats.map((chat) => {
@@ -120,14 +176,11 @@ export const sendMessage = async (
     await message.populate('sender', 'name email avatar');
 
     chat.lastMessage = message;
-    const otherParticipant = chat.participants.find(
-      (p) => p.toString() !== user._id.toString()
-    );
-    if (otherParticipant) {
-      chat.unreadCount.set(
-        otherParticipant.toString(),
-        (chat.unreadCount.get(otherParticipant.toString()) || 0) + 1
-      );
+
+    for (const p of chat.participants) {
+      const pid = p.toString();
+      if (pid === user._id.toString()) continue;
+      chat.unreadCount.set(pid, (chat.unreadCount.get(pid) || 0) + 1);
     }
     await chat.save();
 

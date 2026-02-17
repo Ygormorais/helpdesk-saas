@@ -115,7 +115,11 @@ export default function NotificationsPage() {
           )}
 
           {notifications.map((n) => {
-            const link = n.ticketId ? `/tickets/${n.ticketId}` : n.chatId ? `/chat` : '#';
+            const link = n.ticketId
+              ? `/tickets/${n.ticketId}`
+              : n.chatId
+                ? `/chat?chatId=${encodeURIComponent(n.chatId)}`
+                : '#';
             return (
               <Link
                 key={n.id}

@@ -13,6 +13,7 @@ import satisfactionRoutes from './satisfactionRoutes.js';
 import timeTrackingRoutes from './timeTrackingRoutes.js';
 import planRoutes from './planRoutes.js';
 import billingRoutes from './billingRoutes.js';
+import userRoutes from './userRoutes.js';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/satisfaction', satisfactionRoutes);
 router.use('/time', timeTrackingRoutes);
 router.use('/plan', planRoutes);
 router.use('/billing', billingRoutes);
+router.use('/users', userRoutes);
 
 export default router;

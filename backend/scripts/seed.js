@@ -27,7 +27,16 @@ async function main() {
     await client.connect();
     console.log('Seed DB connected');
 
-    const db = client.db('helpdesk');
+    const dbNameFromUri = (() => {
+      try {
+        const u = new URL(uri);
+        const p = String(u.pathname || '').replace(/^\//, '');
+        return p && p !== '' ? p : '';
+      } catch {
+        return '';
+      }
+    })();
+    const db = client.db(dbNameFromUri || process.env.MONGODB_DB || 'helpdesk');
 
     const tenants = db.collection('tenants');
     const users = db.collection('users');
