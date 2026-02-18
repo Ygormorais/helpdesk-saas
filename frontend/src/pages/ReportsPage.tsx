@@ -74,13 +74,17 @@ export default function ReportsPage() {
     queryKey: ['report-schedules'],
     queryFn: async () => {
       const res = await reportSchedulesApi.list();
-      return res.data.schedules;
+      return res.data;
     },
     staleTime: 60_000,
     retry: 0,
   });
 
   const schedulesForbidden = (schedulesQuery.error as any)?.response?.status === 403;
+  const schedules = schedulesQuery.data?.schedules || [];
+  const schedulesUsage = schedulesQuery.data?.usage;
+  const schedulesLimitReached =
+    schedulesUsage?.max !== undefined && schedulesUsage.max !== -1 && (schedulesUsage.current || 0) >= schedulesUsage.max;
 
   const createSchedule = useMutation({
     mutationFn: async () => {
@@ -346,32 +350,56 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>Relatorios agendados (Email)</CardTitle>
-            <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="secondary"
-                  disabled={schedulesForbidden}
-                  onClick={() => {
-                    if (schedulesForbidden) {
-                      toast({
-                        title: 'Agendamento bloqueado',
-                        description: 'Disponivel apenas em planos superiores.',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                >
-                  Agendar
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Novo agendamento</DialogTitle>
-                </DialogHeader>
+       <Card>
+         <CardHeader>
+           <div className="flex items-center justify-between gap-3">
+             <div className="space-y-1">
+               <CardTitle>Relatorios agendados (Email)</CardTitle>
+               {!schedulesForbidden && schedulesUsage ? (
+                 <p className="text-xs text-muted-foreground">
+                   {schedulesUsage.max === -1 ? 'Ilimitado' : `${schedulesUsage.current}/${schedulesUsage.max} usados`}
+                   {schedulesLimitReached ? (
+                     <>
+                       {' '}
+                       - limite do plano atingido. <Link className="underline" to="/plans">Ver planos</Link>
+                     </>
+                   ) : null}
+                 </p>
+               ) : null}
+             </div>
+             <Dialog
+               open={scheduleOpen}
+               onOpenChange={(open) => {
+                 if (open) {
+                   if (schedulesForbidden) {
+                     toast({
+                       title: 'Agendamento bloqueado',
+                       description: 'Disponivel apenas em planos superiores.',
+                       variant: 'destructive',
+                     });
+                     return;
+                   }
+                   if (schedulesLimitReached) {
+                     toast({
+                       title: 'Limite do plano atingido',
+                       description: 'Voce atingiu o limite de relatorios agendados do seu plano. Veja os planos para aumentar esse limite.',
+                       variant: 'destructive',
+                     });
+                     return;
+                   }
+                 }
+                 setScheduleOpen(open);
+               }}
+             >
+               <DialogTrigger asChild>
+                 <Button variant="secondary" disabled={schedulesQuery.isLoading}>
+                   Agendar
+                 </Button>
+               </DialogTrigger>
+               <DialogContent className="max-w-lg">
+                 <DialogHeader>
+                   <DialogTitle>Novo agendamento</DialogTitle>
+                 </DialogHeader>
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <Label>Nome</Label>
@@ -449,32 +477,32 @@ export default function ReportsPage() {
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent>
-          {schedulesForbidden ? (
-            <FeatureUnavailable
-              title="Agendamento bloqueado"
-              description="Relatorios agendados por email estao disponiveis apenas em planos superiores."
-            />
-          ) : schedulesQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">Carregando...</p>
-          ) : schedulesQuery.isError ? (
-            <p className="text-sm text-destructive">Falha ao carregar agendamentos</p>
-          ) : (schedulesQuery.data || []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum agendamento criado</p>
-          ) : (
-            <div className="space-y-2">
-              {(schedulesQuery.data || []).map((s: any) => (
-                <div key={s._id} className="rounded-lg border p-3">
-                  <p className="font-medium">{s.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Proximo envio: {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString('pt-BR') : '-'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+         <CardContent>
+           {schedulesForbidden ? (
+             <FeatureUnavailable
+               title="Agendamento bloqueado"
+               description="Relatorios agendados por email estao disponiveis apenas em planos superiores."
+             />
+           ) : schedulesQuery.isLoading ? (
+             <p className="text-sm text-muted-foreground">Carregando...</p>
+           ) : schedulesQuery.isError ? (
+             <p className="text-sm text-destructive">Falha ao carregar agendamentos</p>
+           ) : schedules.length === 0 ? (
+             <p className="text-sm text-muted-foreground">Nenhum agendamento criado</p>
+           ) : (
+             <div className="space-y-2">
+               {schedules.map((s: any) => (
+                 <div key={s._id} className="rounded-lg border p-3">
+                   <p className="font-medium">{s.name}</p>
+                   <p className="text-xs text-muted-foreground mt-1">
+                     Proximo envio: {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString('pt-BR') : '-'}
+                   </p>
+                 </div>
+               ))}
+             </div>
+           )}
+         </CardContent>
+       </Card>
 
       {reportsQuery.isError ? (
         <div className="text-sm text-red-600">Falha ao carregar relatórios.</div>

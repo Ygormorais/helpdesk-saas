@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { PlanLimit, PLAN_LIMITS, PlanType, User, Ticket, Macro, AutomationRule, type IPlanLimit } from '../models/index.js';
+import { PlanLimit, PLAN_LIMITS, PlanType, User, Ticket, Macro, AutomationRule, ReportSchedule, type IPlanLimit } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
@@ -42,6 +42,7 @@ export class PlanService {
     maxStorage: number;
     maxMacros: number;
     maxAutomationRules: number;
+    maxReportSchedules: number;
     auditRetentionDays: number;
     features: IPlanLimit['features'];
     isPaidAccessBlocked: boolean;
@@ -57,8 +58,30 @@ export class PlanService {
       return base + extra;
     };
 
-    const extraAgents = Number((planLimit as any).addons?.extraAgents || 0) || 0;
-    const extraStorage = Number((planLimit as any).addons?.extraStorage || 0) || 0;
+    const oneTimeExtraAgents = Number((planLimit as any).addons?.extraAgents || 0) || 0;
+    const oneTimeExtraStorage = Number((planLimit as any).addons?.extraStorage || 0) || 0;
+
+    const recurring = Array.isArray((planLimit as any).addons?.recurring) ? (planLimit as any).addons.recurring : [];
+    const now = Date.now();
+    const recurringExtraAgents = recurring
+      .filter((r: any) => {
+        const status = String(r.status || '');
+        if (status === 'active' || status === 'trialing') return true;
+        if (status === 'canceled' && r.currentPeriodEnd) return new Date(r.currentPeriodEnd).getTime() > now;
+        return false;
+      })
+      .reduce((acc: number, r: any) => acc + (Number(r.extraAgents || 0) || 0), 0);
+    const recurringExtraStorage = recurring
+      .filter((r: any) => {
+        const status = String(r.status || '');
+        if (status === 'active' || status === 'trialing') return true;
+        if (status === 'canceled' && r.currentPeriodEnd) return new Date(r.currentPeriodEnd).getTime() > now;
+        return false;
+      })
+      .reduce((acc: number, r: any) => acc + (Number(r.extraStorage || 0) || 0), 0);
+
+    const extraAgents = oneTimeExtraAgents + recurringExtraAgents;
+    const extraStorage = oneTimeExtraStorage + recurringExtraStorage;
 
     // During the initial trial (created on tenant signup) we grant PRO access,
     // even though the stored plan is FREE.
@@ -71,6 +94,7 @@ export class PlanService {
         maxStorage: addIfFinite(pro.maxStorage, extraStorage),
         maxMacros: pro.maxMacros,
         maxAutomationRules: pro.maxAutomationRules,
+        maxReportSchedules: pro.maxReportSchedules,
         auditRetentionDays: pro.auditRetentionDays,
         features: mergeFeatures(pro.features),
         isPaidAccessBlocked: false,
@@ -92,6 +116,7 @@ export class PlanService {
           maxStorage: addIfFinite(cfg.maxStorage, extraStorage),
           maxMacros: cfg.maxMacros,
           maxAutomationRules: cfg.maxAutomationRules,
+          maxReportSchedules: cfg.maxReportSchedules,
           auditRetentionDays: cfg.auditRetentionDays,
           features: mergeFeatures(cfg.features),
           isPaidAccessBlocked: false,
@@ -105,6 +130,7 @@ export class PlanService {
         maxStorage: addIfFinite(free.maxStorage, extraStorage),
         maxMacros: free.maxMacros,
         maxAutomationRules: free.maxAutomationRules,
+        maxReportSchedules: free.maxReportSchedules,
         auditRetentionDays: free.auditRetentionDays,
         features: mergeFeatures(free.features),
         isPaidAccessBlocked: true,
@@ -122,6 +148,7 @@ export class PlanService {
         maxStorage: addIfFinite(planLimit.maxStorage, extraStorage),
         maxMacros: PLAN_LIMITS[planLimit.plan].maxMacros,
         maxAutomationRules: PLAN_LIMITS[planLimit.plan].maxAutomationRules,
+        maxReportSchedules: PLAN_LIMITS[planLimit.plan].maxReportSchedules,
         auditRetentionDays: PLAN_LIMITS[planLimit.plan].auditRetentionDays,
         features: mergeFeatures(PLAN_LIMITS[planLimit.plan].features),
         isPaidAccessBlocked: false,
@@ -136,6 +163,7 @@ export class PlanService {
       maxStorage: addIfFinite(free.maxStorage, extraStorage),
       maxMacros: free.maxMacros,
       maxAutomationRules: free.maxAutomationRules,
+      maxReportSchedules: free.maxReportSchedules,
       auditRetentionDays: free.auditRetentionDays,
       features: mergeFeatures(free.features),
       isPaidAccessBlocked: true,
@@ -260,7 +288,7 @@ export class PlanService {
     }
 
     // Refresh usage metrics (cheap counters)
-    const [currentAgents, currentTickets, currentMacros, currentAutomationRules] = await Promise.all([
+    const [currentAgents, currentTickets, currentMacros, currentAutomationRules, currentReportSchedules] = await Promise.all([
       User.countDocuments({
         tenant: tenantId,
         role: { $in: ['admin', 'manager', 'agent'] },
@@ -268,6 +296,7 @@ export class PlanService {
       Ticket.countDocuments({ tenant: tenantId }),
       Macro.countDocuments({ tenant: tenantId }),
       AutomationRule.countDocuments({ tenant: tenantId }),
+      ReportSchedule.countDocuments({ tenant: tenantId }),
     ]);
 
     planLimit.currentUsage.agents = currentAgents;
@@ -292,6 +321,7 @@ export class PlanService {
         storage: { current: planLimit.currentUsage.storage, max: effective.maxStorage },
         macros: { current: currentMacros, max: effective.maxMacros },
         automations: { current: currentAutomationRules, max: effective.maxAutomationRules },
+        reportSchedules: { current: currentReportSchedules, max: effective.maxReportSchedules },
       },
       retention: {
         auditDays: effective.auditRetentionDays,

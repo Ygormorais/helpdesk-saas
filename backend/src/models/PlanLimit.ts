@@ -36,6 +36,16 @@ export interface IPlanLimit extends Document {
     extraAgents?: number;
     extraStorage?: number; // MB
     aiCredits?: number;
+
+    recurring?: Array<{
+      addOnId: string;
+      subscriptionId: string;
+      status: 'active' | 'trialing' | 'past_due' | 'canceled';
+      extraAgents: number;
+      extraStorage: number;
+      aiCredits: number;
+      currentPeriodEnd?: Date;
+    }>;
   };
   subscription: {
     status: 'active' | 'trialing' | 'past_due' | 'canceled';
@@ -61,6 +71,7 @@ export interface PlanLimitConfig {
   maxStorage: number;
   maxMacros: number;
   maxAutomationRules: number;
+  maxReportSchedules: number;
   auditRetentionDays: number;
   features: IPlanLimit['features'];
 }
@@ -73,6 +84,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxStorage: 100,
     maxMacros: 0,
     maxAutomationRules: 0,
+    maxReportSchedules: 0,
     auditRetentionDays: 7,
     features: {
       knowledgeBase: false,
@@ -96,6 +108,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxStorage: 1000,
     maxMacros: 50,
     maxAutomationRules: 20,
+    maxReportSchedules: 0,
     auditRetentionDays: 90,
     features: {
       knowledgeBase: true,
@@ -119,6 +132,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxStorage: 10000,
     maxMacros: -1,
     maxAutomationRules: -1,
+    maxReportSchedules: 10,
     auditRetentionDays: 365,
     features: {
       knowledgeBase: true,
@@ -185,6 +199,24 @@ const planLimitSchema = new Schema<IPlanLimit>(
       extraAgents: { type: Number, default: 0 },
       extraStorage: { type: Number, default: 0 },
       aiCredits: { type: Number, default: 0 },
+      recurring: {
+        type: [
+          {
+            addOnId: { type: String, required: true },
+            subscriptionId: { type: String, required: true },
+            status: {
+              type: String,
+              enum: ['active', 'trialing', 'past_due', 'canceled'],
+              default: 'trialing',
+            },
+            extraAgents: { type: Number, default: 0 },
+            extraStorage: { type: Number, default: 0 },
+            aiCredits: { type: Number, default: 0 },
+            currentPeriodEnd: Date,
+          },
+        ],
+        default: [],
+      },
     },
     subscription: {
       status: {

@@ -19,9 +19,33 @@ const PLAN_PRICES: Record<PlanType, number> = {
 };
 
 const ADDON_CATALOG = {
-  extra_agents_5: { id: 'extra_agents_5', name: 'Agentes +5', price: 19.9, extraAgents: 5, extraStorage: 0, aiCredits: 0 },
-  extra_storage_5000: { id: 'extra_storage_5000', name: 'Storage +5GB', price: 9.9, extraAgents: 0, extraStorage: 5000, aiCredits: 0 },
-  ai_pack_1000: { id: 'ai_pack_1000', name: 'AI Pack 1000', price: 15.9, extraAgents: 0, extraStorage: 0, aiCredits: 1000 },
+  extra_agents_5: {
+    id: 'extra_agents_5',
+    name: 'Agentes +5',
+    priceOneTime: 19.9,
+    priceMonthly: 9.9,
+    extraAgents: 5,
+    extraStorage: 0,
+    aiCredits: 0,
+  },
+  extra_storage_5000: {
+    id: 'extra_storage_5000',
+    name: 'Storage +5GB',
+    priceOneTime: 9.9,
+    priceMonthly: 4.9,
+    extraAgents: 0,
+    extraStorage: 5000,
+    aiCredits: 0,
+  },
+  ai_pack_1000: {
+    id: 'ai_pack_1000',
+    name: 'AI Pack 1000',
+    priceOneTime: 15.9,
+    priceMonthly: 7.9,
+    extraAgents: 0,
+    extraStorage: 0,
+    aiCredits: 1000,
+  },
 } as const;
 
 type AddOnId = keyof typeof ADDON_CATALOG;
@@ -42,13 +66,14 @@ function parsePlanFromExternalReference(extRef: any): PlanType | undefined {
   return Object.values(PlanType).includes(plan as PlanType) ? (plan as PlanType) : undefined;
 }
 
-function parseAddOnFromExternalReference(extRef: any): { tenantId: string; addOnId?: AddOnId } {
+function parseAddOnFromExternalReference(extRef: any): { tenantId: string; kind?: 'addon' | 'addonsub'; addOnId?: AddOnId } {
   const raw = String(extRef || '');
-  const [tenantId, kind, addOnId] = raw.split('-');
-  if (!tenantId || kind !== 'addon') return { tenantId };
-  if (!addOnId) return { tenantId };
-  if (!(addOnId in ADDON_CATALOG)) return { tenantId };
-  return { tenantId, addOnId: addOnId as AddOnId };
+  const [tenantId, kindRaw, addOnId] = raw.split('-');
+  const kind = (kindRaw === 'addon' || kindRaw === 'addonsub') ? kindRaw : undefined;
+  if (!tenantId || !kind) return { tenantId };
+  if (!addOnId) return { tenantId, kind };
+  if (!(addOnId in ADDON_CATALOG)) return { tenantId, kind };
+  return { tenantId, kind, addOnId: addOnId as AddOnId };
 }
 
 export const createCheckout = async (
@@ -153,6 +178,8 @@ export const listAddOns = async (req: AuthRequest, res: Response): Promise<void>
   const user = req.user!;
   const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('addons subscription');
 
+  const recurring = Array.isArray((planLimit as any)?.addons?.recurring) ? (planLimit as any).addons.recurring : [];
+
   res.json({
     addons: Object.values(ADDON_CATALOG),
     current: {
@@ -160,6 +187,15 @@ export const listAddOns = async (req: AuthRequest, res: Response): Promise<void>
       extraStorage: Number((planLimit as any)?.addons?.extraStorage || 0) || 0,
       aiCredits: Number((planLimit as any)?.addons?.aiCredits || 0) || 0,
     },
+    recurring: recurring.map((r: any) => ({
+      addOnId: r.addOnId,
+      subscriptionId: r.subscriptionId,
+      status: r.status,
+      extraAgents: r.extraAgents,
+      extraStorage: r.extraStorage,
+      aiCredits: r.aiCredits,
+      currentPeriodEnd: r.currentPeriodEnd,
+    })),
     canPurchase: !!(planLimit as any)?.subscription?.stripeCustomerId,
   });
 };
@@ -196,7 +232,7 @@ export const createAddOnCheckout = async (req: AuthRequest, res: Response): Prom
   const payment = await asaasService.createPayment({
     customer: planLimit.subscription.stripeCustomerId,
     billingType: parsed.data.billingType,
-    value: item.price,
+    value: item.priceOneTime,
     dueDate,
     description: `DeskFlow - Add-on ${item.name}`,
     externalReference: `${tenantId}-addon-${item.id}`,
@@ -206,6 +242,93 @@ export const createAddOnCheckout = async (req: AuthRequest, res: Response): Prom
     checkoutUrl: payment?.invoiceUrl || '',
     paymentId: payment?.id,
   });
+};
+
+export const createAddOnSubscription = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const schema = z.object({
+    addOnId: z.string().min(1),
+    billingType: z.enum(['CREDIT_CARD', 'PIX', 'BOLETO']).default('CREDIT_CARD'),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    return;
+  }
+
+  const addOnId = parsed.data.addOnId as AddOnId;
+  if (!(addOnId in ADDON_CATALOG)) {
+    throw new AppError('Add-on inválido', 400);
+  }
+
+  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
+  if (!planLimit?.subscription?.stripeCustomerId) {
+    throw new AppError('Ative um plano pago antes de comprar add-ons.', 400);
+  }
+
+  const item = ADDON_CATALOG[addOnId];
+  const tenantId = user.tenant._id.toString();
+
+  const due = new Date();
+  due.setDate(due.getDate() + 1);
+
+  const subscriptionData: AsaasSubscription = {
+    customer: planLimit.subscription.stripeCustomerId,
+    billingType: parsed.data.billingType as any,
+    value: item.priceMonthly,
+    nextDueDate: due.toISOString().split('T')[0],
+    cycle: 'MONTHLY',
+    description: `DeskFlow - Add-on mensal ${item.name}`,
+    externalReference: `${tenantId}-addonsub-${item.id}`,
+  };
+
+  const subscription = await asaasService.createSubscription(subscriptionData);
+  const subId = String(subscription?.id || '');
+  if (!subId) {
+    throw new AppError('Falha ao criar assinatura do add-on', 500);
+  }
+
+  (planLimit as any).addons = (planLimit as any).addons || {};
+  (planLimit as any).addons.recurring = Array.isArray((planLimit as any).addons.recurring) ? (planLimit as any).addons.recurring : [];
+  (planLimit as any).addons.recurring.push({
+    addOnId: item.id,
+    subscriptionId: subId,
+    status: 'trialing',
+    extraAgents: item.extraAgents,
+    extraStorage: item.extraStorage,
+    aiCredits: item.aiCredits,
+    currentPeriodEnd: subscription?.nextDueDate ? new Date(String(subscription.nextDueDate)) : undefined,
+  });
+  await planLimit.save();
+
+  const checkoutUrl = `https://${process.env.NODE_ENV === 'production' ? '' : 'sandbox.'}asaas.com/i/${subId}`;
+
+  res.json({
+    subscriptionId: subId,
+    checkoutUrl,
+  });
+};
+
+export const cancelAddOnSubscription = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const schema = z.object({ subscriptionId: z.string().min(1) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    return;
+  }
+
+  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('addons');
+  if (!planLimit) throw new AppError('Plano do tenant nao encontrado', 500);
+  const recurring = Array.isArray((planLimit as any)?.addons?.recurring) ? (planLimit as any).addons.recurring : [];
+  const entry = recurring.find((r: any) => String(r.subscriptionId) === String(parsed.data.subscriptionId));
+  if (!entry) throw new AppError('Assinatura do add-on nao encontrada', 404);
+
+  await asaasService.cancelSubscription(String(parsed.data.subscriptionId));
+
+  entry.status = 'canceled';
+  await planLimit.save();
+  res.json({ success: true });
 };
 
 export const handleWebhook = async (
@@ -363,7 +486,17 @@ export const listWebhookEvents = async (req: AuthRequest, res: Response): Promis
 };
 
 async function handlePaymentReceived(payment: any) {
-  const externalRef = payment.externalReference || '';
+  let externalRef = String(payment?.externalReference || '');
+  // Some payment payloads may not carry externalReference; try subscription.
+  if (!externalRef && payment?.subscription) {
+    try {
+      const sub = await asaasService.getSubscription(String(payment.subscription));
+      externalRef = String(sub?.externalReference || '');
+    } catch {
+      // ignore
+    }
+  }
+
   const tenantId = externalRef.split('-')[0];
   const plan = parsePlanFromExternalReference(externalRef);
   const addon = parseAddOnFromExternalReference(externalRef);
@@ -397,15 +530,38 @@ async function handlePaymentReceived(payment: any) {
     await planService.upgradePlan(tenantId, plan);
   }
 
-  if (addon.addOnId) {
+  if (addon.kind === 'addon' && addon.addOnId) {
     const item = ADDON_CATALOG[addon.addOnId];
     const current = (planLimit as any).addons || {};
     (planLimit as any).addons = {
+      ...current,
       extraAgents: Number(current.extraAgents || 0) + Number(item.extraAgents || 0),
       extraStorage: Number(current.extraStorage || 0) + Number(item.extraStorage || 0),
       aiCredits: Number(current.aiCredits || 0) + Number(item.aiCredits || 0),
+      recurring: current.recurring || [],
     };
     await planLimit.save();
+  }
+
+  if (addon.kind === 'addonsub' && addon.addOnId) {
+    (planLimit as any).addons = (planLimit as any).addons || {};
+    (planLimit as any).addons.recurring = Array.isArray((planLimit as any).addons.recurring) ? (planLimit as any).addons.recurring : [];
+
+    const subId = String(payment?.subscription || '');
+    const entry = subId
+      ? (planLimit as any).addons.recurring.find((r: any) => String(r.subscriptionId) === subId)
+      : null;
+
+    if (entry) {
+      entry.status = 'active';
+      try {
+        const sub = await asaasService.getSubscription(String(subId));
+        if (sub?.nextDueDate) entry.currentPeriodEnd = new Date(String(sub.nextDueDate));
+      } catch {
+        // ignore
+      }
+      await planLimit.save();
+    }
   }
 
   // Email admins
@@ -461,51 +617,102 @@ async function handlePaymentOverdue(payment: any) {
 }
 
 async function handleSubscriptionUpdated(subscription: any) {
+  const ext = String(subscription?.externalReference || '');
+  const parsedAddon = parseAddOnFromExternalReference(ext);
+
+  // Main plan subscription update (existing behavior)
   const planLimit = await PlanLimit.findOne({
     'subscription.stripeSubscriptionId': subscription.id,
   });
-  
-  if (!planLimit) return;
 
-  const rawStatus = String(subscription?.status || '').toUpperCase();
-  if (rawStatus === 'ACTIVE') planLimit.subscription.status = 'active';
-  else if (rawStatus === 'OVERDUE') planLimit.subscription.status = 'past_due';
-  else if (rawStatus === 'INACTIVE' || rawStatus === 'CANCELED' || rawStatus === 'CANCELLED') planLimit.subscription.status = 'canceled';
+  if (planLimit) {
+    const rawStatus = String(subscription?.status || '').toUpperCase();
+    if (rawStatus === 'ACTIVE') planLimit.subscription.status = 'active';
+    else if (rawStatus === 'OVERDUE') planLimit.subscription.status = 'past_due';
+    else if (rawStatus === 'INACTIVE' || rawStatus === 'CANCELED' || rawStatus === 'CANCELLED') planLimit.subscription.status = 'canceled';
 
-  if (subscription?.nextDueDate) {
-    planLimit.subscription.currentPeriodEnd = new Date(String(subscription.nextDueDate));
+    if (subscription?.nextDueDate) {
+      planLimit.subscription.currentPeriodEnd = new Date(String(subscription.nextDueDate));
+    }
+
+    const tenantId = ext.split('-')[0];
+    const plan = parsePlanFromExternalReference(ext);
+    if (tenantId && plan) {
+      await planService.upgradePlan(tenantId, plan);
+    }
+
+    await planLimit.save();
+    return;
   }
 
-  const ext = subscription.externalReference || '';
-  const tenantId = ext.split('-')[0];
-  const plan = ext.split('-')[1];
-  if (tenantId && plan && Object.values(PlanType).includes(plan)) {
-    await planService.upgradePlan(tenantId, plan as PlanType);
+  // Add-on subscription update
+  if (parsedAddon.kind === 'addonsub' && parsedAddon.tenantId && parsedAddon.addOnId) {
+    const tId = parsedAddon.tenantId;
+    const pl = await PlanLimit.findOne({ tenant: tId });
+    if (!pl) return;
+
+    (pl as any).addons = (pl as any).addons || {};
+    (pl as any).addons.recurring = Array.isArray((pl as any).addons.recurring) ? (pl as any).addons.recurring : [];
+    const entry = (pl as any).addons.recurring.find((r: any) => String(r.subscriptionId) === String(subscription.id));
+
+    const mapped = mapAsaasSubscriptionStatus(subscription?.status) || 'trialing';
+    if (entry) {
+      entry.status = mapped;
+      if (subscription?.nextDueDate) entry.currentPeriodEnd = new Date(String(subscription.nextDueDate));
+    } else {
+      const item = ADDON_CATALOG[parsedAddon.addOnId];
+      (pl as any).addons.recurring.push({
+        addOnId: item.id,
+        subscriptionId: String(subscription.id),
+        status: mapped,
+        extraAgents: item.extraAgents,
+        extraStorage: item.extraStorage,
+        aiCredits: item.aiCredits,
+        currentPeriodEnd: subscription?.nextDueDate ? new Date(String(subscription.nextDueDate)) : undefined,
+      });
+    }
+
+    await pl.save();
   }
-  
-  await planLimit.save();
 }
 
 async function handleSubscriptionCancelled(subscription: any) {
+  const ext = String(subscription?.externalReference || '');
+  const parsedAddon = parseAddOnFromExternalReference(ext);
+
   const planLimit = await PlanLimit.findOne({
     'subscription.stripeSubscriptionId': subscription.id,
   });
-  
-  if (!planLimit) return;
 
-  planLimit.subscription.status = 'canceled';
+  if (planLimit) {
+    planLimit.subscription.status = 'canceled';
 
-  if (subscription?.nextDueDate && !planLimit.subscription.currentPeriodEnd) {
-    planLimit.subscription.currentPeriodEnd = new Date(String(subscription.nextDueDate));
+    if (subscription?.nextDueDate && !planLimit.subscription.currentPeriodEnd) {
+      planLimit.subscription.currentPeriodEnd = new Date(String(subscription.nextDueDate));
+    }
+
+    // Fazer downgrade para Free ao final do período pago
+    const periodEnd = planLimit.subscription.currentPeriodEnd;
+    if (periodEnd && new Date() > periodEnd) {
+      await planService.upgradePlan(planLimit.tenant.toString(), PlanType.FREE);
+    }
+
+    await planLimit.save();
+    return;
   }
-  
-  // Fazer downgrade para Free ao final do período pago
-  const periodEnd = planLimit.subscription.currentPeriodEnd;
-  if (periodEnd && new Date() > periodEnd) {
-    await planService.upgradePlan(planLimit.tenant.toString(), PlanType.FREE);
+
+  // Add-on subscription cancel
+  if (parsedAddon.kind === 'addonsub' && parsedAddon.tenantId) {
+    const pl = await PlanLimit.findOne({ tenant: parsedAddon.tenantId });
+    if (!pl) return;
+    const recurring = Array.isArray((pl as any)?.addons?.recurring) ? (pl as any).addons.recurring : [];
+    const entry = recurring.find((r: any) => String(r.subscriptionId) === String(subscription.id));
+    if (entry) {
+      entry.status = 'canceled';
+      if (subscription?.nextDueDate) entry.currentPeriodEnd = new Date(String(subscription.nextDueDate));
+      await pl.save();
+    }
   }
-  
-  await planLimit.save();
 }
 
 export const cancelSubscription = async (

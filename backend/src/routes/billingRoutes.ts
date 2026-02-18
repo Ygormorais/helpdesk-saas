@@ -3,6 +3,8 @@ import {
   createCheckout,
   listAddOns,
   createAddOnCheckout,
+  createAddOnSubscription,
+  cancelAddOnSubscription,
   handleWebhook,
   cancelSubscription,
   getBillingPortal,
@@ -23,6 +25,8 @@ router.use(authenticate);
 router.post('/checkout', authorize('admin', 'manager'), createCheckout);
 router.get('/addons', authorize('admin', 'manager'), listAddOns);
 router.post('/addons/checkout', authorize('admin', 'manager'), createAddOnCheckout);
+router.post('/addons/subscribe', authorize('admin', 'manager'), createAddOnSubscription);
+router.post('/addons/cancel', authorize('admin', 'manager'), cancelAddOnSubscription);
 router.post('/change-plan', authorize('admin', 'manager'), changePlan);
 router.post('/cancel', authorize('admin', 'manager'), cancelSubscription);
 router.post('/sync', authorize('admin', 'manager'), syncSubscription);

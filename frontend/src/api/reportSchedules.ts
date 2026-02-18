@@ -15,7 +15,7 @@ export type ReportSchedule = {
 };
 
 export const reportSchedulesApi = {
-  list: () => api.get<{ schedules: ReportSchedule[] }>('/report-schedules'),
+  list: () => api.get<{ schedules: ReportSchedule[]; usage?: { current: number; max: number } }>('/report-schedules'),
   create: (data: any) => api.post('/report-schedules', data),
   update: (id: string, data: any) => api.put(`/report-schedules/${id}`, data),
   remove: (id: string) => api.delete(`/report-schedules/${id}`),

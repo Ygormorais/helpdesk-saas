@@ -4,6 +4,7 @@ import { ReportSchedule } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { reportScheduleService } from '../services/reportScheduleService.js';
+import { planService } from '../services/planService.js';
 
 const createSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -28,7 +29,15 @@ export const listReportSchedules = async (req: AuthRequest, res: Response): Prom
   const rows = await ReportSchedule.find({ tenant: user.tenant._id })
     .sort({ createdAt: -1 })
     .select('name isActive frequency hour dayOfWeek recipients params nextRunAt lastRunAt lastError createdAt updatedAt');
-  res.json({ schedules: rows });
+
+  const plan = await planService.getPlanDetails(user.tenant._id.toString());
+  const max = (plan as any)?.limits?.reportSchedules?.max ?? -1;
+  const current = (plan as any)?.limits?.reportSchedules?.current ?? rows.length;
+
+  res.json({
+    schedules: rows,
+    usage: { current, max },
+  });
 };
 
 export const createReportSchedule = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -42,6 +51,13 @@ export const createReportSchedule = async (req: AuthRequest, res: Response): Pro
   if (parsed.data.frequency === 'weekly' && parsed.data.dayOfWeek === undefined) {
     res.status(400).json({ message: 'dayOfWeek is required for weekly schedules' });
     return;
+  }
+
+  const plan = await planService.getPlanDetails(user.tenant._id.toString());
+  const max = (plan as any)?.limits?.reportSchedules?.max ?? -1;
+  const current = (plan as any)?.limits?.reportSchedules?.current ?? 0;
+  if (max !== -1 && current >= max) {
+    throw new AppError(`Limite de agendamentos atingido (${current}/${max}). Faça upgrade para criar mais agendamentos.`, 403);
   }
 
   const nextRunAt = reportScheduleService.computeNextRunAt({

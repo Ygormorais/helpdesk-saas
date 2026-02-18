@@ -62,7 +62,25 @@ interface CurrentPlan {
   };
 }
 
-type AddOn = { id: string; name: string; price: number; extraAgents?: number; extraStorage?: number; aiCredits?: number };
+type AddOn = {
+  id: string;
+  name: string;
+  priceOneTime: number;
+  priceMonthly: number;
+  extraAgents?: number;
+  extraStorage?: number;
+  aiCredits?: number;
+};
+
+type AddOnRecurring = {
+  addOnId: string;
+  subscriptionId: string;
+  status: string;
+  currentPeriodEnd?: string;
+  extraAgents?: number;
+  extraStorage?: number;
+  aiCredits?: number;
+};
 
 interface BillingWebhookEvent {
   eventId: string;
@@ -95,7 +113,9 @@ export default function PlansPage() {
   const [addons, setAddons] = useState<AddOn[]>([]);
   const [addonsLoading, setAddonsLoading] = useState(false);
   const [addonsCanPurchase, setAddonsCanPurchase] = useState(false);
+  const [addonsRecurring, setAddonsRecurring] = useState<AddOnRecurring[]>([]);
   const [selectedAddon, setSelectedAddon] = useState<string | null>(null);
+  const [addonMode, setAddonMode] = useState<'one_time' | 'monthly'>('one_time');
   const [addonBillingType, setAddonBillingType] = useState<'CREDIT_CARD' | 'BOLETO' | 'PIX'>('CREDIT_CARD');
   const [isAddonCheckoutOpen, setIsAddonCheckoutOpen] = useState(false);
   const [isAddonProcessing, setIsAddonProcessing] = useState(false);
@@ -156,16 +176,19 @@ export default function PlansPage() {
       const res = await api.get('/billing/addons');
       setAddons(Array.isArray(res.data?.addons) ? res.data.addons : []);
       setAddonsCanPurchase(!!res.data?.canPurchase);
+      setAddonsRecurring(Array.isArray(res.data?.recurring) ? res.data.recurring : []);
     } catch {
       setAddons([]);
       setAddonsCanPurchase(false);
+      setAddonsRecurring([]);
     } finally {
       setAddonsLoading(false);
     }
   };
 
-  const openAddonCheckout = (addOnId: string) => {
+  const openAddonCheckout = (addOnId: string, mode: 'one_time' | 'monthly') => {
     setSelectedAddon(addOnId);
+    setAddonMode(mode);
     setAddonBillingType('CREDIT_CARD');
     setIsAddonCheckoutOpen(true);
   };
@@ -174,14 +197,17 @@ export default function PlansPage() {
     if (!selectedAddon) return;
     setIsAddonProcessing(true);
     try {
-      const res = await api.post('/billing/addons/checkout', { addOnId: selectedAddon, billingType: addonBillingType });
+      const endpoint = addonMode === 'monthly' ? '/billing/addons/subscribe' : '/billing/addons/checkout';
+      const res = await api.post(endpoint, { addOnId: selectedAddon, billingType: addonBillingType });
       const data = res.data;
       if (data.checkoutUrl) {
         window.open(data.checkoutUrl, '_blank');
         setIsAddonCheckoutOpen(false);
         toast({
           title: 'Redirecionando...',
-          description: 'Complete o pagamento na nova aba. O add-on sera aplicado automaticamente.',
+          description: addonMode === 'monthly'
+            ? 'Complete o pagamento na nova aba. O add-on mensal sera ativado automaticamente.'
+            : 'Complete o pagamento na nova aba. O add-on sera aplicado automaticamente.',
         });
         return;
       }
@@ -194,6 +220,20 @@ export default function PlansPage() {
       });
     } finally {
       setIsAddonProcessing(false);
+    }
+  };
+
+  const cancelAddonSubscription = async (subscriptionId: string) => {
+    try {
+      await api.post('/billing/addons/cancel', { subscriptionId });
+      toast({ title: 'Assinatura do add-on cancelada' });
+      await fetchPlanDetails();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao cancelar add-on',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -536,6 +576,104 @@ export default function PlansPage() {
         </Card>
       )}
 
+      {/* Add-ons */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Add-ons</CardTitle>
+          <p className="text-sm text-muted-foreground">Expanda limites e recursos sem trocar de plano</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {currentPlan?.addons ? (
+            <Card className="bg-muted/30">
+              <CardContent className="p-4 grid gap-3 md:grid-cols-3">
+                {(() => {
+                  const oneTimeAgents = Number(currentPlan.addons?.extraAgents || 0) || 0;
+                  const oneTimeStorage = Number(currentPlan.addons?.extraStorage || 0) || 0;
+                  const oneTimeAi = Number(currentPlan.addons?.aiCredits || 0) || 0;
+                  const active = addonsRecurring.filter((r) => ['ACTIVE', 'TRIALING'].includes(String(r.status || '').toUpperCase()));
+                  const recurringAgents = active.reduce((acc, r) => acc + (Number(r.extraAgents || 0) || 0), 0);
+                  const recurringStorage = active.reduce((acc, r) => acc + (Number(r.extraStorage || 0) || 0), 0);
+                  const recurringAi = active.reduce((acc, r) => acc + (Number(r.aiCredits || 0) || 0), 0);
+
+                  return (
+                    <div className="md:col-span-3 text-xs text-muted-foreground">
+                      Totais (inclui assinaturas ativas): agentes {oneTimeAgents + recurringAgents} • storage {oneTimeStorage + recurringStorage}MB • AI {oneTimeAi + recurringAi}
+                    </div>
+                  );
+                })()}
+                <div>
+                  <p className="text-xs text-muted-foreground">Extra agentes</p>
+                  <p className="text-sm font-medium">{Number(currentPlan.addons.extraAgents || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Extra storage (MB)</p>
+                  <p className="text-sm font-medium">{Number(currentPlan.addons.extraStorage || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">AI credits</p>
+                  <p className="text-sm font-medium">{Number(currentPlan.addons.aiCredits || 0)}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {addonsRecurring.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Assinaturas ativas</p>
+              {addonsRecurring.map((r) => (
+                <div key={r.subscriptionId} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{r.addOnId}</p>
+                    <p className="text-xs text-muted-foreground">Status: {String(r.status || '').toUpperCase()}</p>
+                    {r.currentPeriodEnd ? (
+                      <p className="text-xs text-muted-foreground">Periodo ate: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
+                    ) : null}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => cancelAddonSubscription(r.subscriptionId)}>
+                    Cancelar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {addonsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando...
+            </div>
+          ) : addons.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum add-on disponivel</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              {addons.map((a) => (
+                <Card key={a.id} className="bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-base">{a.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Unico: R$ {Number(a.priceOneTime || 0).toFixed(2).replace('.', ',')} • Mensal: R$ {Number(a.priceMonthly || 0).toFixed(2).replace('.', ',')}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid gap-2">
+                      <Button onClick={() => openAddonCheckout(a.id, 'one_time')} disabled={!addonsCanPurchase}>
+                        Comprar novamente (unico)
+                      </Button>
+                      <Button variant="secondary" onClick={() => openAddonCheckout(a.id, 'monthly')} disabled={!addonsCanPurchase}>
+                        Assinar (mensal)
+                      </Button>
+                    </div>
+                    {!addonsCanPurchase ? (
+                      <p className="text-xs text-muted-foreground">Ative um plano pago para comprar add-ons.</p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Planos Disponíveis */}
       <div className="grid gap-6 md:grid-cols-3">
         {availablePlans.length === 0 ? (
@@ -679,6 +817,75 @@ export default function PlansPage() {
               ) : null}
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add-on Checkout Dialog */}
+      <Dialog open={isAddonCheckoutOpen} onOpenChange={setIsAddonCheckoutOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Checkout do add-on</DialogTitle>
+            <DialogDescription>
+              {addonMode === 'monthly' ? 'Assinatura mensal do add-on' : 'Compra unica do add-on'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <RadioGroup
+              value={addonBillingType}
+              onValueChange={(value) => setAddonBillingType(value as any)}
+              className="space-y-3"
+            >
+              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted transition-colors">
+                <RadioGroupItem value="CREDIT_CARD" id="addon-credit" />
+                <Label htmlFor="addon-credit" className="flex-1 flex items-center gap-3 cursor-pointer">
+                  <CreditCard className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <div className="font-medium">Cartao</div>
+                    <div className="text-sm text-muted-foreground">Pagamento {addonMode === 'monthly' ? 'recorrente' : 'unico'}</div>
+                  </div>
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted transition-colors">
+                <RadioGroupItem value="PIX" id="addon-pix" />
+                <Label htmlFor="addon-pix" className="flex-1 flex items-center gap-3 cursor-pointer">
+                  <QrCode className="h-5 w-5 text-green-600" />
+                  <div>
+                    <div className="font-medium">PIX</div>
+                    <div className="text-sm text-muted-foreground">Aprovacao em segundos</div>
+                  </div>
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-muted transition-colors">
+                <RadioGroupItem value="BOLETO" id="addon-boleto" />
+                <Label htmlFor="addon-boleto" className="flex-1 flex items-center gap-3 cursor-pointer">
+                  <FileText className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <div className="font-medium">Boleto</div>
+                    <div className="text-sm text-muted-foreground">Compensacao em 1-2 dias</div>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setIsAddonCheckoutOpen(false)} className="flex-1" disabled={isAddonProcessing}>
+              Cancelar
+            </Button>
+            <Button onClick={processAddonCheckout} disabled={isAddonProcessing || !selectedAddon} className="flex-1">
+              {isAddonProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Continuar'
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
