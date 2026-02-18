@@ -82,6 +82,16 @@ type AddOnRecurring = {
   aiCredits?: number;
 };
 
+type AddOnOneTimePayment = {
+  addOnId: string;
+  paymentId: string;
+  status: string;
+  invoiceUrl?: string;
+  value?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 interface BillingWebhookEvent {
   eventId: string;
   event?: string;
@@ -114,6 +124,7 @@ export default function PlansPage() {
   const [addonsLoading, setAddonsLoading] = useState(false);
   const [addonsCanPurchase, setAddonsCanPurchase] = useState(false);
   const [addonsRecurring, setAddonsRecurring] = useState<AddOnRecurring[]>([]);
+  const [addonsOneTime, setAddonsOneTime] = useState<AddOnOneTimePayment[]>([]);
   const [selectedAddon, setSelectedAddon] = useState<string | null>(null);
   const [addonMode, setAddonMode] = useState<'one_time' | 'monthly'>('one_time');
   const [addonBillingType, setAddonBillingType] = useState<'CREDIT_CARD' | 'BOLETO' | 'PIX'>('CREDIT_CARD');
@@ -147,6 +158,15 @@ export default function PlansPage() {
     if (s === 'active') return 'ATIVO';
     if (s === 'trialing') return 'AGUARDANDO PAGAMENTO';
     if (s === 'past_due') return 'EM ATRASO';
+    if (s === 'canceled') return 'CANCELADO';
+    return 'DESCONHECIDO';
+  };
+
+  const formatOneTimeStatus = (raw: string) => {
+    const s = String(raw || '').toLowerCase();
+    if (s === 'pending') return 'AGUARDANDO PAGAMENTO';
+    if (s === 'overdue') return 'EM ATRASO';
+    if (s === 'received') return 'PAGO';
     if (s === 'canceled') return 'CANCELADO';
     return 'DESCONHECIDO';
   };
@@ -202,10 +222,12 @@ export default function PlansPage() {
       setAddons(Array.isArray(res.data?.addons) ? res.data.addons : []);
       setAddonsCanPurchase(!!res.data?.canPurchase);
       setAddonsRecurring(Array.isArray(res.data?.recurring) ? res.data.recurring : []);
+      setAddonsOneTime(Array.isArray(res.data?.pendingOneTime) ? res.data.pendingOneTime : []);
     } catch {
       setAddons([]);
       setAddonsCanPurchase(false);
       setAddonsRecurring([]);
+      setAddonsOneTime([]);
     } finally {
       setAddonsLoading(false);
     }
@@ -225,17 +247,19 @@ export default function PlansPage() {
       const endpoint = addonMode === 'monthly' ? '/billing/addons/subscribe' : '/billing/addons/checkout';
       const res = await api.post(endpoint, { addOnId: selectedAddon, billingType: addonBillingType });
       const data = res.data;
-      if (data.checkoutUrl) {
-        window.open(data.checkoutUrl, '_blank');
-        setIsAddonCheckoutOpen(false);
-        toast({
-          title: 'Redirecionando...',
-          description: addonMode === 'monthly'
-            ? 'Complete o pagamento na nova aba. O add-on mensal sera ativado automaticamente.'
-            : 'Complete o pagamento na nova aba. O add-on sera aplicado automaticamente.',
-        });
-        return;
-      }
+        if (data.checkoutUrl) {
+          window.open(data.checkoutUrl, '_blank');
+          setIsAddonCheckoutOpen(false);
+          toast({
+            title: 'Redirecionando...',
+            description: addonMode === 'monthly'
+              ? 'Complete o pagamento na nova aba. O add-on mensal sera ativado automaticamente.'
+              : 'Complete o pagamento na nova aba. O add-on sera aplicado automaticamente.',
+          });
+          // Refresh so pending payments show up.
+          fetchAddons();
+          return;
+        }
       toast({ title: 'Checkout indisponivel', description: 'Nao foi possivel iniciar o checkout.', variant: 'destructive' });
     } catch (error: any) {
       toast({
@@ -541,7 +565,7 @@ export default function PlansPage() {
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Storage</span>
+                  <span>Armazenamento</span>
                   <span className="text-muted-foreground">
                     {currentPlan.limits.storage.current}MB / {currentPlan.limits.storage.max === -1 ? '∞' : currentPlan.limits.storage.max}MB
                   </span>
@@ -647,6 +671,43 @@ export default function PlansPage() {
                 </div>
               </CardContent>
             </Card>
+          ) : null}
+
+          {addonsOneTime.filter((p) => ['pending', 'overdue'].includes(String(p.status || '').toLowerCase())).length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Pagamentos pendentes (avulso)</p>
+              {addonsOneTime
+                .filter((p) => ['pending', 'overdue'].includes(String(p.status || '').toLowerCase()))
+                .slice(0, 5)
+                .map((p) => {
+                  const meta = addOnById.get(p.addOnId);
+                  const statusRaw = String(p.status || '').toLowerCase();
+                  const label = formatOneTimeStatus(statusRaw);
+                  const invoice = String(p.invoiceUrl || '').trim();
+                  return (
+                    <div key={p.paymentId} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{meta?.name || p.addOnId}</p>
+                          <Badge variant="secondary" className="bg-transparent border border-border text-foreground">
+                            {label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {p.value ? `R$ ${Number(p.value).toFixed(2).replace('.', ',')}` : 'Pagamento avulso'}
+                          {p.createdAt ? ` • criado em ${new Date(p.createdAt).toLocaleDateString('pt-BR')}` : ''}
+                        </p>
+                      </div>
+                      {invoice ? (
+                        <Button variant="outline" size="sm" onClick={() => window.open(invoice, '_blank')}
+                        >
+                          Abrir pagamento
+                        </Button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+            </div>
           ) : null}
 
           {addonsRecurring.length > 0 ? (
