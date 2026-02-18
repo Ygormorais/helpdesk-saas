@@ -179,6 +179,10 @@ docker compose -f docker-compose.dev.yml up
 - `LOG_LEVEL=debug|info|warn|error|silent` (default: info)
 - `LOG_HTTP_SUCCESS=false` para nao logar requests 2xx/3xx (default: true)
 
+### Redis
+
+- Se `REDIS_URL` estiver definido em producao, rate limiting e metrics passam a usar Redis (sobrevive a restart)
+
 ## 📁 Estrutura
 
 ```

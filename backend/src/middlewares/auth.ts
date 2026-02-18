@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { User, IUser } from '../models/index.js';
+import { updateContext } from '../services/requestContext.js';
 
 export interface AuthRequest extends Request {
   user?: IUser;
@@ -44,6 +45,12 @@ export const authenticate = async (
     }
 
     req.user = user;
+
+    updateContext({
+      userId: String(user._id),
+      tenantId: userTenantId,
+    });
+
     next();
   } catch (error) {
     res.status(401).json({ message: 'Invalid token' });

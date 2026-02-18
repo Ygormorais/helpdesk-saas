@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config/index.js';
+import { logger } from './logger.js';
 
 const transporter = nodemailer.createTransport({
   host: config.email.host,
@@ -24,9 +25,10 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       from: `"HelpDesk" <${config.email.user}>`,
       ...options,
     });
+    logger.info({ msg: 'email.sent', to: options.to, subject: options.subject });
     return true;
   } catch (error) {
-    console.error('Email send error:', error);
+    logger.error({ msg: 'email.send_error', to: options.to, subject: options.subject, error: String((error as any)?.message || error) });
     return false;
   }
 }

@@ -14,6 +14,7 @@ import { notificationService } from './services/notificationService.js';
 import { chatService } from './services/chatService.js';
 import { sendTrialRemindersOnce } from './services/billingReminderService.js';
 import { getReadiness } from './services/healthService.js';
+import { metricsService } from './services/metricsService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -82,6 +83,9 @@ const startServer = () => {
     console.log(`Server running on port ${config.port}`);
     console.log(`Environment: ${config.nodeEnv}`);
   });
+
+  // Best-effort load persisted metrics.
+  metricsService.initialize().catch(() => undefined);
 
   if (config.billing.remindersEnabled) {
     const run = async () => {

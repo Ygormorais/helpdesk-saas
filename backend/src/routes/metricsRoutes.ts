@@ -27,7 +27,8 @@ const router = Router();
  */
 
 router.use(authenticate);
-router.get('/', authorize('admin', 'manager'), (_req, res) => {
+router.get('/', authorize('admin', 'manager'), async (_req, res) => {
+  await metricsService.initialize();
   const format = String((_req.query as any)?.format || '').trim().toLowerCase();
   const accept = String(_req.headers.accept || '');
   const wantsProm = format === 'prom' || accept.includes('text/plain');

@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { config } from '../config/index.js';
+import { getRequestId } from './requestContext.js';
+import { logger } from './logger.js';
 
 const ASAAS_API_URL = config.nodeEnv === 'production' 
   ? 'https://api.asaas.com/v3'
@@ -64,9 +66,11 @@ export class AsaasService {
   }
 
   private getHeaders() {
+    const rid = getRequestId();
     return {
       'access_token': this.apiKey,
       'Content-Type': 'application/json',
+      ...(rid ? { 'x-request-id': rid } : null),
     };
   }
 
@@ -80,7 +84,11 @@ export class AsaasService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Asaas createCustomer error:', error.response?.data || error.message);
+      logger.error({
+        msg: 'asaas.createCustomer.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       throw new Error(`Failed to create customer: ${error.response?.data?.errors?.[0]?.description || error.message}`);
     }
   }
@@ -98,7 +106,11 @@ export class AsaasService {
       }
       return null;
     } catch (error: any) {
-      console.error('Asaas findCustomer error:', error.response?.data || error.message);
+      logger.warn({
+        msg: 'asaas.findCustomer.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       return null;
     }
   }
@@ -122,7 +134,11 @@ export class AsaasService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Asaas createSubscription error:', error.response?.data || error.message);
+      logger.error({
+        msg: 'asaas.createSubscription.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       throw new Error(`Failed to create subscription: ${error.response?.data?.errors?.[0]?.description || error.message}`);
     }
   }
@@ -136,7 +152,11 @@ export class AsaasService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Asaas cancelSubscription error:', error.response?.data || error.message);
+      logger.error({
+        msg: 'asaas.cancelSubscription.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       throw new Error(`Failed to cancel subscription: ${error.response?.data?.errors?.[0]?.description || error.message}`);
     }
   }
@@ -150,7 +170,11 @@ export class AsaasService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Asaas getSubscription error:', error.response?.data || error.message);
+      logger.error({
+        msg: 'asaas.getSubscription.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       throw error;
     }
   }
@@ -165,7 +189,11 @@ export class AsaasService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Asaas updateSubscription error:', error.response?.data || error.message);
+      logger.error({
+        msg: 'asaas.updateSubscription.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       throw new Error(`Failed to update subscription: ${error.response?.data?.errors?.[0]?.description || error.message}`);
     }
   }
@@ -180,7 +208,11 @@ export class AsaasService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Asaas createPayment error:', error.response?.data || error.message);
+      logger.error({
+        msg: 'asaas.createPayment.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       throw new Error(`Failed to create payment: ${error.response?.data?.errors?.[0]?.description || error.message}`);
     }
   }
@@ -194,7 +226,11 @@ export class AsaasService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Asaas getPixQrCode error:', error.response?.data || error.message);
+      logger.error({
+        msg: 'asaas.getPixQrCode.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       throw error;
     }
   }
@@ -208,7 +244,11 @@ export class AsaasService {
       );
       return response.data.invoiceUrl || '';
     } catch (error: any) {
-      console.error('Asaas getPaymentLink error:', error.response?.data || error.message);
+      logger.warn({
+        msg: 'asaas.getPaymentLink.error',
+        error: String(error?.message || error),
+        details: error.response?.data,
+      });
       return '';
     }
   }

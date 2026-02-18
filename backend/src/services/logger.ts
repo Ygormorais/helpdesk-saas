@@ -1,3 +1,5 @@
+import { getContext } from './requestContext.js';
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
 
 const levelRank: Record<Exclude<LogLevel, 'silent'>, number> = {
@@ -82,7 +84,15 @@ function safeJsonStringify(obj: any): string {
 }
 
 function write(level: Exclude<LogLevel, 'silent'>, obj: Record<string, any>) {
-  const payload = redact(obj);
+  const ctx = getContext();
+  const enriched = {
+    ...(ctx?.requestId && !('requestId' in obj) ? { requestId: ctx.requestId } : null),
+    ...(ctx?.tenantId && !('tenantId' in obj) ? { tenantId: ctx.tenantId } : null),
+    ...(ctx?.userId && !('userId' in obj) ? { userId: ctx.userId } : null),
+    ...obj,
+  };
+
+  const payload = redact(enriched);
   const line = safeJsonStringify(payload);
   if (level === 'error') console.error(line);
   else if (level === 'warn') console.warn(line);
