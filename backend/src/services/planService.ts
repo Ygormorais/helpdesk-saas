@@ -42,6 +42,7 @@ export class PlanService {
     maxStorage: number;
     maxMacros: number;
     maxAutomationRules: number;
+    auditRetentionDays: number;
     features: IPlanLimit['features'];
     isPaidAccessBlocked: boolean;
   } {
@@ -51,17 +52,26 @@ export class PlanService {
       ...base,
     });
 
+    const addIfFinite = (base: number, extra: number) => {
+      if (base === -1) return -1;
+      return base + extra;
+    };
+
+    const extraAgents = Number((planLimit as any).addons?.extraAgents || 0) || 0;
+    const extraStorage = Number((planLimit as any).addons?.extraStorage || 0) || 0;
+
     // During the initial trial (created on tenant signup) we grant PRO access,
     // even though the stored plan is FREE.
     if (planLimit.plan === PlanType.FREE && this.isActiveTrial(planLimit.subscription)) {
       const pro = PLAN_LIMITS[PlanType.PRO];
       return {
         plan: PlanType.PRO,
-        maxAgents: pro.maxAgents,
+        maxAgents: addIfFinite(pro.maxAgents, extraAgents),
         maxTickets: pro.maxTickets,
-        maxStorage: pro.maxStorage,
+        maxStorage: addIfFinite(pro.maxStorage, extraStorage),
         maxMacros: pro.maxMacros,
         maxAutomationRules: pro.maxAutomationRules,
+        auditRetentionDays: pro.auditRetentionDays,
         features: mergeFeatures(pro.features),
         isPaidAccessBlocked: false,
       };
@@ -77,11 +87,12 @@ export class PlanService {
       if (paidAllowed) {
         return {
           plan: desired,
-          maxAgents: cfg.maxAgents,
+          maxAgents: addIfFinite(cfg.maxAgents, extraAgents),
           maxTickets: cfg.maxTickets,
-          maxStorage: cfg.maxStorage,
+          maxStorage: addIfFinite(cfg.maxStorage, extraStorage),
           maxMacros: cfg.maxMacros,
           maxAutomationRules: cfg.maxAutomationRules,
+          auditRetentionDays: cfg.auditRetentionDays,
           features: mergeFeatures(cfg.features),
           isPaidAccessBlocked: false,
         };
@@ -89,11 +100,12 @@ export class PlanService {
       const free = PLAN_LIMITS[PlanType.FREE];
       return {
         plan: PlanType.FREE,
-        maxAgents: free.maxAgents,
+        maxAgents: addIfFinite(free.maxAgents, extraAgents),
         maxTickets: free.maxTickets,
-        maxStorage: free.maxStorage,
+        maxStorage: addIfFinite(free.maxStorage, extraStorage),
         maxMacros: free.maxMacros,
         maxAutomationRules: free.maxAutomationRules,
+        auditRetentionDays: free.auditRetentionDays,
         features: mergeFeatures(free.features),
         isPaidAccessBlocked: true,
       };
@@ -105,11 +117,12 @@ export class PlanService {
     if (paidAllowed) {
       return {
         plan: planLimit.plan,
-        maxAgents: planLimit.maxAgents,
+        maxAgents: addIfFinite(planLimit.maxAgents, extraAgents),
         maxTickets: planLimit.maxTickets,
-        maxStorage: planLimit.maxStorage,
+        maxStorage: addIfFinite(planLimit.maxStorage, extraStorage),
         maxMacros: PLAN_LIMITS[planLimit.plan].maxMacros,
         maxAutomationRules: PLAN_LIMITS[planLimit.plan].maxAutomationRules,
+        auditRetentionDays: PLAN_LIMITS[planLimit.plan].auditRetentionDays,
         features: mergeFeatures(PLAN_LIMITS[planLimit.plan].features),
         isPaidAccessBlocked: false,
       };
@@ -118,11 +131,12 @@ export class PlanService {
     const free = PLAN_LIMITS[PlanType.FREE];
     return {
       plan: PlanType.FREE,
-      maxAgents: free.maxAgents,
+      maxAgents: addIfFinite(free.maxAgents, extraAgents),
       maxTickets: free.maxTickets,
-      maxStorage: free.maxStorage,
+      maxStorage: addIfFinite(free.maxStorage, extraStorage),
       maxMacros: free.maxMacros,
       maxAutomationRules: free.maxAutomationRules,
+      auditRetentionDays: free.auditRetentionDays,
       features: mergeFeatures(free.features),
       isPaidAccessBlocked: true,
     };
@@ -279,9 +293,18 @@ export class PlanService {
         macros: { current: currentMacros, max: effective.maxMacros },
         automations: { current: currentAutomationRules, max: effective.maxAutomationRules },
       },
+      retention: {
+        auditDays: effective.auditRetentionDays,
+      },
       features: effective.features,
       subscription: planLimit.subscription,
+      addons: (planLimit as any).addons || { extraAgents: 0, extraStorage: 0, aiCredits: 0 },
     };
+  }
+
+  async getAuditRetentionDays(tenantId: string): Promise<number> {
+    const planLimit = await this.getPlanForTenant(tenantId);
+    return this.getEffectiveConfig(planLimit).auditRetentionDays;
   }
 }
 

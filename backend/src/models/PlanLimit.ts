@@ -21,6 +21,7 @@ export interface IPlanLimit extends Document {
     macros: boolean;
     automations: boolean;
     auditExport: boolean;
+    scheduledReports: boolean;
     api: boolean;
     customDomain: boolean;
     whiteLabel: boolean;
@@ -29,6 +30,12 @@ export interface IPlanLimit extends Document {
     agents: number;
     tickets: number;
     storage: number;
+  };
+
+  addons?: {
+    extraAgents?: number;
+    extraStorage?: number; // MB
+    aiCredits?: number;
   };
   subscription: {
     status: 'active' | 'trialing' | 'past_due' | 'canceled';
@@ -54,6 +61,7 @@ export interface PlanLimitConfig {
   maxStorage: number;
   maxMacros: number;
   maxAutomationRules: number;
+  auditRetentionDays: number;
   features: IPlanLimit['features'];
 }
 
@@ -65,6 +73,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxStorage: 100,
     maxMacros: 0,
     maxAutomationRules: 0,
+    auditRetentionDays: 7,
     features: {
       knowledgeBase: false,
       timeTracking: false,
@@ -74,6 +83,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
       macros: false,
       automations: false,
       auditExport: false,
+      scheduledReports: false,
       api: false,
       customDomain: false,
       whiteLabel: false,
@@ -86,6 +96,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxStorage: 1000,
     maxMacros: 50,
     maxAutomationRules: 20,
+    auditRetentionDays: 90,
     features: {
       knowledgeBase: true,
       timeTracking: true,
@@ -95,6 +106,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
       macros: true,
       automations: true,
       auditExport: true,
+      scheduledReports: false,
       api: false,
       customDomain: false,
       whiteLabel: false,
@@ -107,6 +119,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxStorage: 10000,
     maxMacros: -1,
     maxAutomationRules: -1,
+    auditRetentionDays: 365,
     features: {
       knowledgeBase: true,
       timeTracking: true,
@@ -116,6 +129,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
       macros: true,
       automations: true,
       auditExport: true,
+      scheduledReports: true,
       api: true,
       customDomain: true,
       whiteLabel: true,
@@ -157,6 +171,7 @@ const planLimitSchema = new Schema<IPlanLimit>(
       macros: { type: Boolean, default: false },
       automations: { type: Boolean, default: false },
       auditExport: { type: Boolean, default: false },
+      scheduledReports: { type: Boolean, default: false },
       api: { type: Boolean, default: false },
       customDomain: { type: Boolean, default: false },
       whiteLabel: { type: Boolean, default: false },
@@ -165,6 +180,11 @@ const planLimitSchema = new Schema<IPlanLimit>(
       agents: { type: Number, default: 0 },
       tickets: { type: Number, default: 0 },
       storage: { type: Number, default: 0 },
+    },
+    addons: {
+      extraAgents: { type: Number, default: 0 },
+      extraStorage: { type: Number, default: 0 },
+      aiCredits: { type: Number, default: 0 },
     },
     subscription: {
       status: {
