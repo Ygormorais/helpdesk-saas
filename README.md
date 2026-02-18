@@ -166,6 +166,13 @@ docker compose down
 docker compose -f docker-compose.dev.yml up
 ```
 
+## 🩺 Health & Metrics
+
+- Liveness: `GET /health/live` (sempre 200)
+- Readiness: `GET /health` (200 quando deps ok, 503 quando degradado)
+- API health (para o frontend/dev proxy): `GET /api/health` e `GET /api/health/live`
+- Metrics (admin/manager): `GET /api/metrics` (contadores e percentis basicos, in-memory)
+
 ## 📁 Estrutura
 
 ```
