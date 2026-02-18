@@ -30,12 +30,30 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  try {
+    const existing = (config.headers as any)?.['x-request-id'] || (config.headers as any)?.['X-Request-Id'];
+    if (!existing) {
+      const rid = (globalThis as any)?.crypto?.randomUUID
+        ? (globalThis as any).crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      (config.headers as any)['x-request-id'] = rid;
+    }
+  } catch {
+    // ignore
+  }
+
   return config;
 });
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const reqId = error.response?.data?.requestId;
+    if (reqId) {
+      console.error('requestId:', reqId);
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/login';

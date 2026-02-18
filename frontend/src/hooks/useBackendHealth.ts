@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { api } from '@/config/api';
 
 type Health = {
   status?: string;
@@ -13,9 +14,8 @@ export function useBackendHealth() {
   return useQuery({
     queryKey: ['backend-health'],
     queryFn: async () => {
-      const res = await fetch('/health', { cache: 'no-store' });
-      const data = (await res.json().catch(() => ({}))) as Health;
-      return { ok: res.ok, status: res.status, data };
+      const res = await api.get('/health');
+      return { ok: true, status: res.status, data: (res.data || {}) as Health };
     },
     refetchInterval: 30000,
     retry: 0,
