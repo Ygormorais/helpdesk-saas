@@ -6,6 +6,7 @@ import {
   getBillingPortal,
   listWebhookEvents,
   changePlan,
+  syncSubscription,
 } from '../controllers/billingController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
 
@@ -19,6 +20,7 @@ router.use(authenticate);
 router.post('/checkout', authorize('admin', 'manager'), createCheckout);
 router.post('/change-plan', authorize('admin', 'manager'), changePlan);
 router.post('/cancel', authorize('admin', 'manager'), cancelSubscription);
+router.post('/sync', authorize('admin', 'manager'), syncSubscription);
 router.get('/portal', authorize('admin', 'manager'), getBillingPortal);
 router.get('/webhook-events', authorize('admin', 'manager'), listWebhookEvents);
 

@@ -15,6 +15,22 @@ const PLAN_PRICES: Record<PlanType, number> = {
   enterprise: 99.90,
 };
 
+function mapAsaasSubscriptionStatus(raw: any): 'active' | 'trialing' | 'past_due' | 'canceled' | undefined {
+  const status = String(raw || '').toUpperCase();
+  if (!status) return undefined;
+  if (status === 'ACTIVE') return 'active';
+  if (status === 'OVERDUE') return 'past_due';
+  if (status === 'INACTIVE' || status === 'CANCELED' || status === 'CANCELLED') return 'canceled';
+  return undefined;
+}
+
+function parsePlanFromExternalReference(extRef: any): PlanType | undefined {
+  const ext = String(extRef || '');
+  const plan = ext.split('-')[1];
+  if (!plan) return undefined;
+  return Object.values(PlanType).includes(plan as PlanType) ? (plan as PlanType) : undefined;
+}
+
 export const createCheckout = async (
   req: AuthRequest,
   res: Response
@@ -454,5 +470,62 @@ export const changePlan = async (req: AuthRequest, res: Response): Promise<void>
       : 'Plano atualizado. Seu acesso será liberado imediatamente.',
     effectiveAt,
     desiredPlan: plan,
+  });
+};
+
+export const syncSubscription = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+
+  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id });
+  if (!planLimit || !planLimit.subscription.stripeSubscriptionId) {
+    throw new AppError('Nenhuma assinatura encontrada para sincronizar', 404);
+  }
+
+  const sub = await asaasService.getSubscription(planLimit.subscription.stripeSubscriptionId);
+
+  const mapped = mapAsaasSubscriptionStatus(sub?.status);
+  if (mapped) planLimit.subscription.status = mapped;
+  if (sub?.nextDueDate) planLimit.subscription.currentPeriodEnd = new Date(String(sub.nextDueDate));
+
+  const targetPlan = parsePlanFromExternalReference(sub?.externalReference);
+  if (targetPlan && targetPlan !== PlanType.FREE) {
+    const currentPrice = PLAN_PRICES[planLimit.plan as PlanType] ?? 0;
+    const targetPrice = PLAN_PRICES[targetPlan] ?? 0;
+    const isDowngrade = targetPrice < currentPrice;
+
+    const effectiveAt = isDowngrade && planLimit.subscription.currentPeriodEnd
+      ? new Date(planLimit.subscription.currentPeriodEnd)
+      : new Date();
+
+    // If the provider says subscription is ACTIVE, we can safely reflect the plan now.
+    if (planLimit.subscription.status === 'active' && !isDowngrade) {
+      await planService.upgradePlan(user.tenant._id.toString(), targetPlan);
+      planLimit.subscription.desiredPlan = undefined;
+      planLimit.subscription.desiredPlanEffectiveAt = undefined;
+    } else {
+      planLimit.subscription.desiredPlan = targetPlan;
+      planLimit.subscription.desiredPlanEffectiveAt = effectiveAt;
+    }
+  }
+
+  await planLimit.save();
+
+  res.json({
+    success: true,
+    provider: {
+      id: sub?.id,
+      status: sub?.status,
+      value: sub?.value,
+      nextDueDate: sub?.nextDueDate,
+      cycle: sub?.cycle,
+      externalReference: sub?.externalReference,
+    },
+    local: {
+      plan: planLimit.plan,
+      status: planLimit.subscription.status,
+      currentPeriodEnd: planLimit.subscription.currentPeriodEnd,
+      desiredPlan: planLimit.subscription.desiredPlan,
+      desiredPlanEffectiveAt: planLimit.subscription.desiredPlanEffectiveAt,
+    },
   });
 };

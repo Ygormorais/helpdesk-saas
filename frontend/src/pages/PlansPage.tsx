@@ -71,6 +71,7 @@ export default function PlansPage() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalData, setPortalData] = useState<any>(null);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
 
   const selectedPlanObj = useMemo(
@@ -190,6 +191,27 @@ export default function PlansPage() {
     }
   };
 
+  const sync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await api.post('/billing/sync');
+      toast({
+        title: 'Assinatura sincronizada',
+        description: 'Atualizamos o status e o período com base no Asaas.',
+      });
+      await fetchPlanDetails();
+      setPortalData((prev: any) => (prev ? { ...prev, ...res.data?.local } : prev));
+    } catch (error: any) {
+      toast({
+        title: 'Falha ao sincronizar',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const changePlan = async (planId: string) => {
     setIsChangingPlan(true);
     try {
@@ -214,6 +236,12 @@ export default function PlansPage() {
     if (max === -1) return 0;
     return Math.round((current / max) * 100);
   };
+
+  const desiredPlan = currentPlan?.subscription?.desiredPlan;
+  const desiredAt = currentPlan?.subscription?.desiredPlanEffectiveAt
+    ? new Date(currentPlan.subscription.desiredPlanEffectiveAt)
+    : null;
+  const desiredIsFuture = !!desiredAt && desiredAt.getTime() > Date.now();
 
   if (loading) {
     return (
@@ -263,6 +291,11 @@ export default function PlansPage() {
           <Button variant="outline" onClick={fetchPlanDetails} disabled={loading}>
             Atualizar
           </Button>
+          {currentPlan?.subscription?.stripeSubscriptionId ? (
+            <Button variant="secondary" onClick={sync} disabled={isSyncing}>
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -285,6 +318,11 @@ export default function PlansPage() {
                     Status: {String(currentPlan.subscription.status).toUpperCase()}
                   </Badge>
                 ) : null}
+                {currentPlan.subscription?.currentPeriodEnd ? (
+                  <Badge variant="secondary" className="bg-transparent border border-border text-foreground">
+                    Período até: {new Date(currentPlan.subscription.currentPeriodEnd).toLocaleDateString('pt-BR')}
+                  </Badge>
+                ) : null}
                 {currentPlan.subscription?.stripeSubscriptionId ? (
                   <Button variant="secondary" size="sm" onClick={openPortal}>
                     Ver assinatura
@@ -292,10 +330,8 @@ export default function PlansPage() {
                 ) : null}
                 {currentPlan.subscription?.desiredPlan ? (
                   <Badge variant="secondary" className="bg-amber-100 text-amber-900">
-                    Mudança agendada: {String(currentPlan.subscription.desiredPlan).toUpperCase()}
-                    {currentPlan.subscription.desiredPlanEffectiveAt
-                      ? ` em ${new Date(currentPlan.subscription.desiredPlanEffectiveAt).toLocaleDateString('pt-BR')}`
-                      : ''}
+                    {desiredIsFuture ? 'Mudança agendada:' : 'Mudança em processamento:'} {String(desiredPlan).toUpperCase()}
+                    {desiredAt ? ` em ${desiredAt.toLocaleDateString('pt-BR')}` : ''}
                   </Badge>
                 ) : null}
                 {currentPlan.subscription?.stripeSubscriptionId ? (

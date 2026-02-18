@@ -95,7 +95,32 @@ MONGODB_URI=mongodb://localhost:27017/helpdesk
 JWT_SECRET=sua-chave-secreta
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=http://localhost:5173
+
+# Billing (Asaas)
+ASAAS_API_KEY=
+ASAAS_WEBHOOK_SECRET=
 ```
+
+### Variáveis de Ambiente (Frontend)
+
+```env
+VITE_API_URL=/api
+# ou, se estiver chamando um backend externo:
+# VITE_BACKEND_URL=https://seu-backend.com
+```
+
+## 💳 Billing (Asaas)
+
+- Webhook: configure no painel do Asaas para apontar para `POST /api/billing/webhook`
+- Header de seguranca (opcional): se `ASAAS_WEBHOOK_SECRET` estiver definido, o backend valida o header `asaas-access-token`
+
+### Smoke test (cobranca)
+
+1) Crie um tenant e entre como admin/manager
+2) Va em `Planos` e faca checkout de um plano pago
+3) Confirme que o Asaas chama o webhook e que o tenant passa a ter acesso liberado (ex: `Relatorios`)
+4) Se o webhook falhar, use `Planos > Sincronizar` (chama `POST /api/billing/sync`) para puxar status/periodo do Asaas
+5) Teste troca de plano em `Planos` (upgrade imediato, downgrade agendado para o fim do ciclo)
 
 ## 🚀 Executando
 
