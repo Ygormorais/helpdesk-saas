@@ -8,9 +8,11 @@ import { config } from './config/index.js';
 import { connectDB } from './config/database.js';
 import routes from './routes/index.js';
 import { errorHandler, notFound } from './middlewares/errorHandler.js';
+import { requireDbConnection } from './middlewares/dbReady.js';
 import { notificationService } from './services/notificationService.js';
 import { chatService } from './services/chatService.js';
 import { sendTrialRemindersOnce } from './services/billingReminderService.js';
+import mongoose from 'mongoose';
 
 const app = express();
 const httpServer = createServer(app);
@@ -48,10 +50,18 @@ if (config.nodeEnv === 'production') {
   app.use('/api', limiter);
 }
 
-app.use('/api', routes);
+ // Most API routes require MongoDB. If DB is down, return 503 instead of hanging.
+ app.use('/api', requireDbConnection);
+ app.use('/api', routes);
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    db: {
+      readyState: mongoose.connection.readyState,
+    },
+  });
 });
 
 app.use(notFound);
@@ -85,6 +95,9 @@ connectDB()
   .catch((err) => {
     console.error('Starting server without MongoDB connection');
     console.error(err);
+    if (config.nodeEnv === 'production') {
+      process.exit(1);
+    }
     startServer();
   });
 
