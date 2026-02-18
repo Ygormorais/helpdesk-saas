@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/config/api';
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ export default function PlansPage() {
   const [currentPlan, setCurrentPlan] = useState<CurrentPlan | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [billingType, setBillingType] = useState<'CREDIT_CARD' | 'BOLETO' | 'PIX'>('CREDIT_CARD');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -60,15 +62,17 @@ export default function PlansPage() {
 
   const fetchPlanDetails = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/plan', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      setCurrentPlan(data);
-      setAvailablePlans(data.availablePlans);
+      setLoadError(null);
+      setLoading(true);
+
+      const res = await api.get('/plan');
+      const data = res.data;
+
+      setCurrentPlan(data || null);
+      setAvailablePlans(Array.isArray(data?.availablePlans) ? data.availablePlans : []);
     } catch (error) {
       console.error('Error fetching plan:', error);
+      setLoadError('Não foi possível carregar os detalhes do plano');
       toast({
         title: 'Erro',
         description: 'Não foi possível carregar os detalhes do plano',
@@ -89,20 +93,12 @@ export default function PlansPage() {
     
     setIsProcessing(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ 
-          plan: selectedPlan,
-          billingType 
-        }),
+      const res = await api.post('/billing/checkout', {
+        plan: selectedPlan,
+        billingType,
       });
-      
-      const data = await response.json();
+
+      const data = res.data;
       
       if (data.checkoutUrl) {
         // Redireciona para página de pagamento Asaas
@@ -134,6 +130,27 @@ export default function PlansPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Planos e Preços</h1>
+          <p className="text-muted-foreground">Gerencie seu plano e faturamento</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Não foi possível carregar</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+            <Button onClick={fetchPlanDetails}>Tentar novamente</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -203,7 +220,16 @@ export default function PlansPage() {
 
       {/* Planos Disponíveis */}
       <div className="grid gap-6 md:grid-cols-3">
-        {availablePlans.map((plan) => {
+        {availablePlans.length === 0 ? (
+          <Card className="md:col-span-3">
+            <CardHeader>
+              <CardTitle>Nenhum plano disponível</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Tente recarregar esta página.</p>
+            </CardContent>
+          </Card>
+        ) : availablePlans.map((plan) => {
           const isCurrentPlan = currentPlan?.plan === plan.id;
           const Icon = plan.id === 'free' ? Sparkles : plan.id === 'pro' ? Zap : Building2;
           
