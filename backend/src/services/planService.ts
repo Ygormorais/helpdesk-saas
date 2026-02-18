@@ -43,6 +43,12 @@ export class PlanService {
     features: IPlanLimit['features'];
     isPaidAccessBlocked: boolean;
   } {
+    // Use stored features only to backfill missing keys; the effective plan config wins.
+    const mergeFeatures = (base: IPlanLimit['features']) => ({
+      ...(planLimit.features as any),
+      ...base,
+    });
+
     // During the initial trial (created on tenant signup) we grant PRO access,
     // even though the stored plan is FREE.
     if (planLimit.plan === PlanType.FREE && this.isActiveTrial(planLimit.subscription)) {
@@ -52,7 +58,7 @@ export class PlanService {
         maxAgents: pro.maxAgents,
         maxTickets: pro.maxTickets,
         maxStorage: pro.maxStorage,
-        features: pro.features,
+        features: mergeFeatures(pro.features),
         isPaidAccessBlocked: false,
       };
     }
@@ -70,7 +76,7 @@ export class PlanService {
           maxAgents: cfg.maxAgents,
           maxTickets: cfg.maxTickets,
           maxStorage: cfg.maxStorage,
-          features: cfg.features,
+          features: mergeFeatures(cfg.features),
           isPaidAccessBlocked: false,
         };
       }
@@ -80,7 +86,7 @@ export class PlanService {
         maxAgents: free.maxAgents,
         maxTickets: free.maxTickets,
         maxStorage: free.maxStorage,
-        features: free.features,
+        features: mergeFeatures(free.features),
         isPaidAccessBlocked: true,
       };
     }
@@ -94,7 +100,7 @@ export class PlanService {
         maxAgents: planLimit.maxAgents,
         maxTickets: planLimit.maxTickets,
         maxStorage: planLimit.maxStorage,
-        features: planLimit.features,
+        features: mergeFeatures(PLAN_LIMITS[planLimit.plan].features),
         isPaidAccessBlocked: false,
       };
     }
@@ -105,7 +111,7 @@ export class PlanService {
       maxAgents: free.maxAgents,
       maxTickets: free.maxTickets,
       maxStorage: free.maxStorage,
-      features: free.features,
+      features: mergeFeatures(free.features),
       isPaidAccessBlocked: true,
     };
   }

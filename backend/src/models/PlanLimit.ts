@@ -18,6 +18,9 @@ export interface IPlanLimit extends Document {
     webhooks: boolean;
     satisfactionSurvey: boolean;
     advancedReports: boolean;
+    macros: boolean;
+    automations: boolean;
+    auditExport: boolean;
     api: boolean;
     customDomain: boolean;
     whiteLabel: boolean;
@@ -64,6 +67,9 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
       webhooks: false,
       satisfactionSurvey: true,
       advancedReports: false,
+      macros: false,
+      automations: false,
+      auditExport: false,
       api: false,
       customDomain: false,
       whiteLabel: false,
@@ -80,6 +86,9 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
       webhooks: false,
       satisfactionSurvey: true,
       advancedReports: true,
+      macros: true,
+      automations: true,
+      auditExport: true,
       api: false,
       customDomain: false,
       whiteLabel: false,
@@ -96,6 +105,9 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
       webhooks: true,
       satisfactionSurvey: true,
       advancedReports: true,
+      macros: true,
+      automations: true,
+      auditExport: true,
       api: true,
       customDomain: true,
       whiteLabel: true,
@@ -134,6 +146,9 @@ const planLimitSchema = new Schema<IPlanLimit>(
       webhooks: { type: Boolean, default: false },
       satisfactionSurvey: { type: Boolean, default: true },
       advancedReports: { type: Boolean, default: false },
+      macros: { type: Boolean, default: false },
+      automations: { type: Boolean, default: false },
+      auditExport: { type: Boolean, default: false },
       api: { type: Boolean, default: false },
       customDomain: { type: Boolean, default: false },
       whiteLabel: { type: Boolean, default: false },
