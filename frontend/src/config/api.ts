@@ -1,6 +1,19 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const normalizeBaseUrl = (url: string) => {
+  const trimmed = String(url || '').trim().replace(/\/+$/, '');
+  if (!trimmed) return '/api';
+  if (trimmed === '/api') return '/api';
+
+  // If an absolute backend URL is provided, default to its /api.
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+  }
+
+  return trimmed;
+};
+
+const API_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '/api');
 
 export const api = axios.create({
   baseURL: API_URL,

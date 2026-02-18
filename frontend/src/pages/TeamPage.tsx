@@ -293,7 +293,7 @@ export default function TeamPage() {
                             setResendingInviteId(invite._id);
                             resendInviteMutation.mutate(invite._id);
                           }}
-                          disabled={resendInviteMutation.isPending}
+                          disabled={resendInviteMutation.isPending && resendingInviteId === invite._id}
                           title="Reenviar convite"
                         >
                           <RefreshCw className="mr-2 h-4 w-4" />

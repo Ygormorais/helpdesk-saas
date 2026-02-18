@@ -226,6 +226,8 @@ export default function ChatPage() {
     try {
       const res = await usersApi.listStaff();
       setStaff(res.data.users || []);
+    } catch {
+      setStaff([]);
     } finally {
       setStaffLoading(false);
     }
@@ -379,6 +381,14 @@ export default function ChatPage() {
                     <div
                       key={chat._id}
                       onClick={() => setCurrentChat(chat as any)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setCurrentChat(chat as any);
+                        }
+                      }}
                       className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                         isActive ? 'bg-primary/10' : 'hover:bg-muted'
                       }`}
@@ -433,6 +443,14 @@ export default function ChatPage() {
                       <div
                         key={c._id}
                         onClick={() => setCurrentChat(c as any)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setCurrentChat(c as any);
+                          }
+                        }}
                         className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                           isActive ? 'bg-primary/10' : 'hover:bg-muted'
                         }`}
@@ -482,6 +500,14 @@ export default function ChatPage() {
                         <div
                           key={c._id}
                           onClick={() => setCurrentChat(c as any)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setCurrentChat(c as any);
+                            }
+                          }}
                           className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                             isActive ? 'bg-primary/10' : 'hover:bg-muted'
                           }`}
@@ -612,6 +638,11 @@ export default function ChatPage() {
                   {isLoadingMessages ? (
                     <div className="text-sm text-muted-foreground">Carregando mensagens...</div>
                   ) : null}
+                  {!isLoadingMessages && messages.length === 0 ? (
+                    <div className="py-10 text-center text-sm text-muted-foreground">
+                      Nenhuma mensagem ainda. Envie a primeira mensagem.
+                    </div>
+                  ) : null}
                   {messages.map((m: any, idx: number) => {
                     const isOwn = m.sender?._id === user?.id;
                     const showSender = tab === 'internal' && !isOwn;
@@ -623,7 +654,7 @@ export default function ChatPage() {
                           }`}
                         >
                           {showSender ? (
-                            <div className="text-xs opacity-70 mb-1">{m.sender?.name || 'Usuario'}</div>
+                            <div className="text-xs opacity-70 mb-1">{m.sender?.name || 'Usuário'}</div>
                           ) : null}
                           <p className="text-sm">{m.content}</p>
                           <div className={`flex items-center gap-2 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -695,7 +726,14 @@ export default function ChatPage() {
                     }}
                     className="flex-1"
                   />
-                  <Button onClick={handleSend} size="icon" type="button">
+                  <Button
+                    onClick={handleSend}
+                    size="icon"
+                    type="button"
+                    disabled={!inputValue.trim()}
+                    aria-label="Enviar mensagem"
+                    title="Enviar"
+                  >
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
@@ -715,8 +753,8 @@ export default function ChatPage() {
               <h3 className="font-medium">Selecione uma conversa</h3>
               <p className="text-sm text-muted-foreground">
                 {tab === 'internal'
-                  ? 'Escolha um canal ou conversa direta para comecar'
-                  : 'Escolha uma conversa a esquerda para comecar'}
+                  ? 'Escolha um canal ou conversa direta para começar'
+                  : 'Escolha uma conversa à esquerda para começar'}
               </p>
             </div>
           </div>

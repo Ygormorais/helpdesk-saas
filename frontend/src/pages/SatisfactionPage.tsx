@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SatisfactionCard } from '@/components/SatisfactionSurvey';
+import { api } from '@/config/api';
 import {
   BarChart,
   Bar,
@@ -56,6 +57,7 @@ export default function SatisfactionPage() {
   const [recentSurveys, setRecentSurveys] = useState<RecentSurvey[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -63,18 +65,15 @@ export default function SatisfactionPage() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `/api/satisfaction/stats?days=${dateRange}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const data = await response.json();
+      setLoadError(null);
+      setLoading(true);
+      const res = await api.get('/satisfaction/stats', { params: { days: dateRange } });
+      const data = res.data;
       setStats(data.stats);
       setComments(data.comments || []);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      if (import.meta.env.DEV) console.error('Error fetching stats:', error);
+      setLoadError('Não foi possível carregar as estatísticas de satisfação');
     } finally {
       setLoading(false);
     }
@@ -102,6 +101,27 @@ export default function SatisfactionPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Satisfação do Cliente</h1>
+          <p className="text-muted-foreground">Acompanhe a satisfação dos seus clientes</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Não foi possível carregar</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+            <Button onClick={fetchStats}>Tentar novamente</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

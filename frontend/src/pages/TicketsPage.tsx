@@ -124,7 +124,7 @@ export default function TicketsPage() {
     setSearchParams(next, { replace: true });
   }, [debouncedSearch, mineOnly, page, priorityFilter, setSearchParams, statusFilter]);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ['tickets', { page, limit, search: debouncedSearch, statusFilter, priorityFilter, mineOnly }],
     queryFn: async () => {
       const res = await ticketsApi.list({
@@ -146,6 +146,9 @@ export default function TicketsPage() {
 
   const tickets = useMemo(() => data?.tickets || [], [data]);
   const pagination = data?.pagination;
+
+  const hasActiveFilters =
+    !!debouncedSearch.trim() || statusFilter !== 'all' || priorityFilter !== 'all' || mineOnly;
 
   const canExport = user?.role !== 'client';
   const canUseMineFilter = user?.role !== 'client';
@@ -174,8 +177,8 @@ export default function TicketsPage() {
     } catch (error: any) {
       const msg = error?.response?.data?.message;
       toast({
-        title: 'Nao foi possivel abrir o chat',
-        description: msg || (user?.role === 'client' ? 'Ticket sem agente atribuido' : 'Tente novamente'),
+        title: 'Não foi possível abrir o chat',
+        description: msg || (user?.role === 'client' ? 'Ticket sem agente atribuído' : 'Tente novamente'),
         variant: 'destructive',
       });
     } finally {
@@ -248,7 +251,7 @@ export default function TicketsPage() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px]" aria-label="Filtrar por status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -260,7 +263,7 @@ export default function TicketsPage() {
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px]" aria-label="Filtrar por prioridade">
                 <SelectValue placeholder="Prioridade" />
               </SelectTrigger>
               <SelectContent>
@@ -292,16 +295,36 @@ export default function TicketsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Por pagina" />
+              <SelectTrigger className="w-[140px]" aria-label="Itens por página">
+                <SelectValue placeholder="Por página" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="20">20 / pagina</SelectItem>
-                <SelectItem value="50">50 / pagina</SelectItem>
-                <SelectItem value="100">100 / pagina</SelectItem>
+                <SelectItem value="20">20 / página</SelectItem>
+                <SelectItem value="50">50 / página</SelectItem>
+                <SelectItem value="100">100 / página</SelectItem>
               </SelectContent>
             </Select>
+
+            {hasActiveFilters ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setSearch('');
+                  setDebouncedSearch('');
+                  setStatusFilter('all');
+                  setPriorityFilter('all');
+                  setMineOnly(false);
+                  setPage(1);
+                }}
+              >
+                Limpar
+              </Button>
+            ) : null}
           </div>
+          {isFetching && !isLoading ? (
+            <div className="mt-3 text-xs text-muted-foreground">Atualizando resultados...</div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -310,23 +333,32 @@ export default function TicketsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Título</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Prioridade</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Categoria</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Criado por</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
-                <th className="px-4 py-3 text-right text-sm font-medium">Chat</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Título</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Prioridade</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Categoria</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Criado por</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                <th scope="col" className="px-4 py-3 text-right text-sm font-medium">Chat</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr>
-                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={8}>
-                    Carregando tickets...
-                  </td>
-                </tr>
+                <>
+                  <tr>
+                    <td className="px-4 py-4 text-left text-xs text-muted-foreground" colSpan={8}>
+                      Carregando tickets...
+                    </td>
+                  </tr>
+                  {Array.from({ length: 8 }).map((_, idx) => (
+                    <tr key={`skeleton-${idx}`} className="border-b last:border-0">
+                      <td className="px-4 py-3" colSpan={8}>
+                        <div className="h-5 w-full animate-pulse rounded bg-muted" />
+                      </td>
+                    </tr>
+                  ))}
+                </>
               )}
               {isError && (
                 <tr>
@@ -390,7 +422,7 @@ export default function TicketsPage() {
       {pagination ? (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Pagina {pagination.page} de {pagination.pages} • {pagination.total} tickets
+            Página {pagination.page} de {pagination.pages} • {pagination.total} tickets
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -398,7 +430,7 @@ export default function TicketsPage() {
               variant="outline"
               size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={pagination.page <= 1}
+              disabled={pagination.page <= 1 || isFetching}
             >
               Anterior
             </Button>
@@ -407,9 +439,9 @@ export default function TicketsPage() {
               variant="outline"
               size="sm"
               onClick={() => setPage((p) => Math.min(pagination.pages || p + 1, p + 1))}
-              disabled={pagination.page >= pagination.pages}
+              disabled={pagination.page >= pagination.pages || isFetching}
             >
-              Proxima
+              Próxima
             </Button>
           </div>
         </div>

@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useTimeTracking } from '@/contexts/TimeTrackingContext';
+import { api } from '@/config/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface TimerProps {
   ticketId?: string;
@@ -25,6 +27,7 @@ export default function Timer({
   onTimerStop,
 }: TimerProps) {
   const { activeTimer, isRunning, startTimer, stopTimer, formatElapsedTime } = useTimeTracking();
+  const { toast } = useToast();
   const [manualHours, setManualHours] = useState('');
   const [manualMinutes, setManualMinutes] = useState('');
   const [description, setDescription] = useState('');
@@ -52,20 +55,12 @@ export default function Timer({
     if (duration <= 0) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await fetch('/api/time/manual', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ticketId,
-          description: description || 'Registro manual',
-          duration,
-          startTime: new Date(Date.now() - duration).toISOString(),
-          endTime: new Date().toISOString(),
-        }),
+      await api.post('/time/manual', {
+        ticketId,
+        description: description || 'Registro manual',
+        duration,
+        startTime: new Date(Date.now() - duration).toISOString(),
+        endTime: new Date().toISOString(),
       });
 
       setManualHours('');
@@ -74,7 +69,12 @@ export default function Timer({
       setShowManual(false);
       onTimerStart?.();
     } catch (error) {
-      console.error('Error adding manual entry:', error);
+      if (import.meta.env.DEV) console.error('Error adding manual entry:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível adicionar a entrada manual',
+        variant: 'destructive',
+      });
     }
   };
 

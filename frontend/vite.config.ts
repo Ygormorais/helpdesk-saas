@@ -5,7 +5,9 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const proxyTarget = env.VITE_PROXY_TARGET || env.VITE_BACKEND_URL || 'http://localhost:3000';
+  const apiUrl = env.VITE_API_URL || '';
+  const apiTarget = /^https?:\/\//i.test(apiUrl) ? apiUrl : '';
+  const proxyTarget = env.VITE_PROXY_TARGET || env.VITE_BACKEND_URL || apiTarget || 'http://localhost:3000';
 
   return {
     plugins: [

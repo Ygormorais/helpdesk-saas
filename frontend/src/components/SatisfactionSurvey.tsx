@@ -51,7 +51,7 @@ export default function SatisfactionSurvey({
       await onSubmit(rating, comment);
       onClose();
     } catch (error) {
-      console.error('Error submitting survey:', error);
+      if (import.meta.env.DEV) console.error('Error submitting survey:', error);
     } finally {
       setIsSubmitting(false);
     }

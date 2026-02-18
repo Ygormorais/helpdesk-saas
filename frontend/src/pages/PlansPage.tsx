@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Check, X, Sparkles, Zap, Building2, CreditCard, QrCode, FileText, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,11 @@ export default function PlansPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
+  const selectedPlanObj = useMemo(
+    () => (selectedPlan ? availablePlans.find((p) => p.id === selectedPlan) : undefined),
+    [availablePlans, selectedPlan]
+  );
+
   useEffect(() => {
     fetchPlanDetails();
   }, []);
@@ -71,7 +76,6 @@ export default function PlansPage() {
       setCurrentPlan(data || null);
       setAvailablePlans(Array.isArray(data?.availablePlans) ? data.availablePlans : []);
     } catch (error) {
-      console.error('Error fetching plan:', error);
       setLoadError('Não foi possível carregar os detalhes do plano');
       toast({
         title: 'Erro',
@@ -85,6 +89,7 @@ export default function PlansPage() {
 
   const openCheckout = (planId: string) => {
     setSelectedPlan(planId);
+    setBillingType('CREDIT_CARD');
     setIsCheckoutOpen(true);
   };
 
@@ -109,7 +114,14 @@ export default function PlansPage() {
           title: 'Redirecionando...',
           description: 'Complete o pagamento na nova aba. Seu plano será ativado automaticamente.',
         });
+        return;
       }
+
+      toast({
+        title: 'Checkout indisponível',
+        description: 'Não foi possível iniciar o checkout. Tente novamente.',
+        variant: 'destructive',
+      });
     } catch (error) {
       toast({
         title: 'Erro',
@@ -258,9 +270,7 @@ export default function PlansPage() {
                   <CardTitle>{plan.name}</CardTitle>
                 </div>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">
-                    ${plan.price}
-                  </span>
+                  <span className="text-4xl font-bold">R$ {plan.price.toFixed(2).replace('.', ',')}</span>
                   <span className="text-muted-foreground">/mês</span>
                 </div>
               </CardHeader>
@@ -315,13 +325,21 @@ export default function PlansPage() {
       </div>
 
       {/* Checkout Dialog */}
-      <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+      <Dialog
+        open={isCheckoutOpen}
+        onOpenChange={(open) => {
+          if (isProcessing) return;
+          setIsCheckoutOpen(open);
+          if (!open) setSelectedPlan(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Escolher Forma de Pagamento</DialogTitle>
             <DialogDescription>
-              Plano {selectedPlan?.charAt(0).toUpperCase()}{selectedPlan?.slice(1)} - 
-              R$ {availablePlans.find(p => p.id === selectedPlan)?.price.toFixed(2).replace('.', ',')}/mês
+              {selectedPlanObj
+                ? `Plano ${selectedPlanObj.name} - R$ ${selectedPlanObj.price.toFixed(2).replace('.', ',')}/mês`
+                : 'Selecione um plano para continuar.'}
             </DialogDescription>
           </DialogHeader>
           
@@ -367,10 +385,15 @@ export default function PlansPage() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setIsCheckoutOpen(false)} className="flex-1">
+            <Button
+              variant="outline"
+              onClick={() => setIsCheckoutOpen(false)}
+              className="flex-1"
+              disabled={isProcessing}
+            >
               Cancelar
             </Button>
-            <Button onClick={processCheckout} disabled={isProcessing} className="flex-1">
+            <Button onClick={processCheckout} disabled={isProcessing || !selectedPlanObj} className="flex-1">
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
