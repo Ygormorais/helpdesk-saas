@@ -96,6 +96,7 @@ export default function TicketDetailPage() {
   const comments = useMemo(() => data?.comments || [], [data]);
 
   const isStaff = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'agent';
+  const isClient = user?.role === 'client';
 
   const linkedArticlesQuery = useQuery({
     queryKey: ['ticket', id, 'kb-articles'],
@@ -107,6 +108,15 @@ export default function TicketDetailPage() {
   });
 
   const kbQueryText = `${ticket?.title || ''}\n\n${ticket?.description || ''}`.trim();
+
+  const clientSuggestedArticlesQuery = useQuery({
+    queryKey: ['ticket', id, 'kb-suggested-client', kbQueryText],
+    enabled: !!id && isClient && kbQueryText.length >= 2,
+    queryFn: async () => {
+      const res = await articlesApi.searchAi({ q: kbQueryText.slice(0, 500), limit: 6 });
+      return res.data.results as any[];
+    },
+  });
   const suggestedArticlesQuery = useQuery({
     queryKey: ['ticket', id, 'kb-suggested', kbQueryText],
     enabled: !!id && isStaff && kbQueryText.length >= 2,
@@ -316,6 +326,32 @@ export default function TicketDetailPage() {
               <p>{ticket.description}</p>
             </CardContent>
           </Card>
+
+          {isClient && ((clientSuggestedArticlesQuery.error as any)?.response?.status !== 403) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Artigos sugeridos</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {clientSuggestedArticlesQuery.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Carregando...</p>
+                ) : (clientSuggestedArticlesQuery.data || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma sugestao no momento</p>
+                ) : (
+                  (clientSuggestedArticlesQuery.data || []).map((a: any) => (
+                    <Link
+                      key={a._id}
+                      to={`/knowledge/${a.slug}`}
+                      className="block rounded-lg border p-3 hover:bg-muted/40 transition-colors"
+                    >
+                      <p className="text-sm font-medium line-clamp-2">{a.title}</p>
+                      {a.excerpt && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{a.excerpt}</p>}
+                    </Link>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

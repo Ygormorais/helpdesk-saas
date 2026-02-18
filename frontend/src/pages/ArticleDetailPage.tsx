@@ -137,7 +137,38 @@ export default function ArticleDetailPage() {
 
       <Card>
         <CardContent className="pt-6 prose prose-sm max-w-none dark:prose-invert">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.content || ''}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            disallowedElements={['img']}
+            unwrapDisallowed
+            components={{
+              a: ({ href, children, ...props }: any) => {
+                const raw = String(href || '').trim();
+                const isInternal = raw.startsWith('/') || raw.startsWith('#');
+                const isHttp = raw.startsWith('http://') || raw.startsWith('https://');
+                const isMail = raw.startsWith('mailto:');
+                const safe = isInternal || isHttp || isMail;
+
+                if (!safe) {
+                  return <span>{children}</span>;
+                }
+
+                const external = isHttp;
+                return (
+                  <a
+                    href={raw}
+                    target={external ? '_blank' : undefined}
+                    rel={external ? 'noopener noreferrer nofollow' : undefined}
+                    {...props}
+                  >
+                    {children}
+                  </a>
+                );
+              },
+            }}
+          >
+            {article.content || ''}
+          </ReactMarkdown>
         </CardContent>
       </Card>
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Edit, Trash, Eye, FileText } from 'lucide-react';
+import { Plus, Search, Edit, Trash, Eye, FileText, MessageSquare } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,8 @@ export default function AdminArticlesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [feedbackArticle, setFeedbackArticle] = useState<any | null>(null);
+  const [feedbackCommentOnly, setFeedbackCommentOnly] = useState(true);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [newArticle, setNewArticle] = useState({
@@ -67,6 +69,15 @@ export default function AdminArticlesPage() {
   });
 
   const articles = listQuery.data || [];
+
+  const feedbackQuery = useQuery({
+    queryKey: ['article-feedback', feedbackArticle?._id, { commentOnly: feedbackCommentOnly }],
+    enabled: !!feedbackArticle?._id,
+    queryFn: async () => {
+      const res = await articlesApi.listFeedback(feedbackArticle._id, { page: 1, limit: 50, commentOnly: feedbackCommentOnly });
+      return res.data;
+    },
+  });
 
   const upsertMutation = useMutation({
     mutationFn: async () => {
@@ -254,6 +265,74 @@ export default function AdminArticlesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog
+          open={!!feedbackArticle}
+          onOpenChange={(open) => {
+            if (!open) setFeedbackArticle(null);
+          }}
+        >
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Feedback do artigo</DialogTitle>
+              <DialogDescription>{feedbackArticle?.title || ''}</DialogDescription>
+            </DialogHeader>
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">
+                {feedbackQuery.data?.stats
+                  ? `${feedbackQuery.data.stats.yes || 0} sim • ${feedbackQuery.data.stats.no || 0} nao • total ${feedbackQuery.data.stats.total || 0}`
+                  : ''}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={feedbackCommentOnly ? 'default' : 'outline'}
+                  onClick={() => setFeedbackCommentOnly(true)}
+                >
+                  Com comentario
+                </Button>
+                <Button
+                  size="sm"
+                  variant={!feedbackCommentOnly ? 'default' : 'outline'}
+                  onClick={() => setFeedbackCommentOnly(false)}
+                >
+                  Todos
+                </Button>
+              </div>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto space-y-2">
+              {feedbackQuery.isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
+              {feedbackQuery.isError && <p className="text-sm text-destructive">Erro ao carregar feedback</p>}
+              {!feedbackQuery.isLoading && !feedbackQuery.isError && (feedbackQuery.data?.feedback || []).length === 0 && (
+                <p className="text-sm text-muted-foreground">Nenhum feedback</p>
+              )}
+
+              {(feedbackQuery.data?.feedback || []).map((f: any) => (
+                <Card key={f.id}>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {f.user?.name || 'Usuario'}
+                          {f.user?.email ? <span className="text-xs text-muted-foreground"> {'<'}{f.user.email}{'>'}</span> : null}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {f.createdAt ? new Date(f.createdAt).toLocaleString('pt-BR') : ''}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${f.helpful ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {f.helpful ? 'Util' : 'Nao util'}
+                      </span>
+                    </div>
+                    {f.comment && <p className="text-sm whitespace-pre-wrap">{f.comment}</p>}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -329,6 +408,17 @@ export default function AdminArticlesPage() {
                       <Eye className="h-4 w-4" />
                     </Button>
                   </Link>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setFeedbackArticle(article);
+                      setFeedbackCommentOnly(true);
+                    }}
+                    aria-label="Ver feedback"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"

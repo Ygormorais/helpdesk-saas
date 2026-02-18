@@ -226,6 +226,23 @@ const searchAiSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
+const listFeedbackQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  commentOnly: z.preprocess((v) => {
+    if (v === 'true' || v === '1' || v === true) return true;
+    if (v === 'false' || v === '0' || v === false) return false;
+    return v;
+  }, z.boolean().optional()),
+  helpful: z.preprocess((v) => {
+    if (v === 'true' || v === true) return true;
+    if (v === 'false' || v === false) return false;
+    if (v === 'yes') return true;
+    if (v === 'no') return false;
+    return v;
+  }, z.boolean().optional()),
+});
+
 export const searchArticlesAi = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
   const parsed = searchAiSchema.safeParse(req.query);
@@ -332,6 +349,72 @@ export const submitArticleFeedback = async (req: AuthRequest, res: Response): Pr
   });
 
   res.json({ success: true });
+};
+
+export const listArticleFeedback = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { id } = req.params;
+  const { page, limit, commentOnly, helpful } = listFeedbackQuerySchema.parse(req.query);
+
+  const article = await Article.findOne({ _id: id, tenant: user.tenant._id }).select('_id helpful');
+  if (!article) {
+    throw new AppError('Article not found', 404);
+  }
+
+  const query: any = {
+    tenant: user.tenant._id,
+    article: article._id,
+  };
+
+  if (typeof helpful === 'boolean') {
+    query.helpful = helpful;
+  }
+
+  if (commentOnly) {
+    query.comment = { $exists: true, $ne: '' };
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [items, total, grouped] = await Promise.all([
+    ArticleFeedback.find(query)
+      .populate('user', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select('helpful comment user createdAt'),
+    ArticleFeedback.countDocuments(query),
+    ArticleFeedback.aggregate([
+      { $match: { tenant: user.tenant._id, article: article._id } },
+      { $group: { _id: '$helpful', count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const stats = {
+    yes: grouped.find((g: any) => g._id === true)?.count || 0,
+    no: grouped.find((g: any) => g._id === false)?.count || 0,
+    total: grouped.reduce((acc: number, g: any) => acc + (g.count || 0), 0),
+    counters: article.helpful,
+  };
+
+  const feedback = items.map((f: any) => ({
+    id: f._id,
+    helpful: f.helpful,
+    comment: f.comment,
+    createdAt: f.createdAt,
+    user: f.user ? { id: f.user._id, name: f.user.name, email: f.user.email } : undefined,
+  }));
+
+  res.json({
+    feedback,
+    stats,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+  });
 };
 
 export const addRelatedTicket = async (req: AuthRequest, res: Response): Promise<void> => {

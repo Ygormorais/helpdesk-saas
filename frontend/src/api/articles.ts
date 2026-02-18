@@ -50,6 +50,12 @@ export const articlesApi = {
   feedback: (id: string, data: { helpful: boolean; comment?: string }) =>
     api.post(`/articles/${id}/feedback`, data),
 
+  listFeedback: (id: string, params?: { page?: number; limit?: number; commentOnly?: boolean; helpful?: boolean }) =>
+    api.get<{ feedback: Array<{ id: string; helpful: boolean; comment?: string; createdAt: string; user?: any }>; stats: any; pagination: any }>(
+      `/articles/${id}/feedback`,
+      { params }
+    ),
+
   linkTicket: (articleId: string, ticketId: string) =>
     api.post(`/articles/${articleId}/related-tickets`, { ticketId }),
 

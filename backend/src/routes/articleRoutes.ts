@@ -10,6 +10,7 @@ import {
   getPopularArticles,
   searchArticlesAi,
   submitArticleFeedback,
+  listArticleFeedback,
   addRelatedTicket,
   removeRelatedTicket,
   getArticlesByTicket,
@@ -37,6 +38,7 @@ router.put('/:id', authorize('admin', 'manager', 'agent'), updateArticle);
 router.delete('/:id', authorize('admin', 'manager'), deleteArticle);
 router.post('/:id/vote', voteArticle);
 router.post('/:id/feedback', submitArticleFeedback);
+router.get('/:id/feedback', authorize('admin', 'manager', 'agent'), listArticleFeedback);
 router.post('/:id/related-tickets', authorize('admin', 'manager', 'agent'), addRelatedTicket);
 router.delete('/:id/related-tickets/:ticketId', authorize('admin', 'manager', 'agent'), removeRelatedTicket);
 
