@@ -172,6 +172,12 @@ docker compose -f docker-compose.dev.yml up
 - Readiness: `GET /health` (200 quando deps ok, 503 quando degradado)
 - API health (para o frontend/dev proxy): `GET /api/health` e `GET /api/health/live`
 - Metrics (admin/manager): `GET /api/metrics` (contadores e percentis basicos, in-memory)
+- Prometheus: `GET /api/metrics?format=prom` (text/plain)
+
+### Logs
+
+- `LOG_LEVEL=debug|info|warn|error|silent` (default: info)
+- `LOG_HTTP_SUCCESS=false` para nao logar requests 2xx/3xx (default: true)
 
 ## 📁 Estrutura
 

@@ -12,6 +12,13 @@ const router = Router();
  *     tags: [Ops]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [json, prom]
+ *         description: Use "prom" for Prometheus text format
  *     responses:
  *       200:
  *         description: Snapshot de contadores e latência
@@ -21,6 +28,15 @@ const router = Router();
 
 router.use(authenticate);
 router.get('/', authorize('admin', 'manager'), (_req, res) => {
+  const format = String((_req.query as any)?.format || '').trim().toLowerCase();
+  const accept = String(_req.headers.accept || '');
+  const wantsProm = format === 'prom' || accept.includes('text/plain');
+
+  if (wantsProm) {
+    res.type('text/plain').send(metricsService.toPrometheus());
+    return;
+  }
+
   res.json(metricsService.snapshot());
 });
 

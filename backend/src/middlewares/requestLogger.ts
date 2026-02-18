@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import { randomUUID } from 'crypto';
 import { metricsService } from '../services/metricsService.js';
+import { logger } from '../services/logger.js';
 
 function nowMs() {
   return Date.now();
@@ -29,8 +30,11 @@ export const requestLogger: RequestHandler = (req: any, res, next) => {
     const userId = req.user?._id ? String(req.user._id) : undefined;
     const tenantId = req.user?.tenant?._id ? String(req.user.tenant._id) : undefined;
 
+    if (!logger.shouldLogHttpSuccess() && res.statusCode < 400) {
+      return;
+    }
+
     const line = {
-      level: 'info',
       msg: 'request',
       requestId,
       method: req.method,
@@ -42,7 +46,7 @@ export const requestLogger: RequestHandler = (req: any, res, next) => {
       tenantId,
     };
 
-    console.log(JSON.stringify(line));
+    logger.info(line);
   });
 
   next();

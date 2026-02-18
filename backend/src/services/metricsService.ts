@@ -44,6 +44,36 @@ export class MetricsService {
       },
     };
   }
+
+  toPrometheus(): string {
+    const snap = this.snapshot();
+    const lines: string[] = [];
+
+    const counter = (name: string, value: number) => {
+      lines.push(`# TYPE ${name} counter`);
+      lines.push(`${name} ${value}`);
+    };
+
+    const gauge = (name: string, value: number) => {
+      lines.push(`# TYPE ${name} gauge`);
+      lines.push(`${name} ${value}`);
+    };
+
+    gauge('app_uptime_seconds', snap.uptimeSec);
+    for (const [k, v] of Object.entries(snap.counters || {})) {
+      counter(k, Number(v) || 0);
+    }
+
+    lines.push('# TYPE http_request_latency_ms gauge');
+    lines.push(`http_request_latency_ms{quantile="0.50"} ${snap.latencyMs.p50}`);
+    lines.push(`http_request_latency_ms{quantile="0.90"} ${snap.latencyMs.p90}`);
+    lines.push(`http_request_latency_ms{quantile="0.95"} ${snap.latencyMs.p95}`);
+    lines.push(`http_request_latency_ms{quantile="0.99"} ${snap.latencyMs.p99}`);
+    lines.push(`# TYPE http_request_latency_ms_count gauge`);
+    lines.push(`http_request_latency_ms_count ${snap.latencyMs.count}`);
+
+    return `${lines.join('\n')}\n`;
+  }
 }
 
 export const metricsService = new MetricsService();

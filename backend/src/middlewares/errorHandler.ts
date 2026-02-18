@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { ZodError } from 'zod';
+import { logger } from '../services/logger.js';
 
 export class AppError extends Error {
   statusCode: number;
@@ -26,7 +27,6 @@ export const errorHandler = (
   const tenantId = (req as any).user?.tenant?._id ? String((req as any).user.tenant._id) : undefined;
 
   const line = {
-    level: 'error',
     msg: 'error',
     requestId,
     method: req.method,
@@ -37,7 +37,7 @@ export const errorHandler = (
     userId,
     tenantId,
   };
-  console.error(JSON.stringify(line));
+  logger.error(line);
 
   if (err instanceof ZodError) {
     res.status(400).json({
