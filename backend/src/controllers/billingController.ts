@@ -8,6 +8,7 @@ import { AppError } from '../middlewares/errorHandler.js';
 import { config } from '../config/index.js';
 import { timingSafeEqual } from 'crypto';
 import { emailTemplates, sendEmail } from '../services/emailService.js';
+import { z } from 'zod';
 
 import type { AsaasSubscription } from '../services/asaasService.js';
 
@@ -16,6 +17,14 @@ const PLAN_PRICES: Record<PlanType, number> = {
   pro: 29.90,
   enterprise: 99.90,
 };
+
+const ADDON_CATALOG = {
+  extra_agents_5: { id: 'extra_agents_5', name: 'Agentes +5', price: 19.9, extraAgents: 5, extraStorage: 0, aiCredits: 0 },
+  extra_storage_5000: { id: 'extra_storage_5000', name: 'Storage +5GB', price: 9.9, extraAgents: 0, extraStorage: 5000, aiCredits: 0 },
+  ai_pack_1000: { id: 'ai_pack_1000', name: 'AI Pack 1000', price: 15.9, extraAgents: 0, extraStorage: 0, aiCredits: 1000 },
+} as const;
+
+type AddOnId = keyof typeof ADDON_CATALOG;
 
 function mapAsaasSubscriptionStatus(raw: any): 'active' | 'trialing' | 'past_due' | 'canceled' | undefined {
   const status = String(raw || '').toUpperCase();
@@ -31,6 +40,15 @@ function parsePlanFromExternalReference(extRef: any): PlanType | undefined {
   const plan = ext.split('-')[1];
   if (!plan) return undefined;
   return Object.values(PlanType).includes(plan as PlanType) ? (plan as PlanType) : undefined;
+}
+
+function parseAddOnFromExternalReference(extRef: any): { tenantId: string; addOnId?: AddOnId } {
+  const raw = String(extRef || '');
+  const [tenantId, kind, addOnId] = raw.split('-');
+  if (!tenantId || kind !== 'addon') return { tenantId };
+  if (!addOnId) return { tenantId };
+  if (!(addOnId in ADDON_CATALOG)) return { tenantId };
+  return { tenantId, addOnId: addOnId as AddOnId };
 }
 
 export const createCheckout = async (
@@ -129,6 +147,65 @@ export const createCheckout = async (
     if (error instanceof AppError) throw error;
     throw new AppError(error.message || 'Erro ao criar checkout', 500);
   }
+};
+
+export const listAddOns = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('addons subscription');
+
+  res.json({
+    addons: Object.values(ADDON_CATALOG),
+    current: {
+      extraAgents: Number((planLimit as any)?.addons?.extraAgents || 0) || 0,
+      extraStorage: Number((planLimit as any)?.addons?.extraStorage || 0) || 0,
+      aiCredits: Number((planLimit as any)?.addons?.aiCredits || 0) || 0,
+    },
+    canPurchase: !!(planLimit as any)?.subscription?.stripeCustomerId,
+  });
+};
+
+export const createAddOnCheckout = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const schema = z.object({
+    addOnId: z.string().min(1),
+    billingType: z.enum(['CREDIT_CARD', 'PIX', 'BOLETO']).default('CREDIT_CARD'),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    return;
+  }
+
+  const addOnId = parsed.data.addOnId as AddOnId;
+  if (!(addOnId in ADDON_CATALOG)) {
+    throw new AppError('Add-on inválido', 400);
+  }
+
+  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription');
+  if (!planLimit?.subscription?.stripeCustomerId) {
+    throw new AppError('Ative um plano pago antes de comprar add-ons.', 400);
+  }
+
+  const item = ADDON_CATALOG[addOnId];
+  const tenantId = user.tenant._id.toString();
+
+  const due = new Date();
+  due.setDate(due.getDate() + 1);
+  const dueDate = due.toISOString().split('T')[0];
+
+  const payment = await asaasService.createPayment({
+    customer: planLimit.subscription.stripeCustomerId,
+    billingType: parsed.data.billingType,
+    value: item.price,
+    dueDate,
+    description: `DeskFlow - Add-on ${item.name}`,
+    externalReference: `${tenantId}-addon-${item.id}`,
+  } as any);
+
+  res.json({
+    checkoutUrl: payment?.invoiceUrl || '',
+    paymentId: payment?.id,
+  });
 };
 
 export const handleWebhook = async (
@@ -289,6 +366,7 @@ async function handlePaymentReceived(payment: any) {
   const externalRef = payment.externalReference || '';
   const tenantId = externalRef.split('-')[0];
   const plan = parsePlanFromExternalReference(externalRef);
+  const addon = parseAddOnFromExternalReference(externalRef);
   
   if (!tenantId) return;
 
@@ -317,6 +395,17 @@ async function handlePaymentReceived(payment: any) {
 
   if (plan) {
     await planService.upgradePlan(tenantId, plan);
+  }
+
+  if (addon.addOnId) {
+    const item = ADDON_CATALOG[addon.addOnId];
+    const current = (planLimit as any).addons || {};
+    (planLimit as any).addons = {
+      extraAgents: Number(current.extraAgents || 0) + Number(item.extraAgents || 0),
+      extraStorage: Number(current.extraStorage || 0) + Number(item.extraStorage || 0),
+      aiCredits: Number(current.aiCredits || 0) + Number(item.aiCredits || 0),
+    };
+    await planLimit.save();
   }
 
   // Email admins

@@ -26,6 +26,8 @@ interface Plan {
     agents: string;
     tickets: string;
     storage: string;
+    macros?: string;
+    automations?: string;
   };
   features: {
     name: string;
@@ -46,6 +48,8 @@ interface CurrentPlan {
     storage: { current: number; max: number };
   };
   features: Record<string, boolean>;
+  retention?: { auditDays?: number };
+  addons?: { extraAgents?: number; extraStorage?: number; aiCredits?: number };
   subscription?: {
     status?: string;
     trialEndsAt?: string;
@@ -57,6 +61,8 @@ interface CurrentPlan {
     desiredPlanEffectiveAt?: string;
   };
 }
+
+type AddOn = { id: string; name: string; price: number; extraAgents?: number; extraStorage?: number; aiCredits?: number };
 
 interface BillingWebhookEvent {
   eventId: string;
@@ -86,6 +92,13 @@ export default function PlansPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [billingEvents, setBillingEvents] = useState<BillingWebhookEvent[]>([]);
   const [billingEventsLoading, setBillingEventsLoading] = useState(false);
+  const [addons, setAddons] = useState<AddOn[]>([]);
+  const [addonsLoading, setAddonsLoading] = useState(false);
+  const [addonsCanPurchase, setAddonsCanPurchase] = useState(false);
+  const [selectedAddon, setSelectedAddon] = useState<string | null>(null);
+  const [addonBillingType, setAddonBillingType] = useState<'CREDIT_CARD' | 'BOLETO' | 'PIX'>('CREDIT_CARD');
+  const [isAddonCheckoutOpen, setIsAddonCheckoutOpen] = useState(false);
+  const [isAddonProcessing, setIsAddonProcessing] = useState(false);
   const { toast } = useToast();
 
   const selectedPlanObj = useMemo(
@@ -124,6 +137,7 @@ export default function PlansPage() {
 
       // Best-effort: billing events are only available for admin/manager.
       fetchBillingEvents();
+      fetchAddons();
     } catch (error) {
       setLoadError('Não foi possível carregar os detalhes do plano');
       toast({
@@ -133,6 +147,53 @@ export default function PlansPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAddons = async () => {
+    setAddonsLoading(true);
+    try {
+      const res = await api.get('/billing/addons');
+      setAddons(Array.isArray(res.data?.addons) ? res.data.addons : []);
+      setAddonsCanPurchase(!!res.data?.canPurchase);
+    } catch {
+      setAddons([]);
+      setAddonsCanPurchase(false);
+    } finally {
+      setAddonsLoading(false);
+    }
+  };
+
+  const openAddonCheckout = (addOnId: string) => {
+    setSelectedAddon(addOnId);
+    setAddonBillingType('CREDIT_CARD');
+    setIsAddonCheckoutOpen(true);
+  };
+
+  const processAddonCheckout = async () => {
+    if (!selectedAddon) return;
+    setIsAddonProcessing(true);
+    try {
+      const res = await api.post('/billing/addons/checkout', { addOnId: selectedAddon, billingType: addonBillingType });
+      const data = res.data;
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, '_blank');
+        setIsAddonCheckoutOpen(false);
+        toast({
+          title: 'Redirecionando...',
+          description: 'Complete o pagamento na nova aba. O add-on sera aplicado automaticamente.',
+        });
+        return;
+      }
+      toast({ title: 'Checkout indisponivel', description: 'Nao foi possivel iniciar o checkout.', variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error?.response?.data?.message || 'Nao foi possivel iniciar o checkout do add-on',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAddonProcessing(false);
     }
   };
 

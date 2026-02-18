@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
   createCheckout,
+  listAddOns,
+  createAddOnCheckout,
   handleWebhook,
   cancelSubscription,
   getBillingPortal,
@@ -19,6 +21,8 @@ router.post('/webhook', billingWebhookLimiter, handleWebhook);
 // Rotas protegidas
 router.use(authenticate);
 router.post('/checkout', authorize('admin', 'manager'), createCheckout);
+router.get('/addons', authorize('admin', 'manager'), listAddOns);
+router.post('/addons/checkout', authorize('admin', 'manager'), createAddOnCheckout);
 router.post('/change-plan', authorize('admin', 'manager'), changePlan);
 router.post('/cancel', authorize('admin', 'manager'), cancelSubscription);
 router.post('/sync', authorize('admin', 'manager'), syncSubscription);
