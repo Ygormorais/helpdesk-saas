@@ -15,6 +15,8 @@ import { chatService } from './services/chatService.js';
 import { sendTrialRemindersOnce } from './services/billingReminderService.js';
 import { getReadiness } from './services/healthService.js';
 import { metricsService } from './services/metricsService.js';
+import { startAuditRetentionCleanupScheduler } from './services/auditRetentionCleanupService.js';
+import { reportScheduleService } from './services/reportScheduleService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -86,6 +88,9 @@ const startServer = () => {
 
   // Best-effort load persisted metrics.
   metricsService.initialize().catch(() => undefined);
+
+  startAuditRetentionCleanupScheduler();
+  reportScheduleService.startScheduler();
 
   if (config.billing.remindersEnabled) {
     const run = async () => {
