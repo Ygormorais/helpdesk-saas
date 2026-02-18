@@ -142,6 +142,15 @@ export default function PlansPage() {
     return false;
   };
 
+  const formatRecurringStatus = (raw: string) => {
+    const s = String(raw || '').toLowerCase();
+    if (s === 'active') return 'ATIVO';
+    if (s === 'trialing') return 'AGUARDANDO PAGAMENTO';
+    if (s === 'past_due') return 'EM ATRASO';
+    if (s === 'canceled') return 'CANCELADO';
+    return 'DESCONHECIDO';
+  };
+
   useEffect(() => {
     fetchPlanDetails();
   }, []);
@@ -663,14 +672,14 @@ export default function PlansPage() {
                           variant="secondary"
                           className={effective ? 'bg-transparent border border-border text-foreground' : 'bg-muted text-muted-foreground'}
                         >
-                          {statusRaw ? statusRaw.toUpperCase() : 'DESCONHECIDO'}
+                          {formatRecurringStatus(statusRaw)}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {meta ? `R$ ${Number(meta.priceMonthly || 0).toFixed(2).replace('.', ',')}/mes` : 'Assinatura mensal'}
                       </p>
                       {r.currentPeriodEnd ? (
-                        <p className="text-xs text-muted-foreground">Periodo ate: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
+                        <p className="text-xs text-muted-foreground">Ativo ate: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
                       ) : null}
                       {parts.length > 0 ? (
                         <p className="text-xs text-muted-foreground">{parts.join(' • ')}</p>
