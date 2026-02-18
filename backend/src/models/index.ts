@@ -14,6 +14,7 @@ export * from './Invite.js';
 export * from './Macro.js';
 export * from './PlanLimit.js';
 export * from './TimeEntry.js';
+export * from './ReportSchedule.js';
 export * from './Webhook.js';
 export * from './Notification.js';
 export * from './WebhookEvent.js';

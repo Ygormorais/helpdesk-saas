@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 const ReportsCharts = lazy(() => import('@/components/charts/ReportsCharts'));
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,11 @@ import { Input } from '@/components/ui/input';
 import { analyticsApi } from '@/config/analytics';
 import { downloadCSV } from '@/utils/csv';
 import { FeatureUnavailable } from '@/components/FeatureUnavailable';
+import { reportSchedulesApi } from '@/api/reportSchedules';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 function KPI({ title, value }: { title: string; value: string | number }) {
   return (
@@ -31,6 +36,17 @@ const STATUS_META: Array<{ key: 'open' | 'in_progress' | 'waiting_customer' | 'r
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    name: 'Relatorio semanal',
+    frequency: 'weekly',
+    hour: 9,
+    dayOfWeek: 1,
+    recipients: '',
+  });
+
+  const qc = useQueryClient();
+  const { toast } = useToast();
 
   const setDateRangeMonths = (monthsBack: number) => {
     const today = new Date();
@@ -52,6 +68,51 @@ export default function ReportsPage() {
     },
     staleTime: 60_000,
     placeholderData: keepPreviousData,
+  });
+
+  const schedulesQuery = useQuery({
+    queryKey: ['report-schedules'],
+    queryFn: async () => {
+      const res = await reportSchedulesApi.list();
+      return res.data.schedules;
+    },
+    staleTime: 60_000,
+    retry: 0,
+  });
+
+  const schedulesForbidden = (schedulesQuery.error as any)?.response?.status === 403;
+
+  const createSchedule = useMutation({
+    mutationFn: async () => {
+      const emails = scheduleForm.recipients
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      await reportSchedulesApi.create({
+        name: scheduleForm.name,
+        frequency: scheduleForm.frequency,
+        hour: Number(scheduleForm.hour),
+        dayOfWeek: scheduleForm.frequency === 'weekly' ? Number(scheduleForm.dayOfWeek) : undefined,
+        recipients: emails,
+        params: {
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        },
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['report-schedules'] });
+      toast({ title: 'Agendamento criado' });
+      setScheduleOpen(false);
+    },
+    onError: (e: any) => {
+      toast({
+        title: 'Erro ao agendar',
+        description: e?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
   });
 
   const priorityQuery = useQuery({
@@ -282,6 +343,136 @@ export default function ReportsPage() {
           <Button variant="secondary" onClick={exportCSV_Tickets} disabled={!report}>
             Exportar trend
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Relatorios agendados (Email)</CardTitle>
+            <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="secondary"
+                  disabled={schedulesForbidden}
+                  onClick={() => {
+                    if (schedulesForbidden) {
+                      toast({
+                        title: 'Agendamento bloqueado',
+                        description: 'Disponivel apenas em planos superiores.',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                >
+                  Agendar
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Novo agendamento</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Nome</Label>
+                    <Input value={scheduleForm.name} onChange={(e) => setScheduleForm({ ...scheduleForm, name: e.target.value })} />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Frequencia</Label>
+                      <Select value={scheduleForm.frequency} onValueChange={(v) => setScheduleForm({ ...scheduleForm, frequency: v })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Diario</SelectItem>
+                          <SelectItem value="weekly">Semanal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Hora</Label>
+                      <Select value={String(scheduleForm.hour)} onValueChange={(v) => setScheduleForm({ ...scheduleForm, hour: Number(v) })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 24 }).map((_, h) => (
+                            <SelectItem key={h} value={String(h)}>
+                              {String(h).padStart(2, '0')}:00
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {scheduleForm.frequency === 'weekly' ? (
+                    <div className="space-y-2">
+                      <Label>Dia da semana</Label>
+                      <Select value={String(scheduleForm.dayOfWeek)} onValueChange={(v) => setScheduleForm({ ...scheduleForm, dayOfWeek: Number(v) })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Segunda</SelectItem>
+                          <SelectItem value="2">Terca</SelectItem>
+                          <SelectItem value="3">Quarta</SelectItem>
+                          <SelectItem value="4">Quinta</SelectItem>
+                          <SelectItem value="5">Sexta</SelectItem>
+                          <SelectItem value="0">Domingo</SelectItem>
+                          <SelectItem value="6">Sabado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-2">
+                    <Label>Destinatarios (separar por virgula)</Label>
+                    <Input
+                      placeholder="financeiro@empresa.com, gestor@empresa.com"
+                      value={scheduleForm.recipients}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, recipients: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">O email contem um link para a pagina de relatorios com o filtro atual.</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setScheduleOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={() => createSchedule.mutate()} disabled={createSchedule.isPending}>
+                    {createSchedule.isPending ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {schedulesForbidden ? (
+            <FeatureUnavailable
+              title="Agendamento bloqueado"
+              description="Relatorios agendados por email estao disponiveis apenas em planos superiores."
+            />
+          ) : schedulesQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : schedulesQuery.isError ? (
+            <p className="text-sm text-destructive">Falha ao carregar agendamentos</p>
+          ) : (schedulesQuery.data || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum agendamento criado</p>
+          ) : (
+            <div className="space-y-2">
+              {(schedulesQuery.data || []).map((s: any) => (
+                <div key={s._id} className="rounded-lg border p-3">
+                  <p className="font-medium">{s.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Proximo envio: {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString('pt-BR') : '-'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
