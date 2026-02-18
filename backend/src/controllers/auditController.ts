@@ -28,7 +28,14 @@ export const getAuditLogs = async (
       return;
     }
 
-    const result = await auditService.getLogs(user.tenant._id.toString(), query);
+    const auditDays = await planService.getAuditRetentionDays(user.tenant._id.toString());
+    const cutoff = new Date(Date.now() - auditDays * 24 * 60 * 60 * 1000);
+    const startDate = query.startDate && query.startDate > cutoff ? query.startDate : cutoff;
+
+    const result = await auditService.getLogs(user.tenant._id.toString(), {
+      ...query,
+      startDate,
+    });
 
     res.json(result);
   } catch (error) {
@@ -56,8 +63,13 @@ export const exportAuditLogsCsv = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
+    const auditDays = await planService.getAuditRetentionDays(user.tenant._id.toString());
+    const cutoff = new Date(Date.now() - auditDays * 24 * 60 * 60 * 1000);
+    const startDate = query.startDate && query.startDate > cutoff ? query.startDate : cutoff;
+
     const result = await auditService.getLogs(user.tenant._id.toString(), {
       ...query,
+      startDate,
       page: 1,
       limit: Math.min(5000, query.limit || 50),
     } as any);
