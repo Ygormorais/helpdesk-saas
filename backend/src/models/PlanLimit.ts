@@ -37,6 +37,16 @@ export interface IPlanLimit extends Document {
     extraStorage?: number; // MB
     aiCredits?: number;
 
+    pendingOneTime?: Array<{
+      addOnId: string;
+      paymentId: string;
+      status: 'pending' | 'overdue' | 'received' | 'canceled';
+      invoiceUrl?: string;
+      value?: number;
+      createdAt: Date;
+      updatedAt?: Date;
+    }>;
+
     recurring?: Array<{
       addOnId: string;
       subscriptionId: string;
@@ -199,6 +209,24 @@ const planLimitSchema = new Schema<IPlanLimit>(
       extraAgents: { type: Number, default: 0 },
       extraStorage: { type: Number, default: 0 },
       aiCredits: { type: Number, default: 0 },
+      pendingOneTime: {
+        type: [
+          {
+            addOnId: { type: String, required: true },
+            paymentId: { type: String, required: true },
+            status: {
+              type: String,
+              enum: ['pending', 'overdue', 'received', 'canceled'],
+              default: 'pending',
+            },
+            invoiceUrl: String,
+            value: Number,
+            createdAt: { type: Date, required: true },
+            updatedAt: Date,
+          },
+        ],
+        default: [],
+      },
       recurring: {
         type: [
           {

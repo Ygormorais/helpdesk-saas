@@ -373,7 +373,7 @@ function toUtcDayStart(date: Date): Date {
 
 function parseDay(value: string): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) throw new Error('Invalid date');
+  if (!m) throw new Error('Data invalida');
 
   const y = Number(m[1]);
   const mo = Number(m[2]);
@@ -385,7 +385,7 @@ function parseDay(value: string): Date {
     d.getUTCMonth() !== mo - 1 ||
     d.getUTCDate() !== da
   ) {
-    throw new Error('Invalid date');
+    throw new Error('Data invalida');
   }
 
   return d;

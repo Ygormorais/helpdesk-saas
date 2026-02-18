@@ -10,6 +10,14 @@ import { timingSafeEqual } from 'crypto';
 import { emailTemplates, sendEmail } from '../services/emailService.js';
 import { z } from 'zod';
 
+import {
+  ensureAddOns,
+  mapAsaasSubscriptionStatus,
+  setPendingOneTimeStatus,
+  upsertPendingOneTime,
+  upsertRecurringAddOn,
+} from '../services/billingWebhookLogic.js';
+
 import type { AsaasSubscription } from '../services/asaasService.js';
 
 const PLAN_PRICES: Record<PlanType, number> = {
@@ -30,7 +38,7 @@ const ADDON_CATALOG = {
   },
   extra_storage_5000: {
     id: 'extra_storage_5000',
-    name: 'Storage +5GB',
+    name: 'Armazenamento +5GB',
     priceOneTime: 9.9,
     priceMonthly: 4.9,
     extraAgents: 0,
@@ -39,7 +47,7 @@ const ADDON_CATALOG = {
   },
   ai_pack_1000: {
     id: 'ai_pack_1000',
-    name: 'AI Pack 1000',
+    name: 'Pacote IA 1000',
     priceOneTime: 15.9,
     priceMonthly: 7.9,
     extraAgents: 0,
@@ -49,15 +57,6 @@ const ADDON_CATALOG = {
 } as const;
 
 type AddOnId = keyof typeof ADDON_CATALOG;
-
-function mapAsaasSubscriptionStatus(raw: any): 'active' | 'trialing' | 'past_due' | 'canceled' | undefined {
-  const status = String(raw || '').toUpperCase();
-  if (!status) return undefined;
-  if (status === 'ACTIVE') return 'active';
-  if (status === 'OVERDUE') return 'past_due';
-  if (status === 'INACTIVE' || status === 'CANCELED' || status === 'CANCELLED') return 'canceled';
-  return undefined;
-}
 
 function parsePlanFromExternalReference(extRef: any): PlanType | undefined {
   const ext = String(extRef || '');
@@ -178,15 +177,30 @@ export const listAddOns = async (req: AuthRequest, res: Response): Promise<void>
   const user = req.user!;
   const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('addons subscription');
 
-  const recurring = Array.isArray((planLimit as any)?.addons?.recurring) ? (planLimit as any).addons.recurring : [];
+  const addons = ensureAddOns((planLimit as any)?.addons);
+  const recurring = Array.isArray(addons?.recurring) ? addons.recurring : [];
+  const pendingOneTime = Array.isArray(addons?.pendingOneTime) ? addons.pendingOneTime : [];
 
   res.json({
     addons: Object.values(ADDON_CATALOG),
     current: {
-      extraAgents: Number((planLimit as any)?.addons?.extraAgents || 0) || 0,
-      extraStorage: Number((planLimit as any)?.addons?.extraStorage || 0) || 0,
-      aiCredits: Number((planLimit as any)?.addons?.aiCredits || 0) || 0,
+      extraAgents: Number(addons.extraAgents || 0) || 0,
+      extraStorage: Number(addons.extraStorage || 0) || 0,
+      aiCredits: Number(addons.aiCredits || 0) || 0,
     },
+    pendingOneTime: pendingOneTime
+      .slice()
+      .sort((a: any, b: any) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime())
+      .slice(0, 20)
+      .map((p: any) => ({
+        addOnId: p.addOnId,
+        paymentId: p.paymentId,
+        status: p.status,
+        invoiceUrl: p.invoiceUrl,
+        value: p.value,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      })),
     recurring: recurring.map((r: any) => ({
       addOnId: r.addOnId,
       subscriptionId: r.subscriptionId,
@@ -217,7 +231,7 @@ export const createAddOnCheckout = async (req: AuthRequest, res: Response): Prom
     throw new AppError('Add-on inválido', 400);
   }
 
-  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription');
+  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
   if (!planLimit?.subscription?.stripeCustomerId) {
     throw new AppError('Ative um plano pago antes de comprar add-ons.', 400);
   }
@@ -237,6 +251,21 @@ export const createAddOnCheckout = async (req: AuthRequest, res: Response): Prom
     description: `DeskFlow - Add-on ${item.name}`,
     externalReference: `${tenantId}-addon-${item.id}`,
   } as any);
+
+  try {
+    const pid = String(payment?.id || '');
+    if (pid) {
+      (planLimit as any).addons = upsertPendingOneTime((planLimit as any).addons, {
+        addOnId: item.id,
+        paymentId: pid,
+        invoiceUrl: String(payment?.invoiceUrl || '') || undefined,
+        value: Number(item.priceOneTime || 0) || undefined,
+      });
+      await planLimit.save();
+    }
+  } catch {
+    // best-effort
+  }
 
   res.json({
     checkoutUrl: payment?.invoiceUrl || '',
@@ -418,6 +447,11 @@ export const handleWebhook = async (
     // const signature = req.headers['asaas-signature'];
 
     switch (event) {
+      case 'PAYMENT_CREATED':
+      case 'PAYMENT_PENDING':
+        // handled via checkout endpoint (best-effort persistence)
+        break;
+
       case 'PAYMENT_RECEIVED':
       case 'PAYMENT_CONFIRMED':
         await handlePaymentReceived(payment);
@@ -425,6 +459,11 @@ export const handleWebhook = async (
       
       case 'PAYMENT_OVERDUE':
         await handlePaymentOverdue(payment);
+        break;
+
+      case 'PAYMENT_CANCELED':
+      case 'PAYMENT_DELETED':
+        await handlePaymentCanceled(payment);
         break;
       
       case 'SUBSCRIPTION_CREATED':
@@ -506,27 +545,26 @@ async function handlePaymentReceived(payment: any) {
   const planLimit = await PlanLimit.findOne({ tenant: tenantId });
   if (!planLimit) return;
 
-  // Atualizar status para ativo
-  planLimit.subscription.status = 'active';
-  planLimit.subscription.currentPeriodStart = new Date();
-
-  try {
-    const subId = payment?.subscription || planLimit.subscription.stripeSubscriptionId;
-    if (subId) {
-      const sub = await asaasService.getSubscription(String(subId));
-      if (sub?.nextDueDate) {
-        planLimit.subscription.currentPeriodEnd = new Date(String(sub.nextDueDate));
-      }
-    }
-  } catch {
-    const periodEnd = new Date();
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
-    planLimit.subscription.currentPeriodEnd = periodEnd;
-  }
-  
-  await planLimit.save();
-
   if (plan) {
+    // Atualizar status para ativo (apenas para pagamento do plano)
+    planLimit.subscription.status = 'active';
+    planLimit.subscription.currentPeriodStart = new Date();
+
+    try {
+      const subId = payment?.subscription || planLimit.subscription.stripeSubscriptionId;
+      if (subId) {
+        const sub = await asaasService.getSubscription(String(subId));
+        if (sub?.nextDueDate) {
+          planLimit.subscription.currentPeriodEnd = new Date(String(sub.nextDueDate));
+        }
+      }
+    } catch {
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      planLimit.subscription.currentPeriodEnd = periodEnd;
+    }
+
+    await planLimit.save();
     await planService.upgradePlan(tenantId, plan);
   }
 
@@ -540,6 +578,16 @@ async function handlePaymentReceived(payment: any) {
       aiCredits: Number(current.aiCredits || 0) + Number(item.aiCredits || 0),
       recurring: current.recurring || [],
     };
+
+    try {
+      const pid = String(payment?.id || '');
+      if (pid) {
+        (planLimit as any).addons = setPendingOneTimeStatus((planLimit as any).addons, pid, 'received');
+      }
+    } catch {
+      // ignore
+    }
+
     await planLimit.save();
   }
 
@@ -564,56 +612,110 @@ async function handlePaymentReceived(payment: any) {
     }
   }
 
-  // Email admins
-  try {
-    const tenant = await Tenant.findById(tenantId).select('name');
-    const admins = await User.find({ tenant: tenantId, role: 'admin', isActive: true }).select('email');
-    const to = admins.map((a: any) => String(a.email)).filter(Boolean);
-    if (tenant && to.length > 0) {
-      const url = `${process.env.FRONTEND_URL || ''}/plans`;
-      const tpl = emailTemplates.paymentConfirmed({
-        tenantName: tenant.name,
-         plan: String(plan || planLimit.plan),
-         periodEnd: planLimit.subscription.currentPeriodEnd,
-         url,
-       });
-      await Promise.all(to.map((email) => sendEmail({ to: email, ...tpl })));
+  // Email admins (apenas para pagamento do plano)
+  if (plan) {
+    try {
+      const tenant = await Tenant.findById(tenantId).select('name');
+      const admins = await User.find({ tenant: tenantId, role: 'admin', isActive: true }).select('email');
+      const to = admins.map((a: any) => String(a.email)).filter(Boolean);
+      if (tenant && to.length > 0) {
+        const url = `${process.env.FRONTEND_URL || ''}/plans`;
+        const tpl = emailTemplates.paymentConfirmed({
+          tenantName: tenant.name,
+          plan: String(plan),
+          periodEnd: planLimit.subscription.currentPeriodEnd,
+          url,
+        });
+        await Promise.all(to.map((email) => sendEmail({ to: email, ...tpl })));
+      }
+    } catch {
+      // best-effort
     }
-  } catch {
-    // best-effort
-  }
 
-  // Aqui você pode enviar email de confirmação
-  console.log(`Payment received for tenant ${tenantId}`);
+    console.log(`Payment received for tenant ${tenantId}`);
+  }
 }
 
 async function handlePaymentOverdue(payment: any) {
-  const externalRef = payment.externalReference || '';
+  let externalRef = String(payment?.externalReference || '');
+  if (!externalRef && payment?.subscription) {
+    try {
+      const sub = await asaasService.getSubscription(String(payment.subscription));
+      externalRef = String(sub?.externalReference || '');
+    } catch {
+      // ignore
+    }
+  }
+
   const tenantId = externalRef.split('-')[0];
-  
+  const plan = parsePlanFromExternalReference(externalRef);
+  const addon = parseAddOnFromExternalReference(externalRef);
   if (!tenantId) return;
 
   const planLimit = await PlanLimit.findOne({ tenant: tenantId });
   if (!planLimit) return;
 
-  planLimit.subscription.status = 'past_due';
-  await planLimit.save();
-
-  // Email admins
-  try {
-    const tenant = await Tenant.findById(tenantId).select('name');
-    const admins = await User.find({ tenant: tenantId, role: 'admin', isActive: true }).select('email');
-    const to = admins.map((a: any) => String(a.email)).filter(Boolean);
-    if (tenant && to.length > 0) {
-      const url = `${process.env.FRONTEND_URL || ''}/plans`;
-      const tpl = emailTemplates.paymentOverdue({ tenantName: tenant.name, url });
-      await Promise.all(to.map((email) => sendEmail({ to: email, ...tpl })));
-    }
-  } catch {
-    // best-effort
+  // Plan payment overdue
+  if (plan) {
+    planLimit.subscription.status = 'past_due';
+    await planLimit.save();
   }
 
-  console.log(`Payment overdue for tenant ${tenantId}`);
+  // One-time add-on payment overdue
+  if (addon.kind === 'addon') {
+    const pid = String(payment?.id || '');
+    if (pid) {
+      (planLimit as any).addons = setPendingOneTimeStatus((planLimit as any).addons, pid, 'overdue');
+      await planLimit.save();
+    }
+  }
+
+  // Recurring add-on payment overdue (keep entry as past_due)
+  if (addon.kind === 'addonsub') {
+    const subId = String(payment?.subscription || '');
+    if (subId) {
+      (planLimit as any).addons = ensureAddOns((planLimit as any).addons);
+      const recurring = Array.isArray((planLimit as any).addons.recurring) ? (planLimit as any).addons.recurring : [];
+      const entry = recurring.find((r: any) => String(r.subscriptionId) === subId);
+      if (entry) {
+        entry.status = 'past_due';
+        await planLimit.save();
+      }
+    }
+  }
+
+  // Email admins (apenas para plano)
+  if (plan) {
+    try {
+      const tenant = await Tenant.findById(tenantId).select('name');
+      const admins = await User.find({ tenant: tenantId, role: 'admin', isActive: true }).select('email');
+      const to = admins.map((a: any) => String(a.email)).filter(Boolean);
+      if (tenant && to.length > 0) {
+        const url = `${process.env.FRONTEND_URL || ''}/plans`;
+        const tpl = emailTemplates.paymentOverdue({ tenantName: tenant.name, url });
+        await Promise.all(to.map((email) => sendEmail({ to: email, ...tpl })));
+      }
+    } catch {
+      // best-effort
+    }
+
+    console.log(`Payment overdue for tenant ${tenantId}`);
+  }
+}
+
+async function handlePaymentCanceled(payment: any) {
+  const externalRef = String(payment?.externalReference || '');
+  const addon = parseAddOnFromExternalReference(externalRef);
+  if (addon.kind !== 'addon') return;
+  if (!addon.tenantId) return;
+
+  const planLimit = await PlanLimit.findOne({ tenant: addon.tenantId });
+  if (!planLimit) return;
+
+  const pid = String(payment?.id || '');
+  if (!pid) return;
+  (planLimit as any).addons = setPendingOneTimeStatus((planLimit as any).addons, pid, 'canceled');
+  await planLimit.save();
 }
 
 async function handleSubscriptionUpdated(subscription: any) {
@@ -651,26 +753,17 @@ async function handleSubscriptionUpdated(subscription: any) {
     const pl = await PlanLimit.findOne({ tenant: tId });
     if (!pl) return;
 
-    (pl as any).addons = (pl as any).addons || {};
-    (pl as any).addons.recurring = Array.isArray((pl as any).addons.recurring) ? (pl as any).addons.recurring : [];
-    const entry = (pl as any).addons.recurring.find((r: any) => String(r.subscriptionId) === String(subscription.id));
-
     const mapped = mapAsaasSubscriptionStatus(subscription?.status) || 'trialing';
-    if (entry) {
-      entry.status = mapped;
-      if (subscription?.nextDueDate) entry.currentPeriodEnd = new Date(String(subscription.nextDueDate));
-    } else {
-      const item = ADDON_CATALOG[parsedAddon.addOnId];
-      (pl as any).addons.recurring.push({
-        addOnId: item.id,
-        subscriptionId: String(subscription.id),
-        status: mapped,
-        extraAgents: item.extraAgents,
-        extraStorage: item.extraStorage,
-        aiCredits: item.aiCredits,
-        currentPeriodEnd: subscription?.nextDueDate ? new Date(String(subscription.nextDueDate)) : undefined,
-      });
-    }
+    const item = ADDON_CATALOG[parsedAddon.addOnId];
+    (pl as any).addons = upsertRecurringAddOn((pl as any).addons, {
+      addOnId: item.id,
+      subscriptionId: String(subscription.id),
+      status: mapped,
+      extraAgents: item.extraAgents,
+      extraStorage: item.extraStorage,
+      aiCredits: item.aiCredits,
+      currentPeriodEnd: subscription?.nextDueDate ? new Date(String(subscription.nextDueDate)) : undefined,
+    });
 
     await pl.save();
   }
