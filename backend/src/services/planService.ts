@@ -4,6 +4,60 @@ import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
 export class PlanService {
+  private subscriptionAllowsPaidFeatures(sub: IPlanLimit['subscription'] | undefined): boolean {
+    if (!sub) return false;
+
+    if (sub.status === 'active') return true;
+
+    if (sub.status === 'trialing') {
+      if (!sub.trialEndsAt) return true;
+      return sub.trialEndsAt.getTime() > Date.now();
+    }
+
+    // If the subscription was cancelled but still within the paid period,
+    // keep access until the end of the current period.
+    if (sub.status === 'canceled') {
+      if (!sub.currentPeriodEnd) return false;
+      return sub.currentPeriodEnd.getTime() > Date.now();
+    }
+
+    // past_due => deny paid features
+    return false;
+  }
+
+  private getEffectiveConfig(planLimit: IPlanLimit): {
+    plan: PlanType;
+    maxAgents: number;
+    maxTickets: number;
+    maxStorage: number;
+    features: IPlanLimit['features'];
+    isPaidAccessBlocked: boolean;
+  } {
+    const isPaidPlan = planLimit.plan !== PlanType.FREE;
+    const paidAllowed = !isPaidPlan || this.subscriptionAllowsPaidFeatures(planLimit.subscription);
+
+    if (paidAllowed) {
+      return {
+        plan: planLimit.plan,
+        maxAgents: planLimit.maxAgents,
+        maxTickets: planLimit.maxTickets,
+        maxStorage: planLimit.maxStorage,
+        features: planLimit.features,
+        isPaidAccessBlocked: false,
+      };
+    }
+
+    const free = PLAN_LIMITS[PlanType.FREE];
+    return {
+      plan: PlanType.FREE,
+      maxAgents: free.maxAgents,
+      maxTickets: free.maxTickets,
+      maxStorage: free.maxStorage,
+      features: free.features,
+      isPaidAccessBlocked: true,
+    };
+  }
+
   async initializeTenantPlan(tenantId: string): Promise<void> {
     const existing = await PlanLimit.findOne({ tenant: tenantId });
     if (existing) return;
@@ -44,7 +98,8 @@ export class PlanService {
 
   async checkFeatureAccess(tenantId: string, feature: keyof typeof PLAN_LIMITS[PlanType.FREE]['features']): Promise<boolean> {
     const planLimit = await this.getPlanForTenant(tenantId);
-    return planLimit.features[feature] ?? false;
+    const effective = this.getEffectiveConfig(planLimit);
+    return effective.features[feature] ?? false;
   }
 
   async checkAgentLimit(tenantId: string): Promise<{ allowed: boolean; current: number; max: number }> {
@@ -57,7 +112,7 @@ export class PlanService {
     planLimit.currentUsage.agents = currentAgents;
     await planLimit.save();
 
-    const maxAgents = planLimit.maxAgents;
+    const maxAgents = this.getEffectiveConfig(planLimit).maxAgents;
     return {
       allowed: maxAgents === -1 || currentAgents < maxAgents,
       current: currentAgents,
@@ -72,7 +127,7 @@ export class PlanService {
     planLimit.currentUsage.tickets = currentTickets;
     await planLimit.save();
 
-    const maxTickets = planLimit.maxTickets;
+    const maxTickets = this.getEffectiveConfig(planLimit).maxTickets;
     return {
       allowed: maxTickets === -1 || currentTickets < maxTickets,
       current: currentTickets,
@@ -98,6 +153,7 @@ export class PlanService {
 
   async getPlanDetails(tenantId: string) {
     const planLimit = await this.getPlanForTenant(tenantId);
+    const effective = this.getEffectiveConfig(planLimit);
     const isTrial = planLimit.subscription.status === 'trialing';
     const trialDaysLeft = isTrial && planLimit.subscription.trialEndsAt
       ? Math.max(0, Math.ceil((planLimit.subscription.trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -105,14 +161,16 @@ export class PlanService {
 
     return {
       plan: planLimit.plan,
+      effectivePlan: effective.plan,
+      isPaidAccessBlocked: effective.isPaidAccessBlocked,
       isTrial,
       trialDaysLeft,
       limits: {
-        agents: { current: planLimit.currentUsage.agents, max: planLimit.maxAgents },
-        tickets: { current: planLimit.currentUsage.tickets, max: planLimit.maxTickets },
-        storage: { current: planLimit.currentUsage.storage, max: planLimit.maxStorage },
+        agents: { current: planLimit.currentUsage.agents, max: effective.maxAgents },
+        tickets: { current: planLimit.currentUsage.tickets, max: effective.maxTickets },
+        storage: { current: planLimit.currentUsage.storage, max: effective.maxStorage },
       },
-      features: planLimit.features,
+      features: effective.features,
       subscription: planLimit.subscription,
     };
   }

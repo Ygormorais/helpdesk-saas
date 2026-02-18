@@ -12,6 +12,7 @@ import {
   getReports,
 } from '../controllers/analyticsController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
+import { requireFeature } from '../services/planService.js';
 
 const router = Router();
 
@@ -27,6 +28,6 @@ router.get('/top-agents', getTopAgents);
 router.get('/sla-compliance', getSLACompliance);
 router.get('/satisfaction', getSatisfactionStats);
 router.get('/recent-activity', getRecentActivity);
-router.get('/reports', getReports);
+router.get('/reports', requireFeature('advancedReports'), getReports);
 
 export default router;
