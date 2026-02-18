@@ -36,6 +36,9 @@ export interface IPlanLimit extends Document {
     stripeSubscriptionId?: string;
     desiredPlan?: PlanType;
     desiredPlanEffectiveAt?: Date;
+
+    trialReminderLastSentAt?: Date;
+    trialReminderLastDaysLeft?: number;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -156,6 +159,9 @@ const planLimitSchema = new Schema<IPlanLimit>(
         enum: Object.values(PlanType),
       },
       desiredPlanEffectiveAt: Date,
+
+      trialReminderLastSentAt: Date,
+      trialReminderLastDaysLeft: Number,
     },
   },
   {

@@ -157,6 +157,63 @@ export const emailTemplates = {
       </div>
     `,
   }),
+
+  trialExpiring: (data: {
+    tenantName: string;
+    daysLeft: number;
+    trialEndsAt: Date;
+    url: string;
+  }) => ({
+    subject: `Seu trial do ${data.tenantName} expira em ${data.daysLeft} dia(s)`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #3B82F6;">Trial expirando</h1>
+        <p>Seu trial está chegando ao fim.</p>
+        <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Empresa:</strong> ${data.tenantName}</p>
+          <p style="margin: 8px 0 0;"><strong>Expira em:</strong> ${data.trialEndsAt.toLocaleDateString('pt-BR')}</p>
+        </div>
+        <p>Para continuar usando recursos PRO, escolha um plano:</p>
+        <a href="${data.url}" style="display:inline-block;background:#3B82F6;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Ver planos</a>
+        <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">Equipe HelpDesk</p>
+      </div>
+    `,
+  }),
+
+  paymentConfirmed: (data: {
+    tenantName: string;
+    plan: string;
+    periodEnd?: Date;
+    url: string;
+  }) => ({
+    subject: `Pagamento confirmado - ${data.tenantName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #10B981;">Pagamento confirmado</h1>
+        <p>Seu pagamento foi confirmado e seu acesso está liberado.</p>
+        <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Empresa:</strong> ${data.tenantName}</p>
+          <p style="margin: 8px 0 0;"><strong>Plano:</strong> ${String(data.plan).toUpperCase()}</p>
+          ${data.periodEnd ? `<p style="margin: 8px 0 0;"><strong>Período até:</strong> ${data.periodEnd.toLocaleDateString('pt-BR')}</p>` : ''}
+        </div>
+        <a href="${data.url}" style="display:inline-block;background:#3B82F6;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Gerenciar plano</a>
+      </div>
+    `,
+  }),
+
+  paymentOverdue: (data: {
+    tenantName: string;
+    url: string;
+  }) => ({
+    subject: `Pagamento em atraso - ${data.tenantName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #EF4444;">Pagamento em atraso</h1>
+        <p>Identificamos um pagamento em atraso. Recursos pagos podem ser bloqueados.</p>
+        <a href="${data.url}" style="display:inline-block;background:#3B82F6;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Ver detalhes</a>
+      </div>
+    `,
+  }),
 };
 
 export default { sendEmail, emailTemplates, transporter };

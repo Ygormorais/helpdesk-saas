@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,6 +37,7 @@ const roleLabels: Record<string, string> = {
 export default function RegisterPage() {
   const { register: registerUser, registerInvite } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -46,6 +47,13 @@ export default function RegisterPage() {
   const inviteToken = useMemo(() => {
     const raw = searchParams.get('token');
     return raw ? String(raw) : null;
+  }, [searchParams]);
+
+  const selectedPlan = useMemo(() => {
+    const raw = String(searchParams.get('plan') || '').trim().toLowerCase();
+    if (!raw) return null;
+    if (raw === 'free' || raw === 'pro' || raw === 'enterprise') return raw;
+    return null;
   }, [searchParams]);
 
   const isInviteMode = !!inviteToken;
@@ -105,6 +113,9 @@ export default function RegisterPage() {
       } else {
         await registerUser(data as RegisterForm);
         toast({ title: 'Conta criada com sucesso' });
+        if (selectedPlan && selectedPlan !== 'free') {
+          navigate(`/plans?checkout=${encodeURIComponent(selectedPlan)}`);
+        }
       }
     } catch (error: any) {
       toast({

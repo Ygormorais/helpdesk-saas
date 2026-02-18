@@ -48,9 +48,9 @@ export default function LandingPage() {
               <button onClick={() => scrollToSection('features')} className="text-sm font-medium text-gray-600 hover:text-gray-900">
                 Funcionalidades
               </button>
-              <button onClick={() => scrollToSection('pricing')} className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              <Link to="/pricing" className="text-sm font-medium text-gray-600 hover:text-gray-900">
                 Preços
-              </button>
+              </Link>
               <button onClick={() => scrollToSection('faq')} className="text-sm font-medium text-gray-600 hover:text-gray-900">
                 FAQ
               </button>
@@ -82,9 +82,9 @@ export default function LandingPage() {
                 <button onClick={() => scrollToSection('features')} className="text-left py-2 font-medium">
                   Funcionalidades
                 </button>
-                <button onClick={() => scrollToSection('pricing')} className="text-left py-2 font-medium">
-                  Preços
-                </button>
+                 <Link to="/pricing" className="text-left py-2 font-medium" onClick={() => setMobileMenuOpen(false)}>
+                   Preços
+                 </Link>
                 <button onClick={() => scrollToSection('faq')} className="text-left py-2 font-medium">
                   FAQ
                 </button>

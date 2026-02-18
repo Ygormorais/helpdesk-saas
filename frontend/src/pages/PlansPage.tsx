@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Check, X, Sparkles, Zap, Building2, CreditCard, QrCode, FileText, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,7 @@ interface CurrentPlan {
 }
 
 export default function PlansPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentPlan, setCurrentPlan] = useState<CurrentPlan | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +84,20 @@ export default function PlansPage() {
   useEffect(() => {
     fetchPlanDetails();
   }, []);
+
+  useEffect(() => {
+    const checkout = String(searchParams.get('checkout') || '').trim().toLowerCase();
+    if (!checkout) return;
+    if (checkout !== 'pro' && checkout !== 'enterprise') return;
+
+    // Wait for plans data, then open checkout and clean URL.
+    if (!loading && availablePlans.length > 0) {
+      openCheckout(checkout);
+      const next = new URLSearchParams(searchParams);
+      next.delete('checkout');
+      setSearchParams(next, { replace: true });
+    }
+  }, [availablePlans.length, loading, searchParams, setSearchParams]);
 
   const fetchPlanDetails = async () => {
     try {

@@ -14,6 +14,7 @@ import timeTrackingRoutes from './timeTrackingRoutes.js';
 import planRoutes from './planRoutes.js';
 import billingRoutes from './billingRoutes.js';
 import userRoutes from './userRoutes.js';
+import platformAdminRoutes from './platformAdminRoutes.js';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/time', timeTrackingRoutes);
 router.use('/plan', planRoutes);
 router.use('/billing', billingRoutes);
 router.use('/users', userRoutes);
+router.use('/platform-admin', platformAdminRoutes);
 
 export default router;

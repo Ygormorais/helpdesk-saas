@@ -32,6 +32,15 @@ export const config = {
   asaasApiKey: process.env.ASAAS_API_KEY || '',
   asaasWebhookSecret: process.env.ASAAS_WEBHOOK_SECRET || '',
 
+  platformAdminEmails: String(process.env.PLATFORM_ADMIN_EMAILS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+
+  billing: {
+    remindersEnabled: String(process.env.BILLING_REMINDERS_ENABLED || '').toLowerCase() === 'true',
+  },
+
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
     baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',

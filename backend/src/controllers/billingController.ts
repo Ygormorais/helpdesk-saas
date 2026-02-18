@@ -2,10 +2,12 @@ import { Response } from 'express';
 import { asaasService } from '../services/asaasService.js';
 import { planService } from '../services/planService.js';
 import { PlanLimit, PlanType, WebhookEvent } from '../models/index.js';
+import { Tenant, User } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { config } from '../config/index.js';
 import { timingSafeEqual } from 'crypto';
+import { emailTemplates, sendEmail } from '../services/emailService.js';
 
 import type { AsaasSubscription } from '../services/asaasService.js';
 
@@ -296,6 +298,25 @@ async function handlePaymentReceived(payment: any) {
     await planService.upgradePlan(tenantId, plan as PlanType);
   }
 
+  // Email admins
+  try {
+    const tenant = await Tenant.findById(tenantId).select('name');
+    const admins = await User.find({ tenant: tenantId, role: 'admin', isActive: true }).select('email');
+    const to = admins.map((a: any) => String(a.email)).filter(Boolean);
+    if (tenant && to.length > 0) {
+      const url = `${process.env.FRONTEND_URL || ''}/plans`;
+      const tpl = emailTemplates.paymentConfirmed({
+        tenantName: tenant.name,
+        plan: String(plan || planLimit.plan),
+        periodEnd: planLimit.subscription.currentPeriodEnd,
+        url,
+      });
+      await Promise.all(to.map((email) => sendEmail({ to: email, ...tpl })));
+    }
+  } catch {
+    // best-effort
+  }
+
   // Aqui você pode enviar email de confirmação
   console.log(`Payment received for tenant ${tenantId}`);
 }
@@ -311,6 +332,20 @@ async function handlePaymentOverdue(payment: any) {
 
   planLimit.subscription.status = 'past_due';
   await planLimit.save();
+
+  // Email admins
+  try {
+    const tenant = await Tenant.findById(tenantId).select('name');
+    const admins = await User.find({ tenant: tenantId, role: 'admin', isActive: true }).select('email');
+    const to = admins.map((a: any) => String(a.email)).filter(Boolean);
+    if (tenant && to.length > 0) {
+      const url = `${process.env.FRONTEND_URL || ''}/plans`;
+      const tpl = emailTemplates.paymentOverdue({ tenantName: tenant.name, url });
+      await Promise.all(to.map((email) => sendEmail({ to: email, ...tpl })));
+    }
+  } catch {
+    // best-effort
+  }
 
   console.log(`Payment overdue for tenant ${tenantId}`);
 }

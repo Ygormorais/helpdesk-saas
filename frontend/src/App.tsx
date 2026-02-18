@@ -30,7 +30,9 @@ const SatisfactionPage = lazy(() => import('@/pages/SatisfactionPage'));
 const TimeReportsPage = lazy(() => import('@/pages/TimeReportsPage'));
 const PlansPage = lazy(() => import('@/pages/PlansPage'));
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const PricingPage = lazy(() => import('@/pages/PricingPage'));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
+const PlatformAdminTenantsPage = lazy(() => import('@/pages/PlatformAdminTenantsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,6 +69,7 @@ function AppRoutes() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/pricing" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <PricingPage />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
         <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
 
@@ -102,6 +105,7 @@ function AppRoutes() {
           <Route path="satisfaction" element={<SatisfactionPage />} />
           <Route path="time" element={<TimeReportsPage />} />
           <Route path="plans" element={<PlansPage />} />
+          <Route path="platform/tenants" element={<PlatformAdminTenantsPage />} />
         </Route>
       </Routes>
     </Suspense>

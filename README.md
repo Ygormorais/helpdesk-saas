@@ -99,6 +99,12 @@ FRONTEND_URL=http://localhost:5173
 # Billing (Asaas)
 ASAAS_API_KEY=
 ASAAS_WEBHOOK_SECRET=
+
+# Platform admin (optional)
+PLATFORM_ADMIN_EMAILS=admin@exemplo.com
+
+# Billing reminders (optional)
+BILLING_REMINDERS_ENABLED=false
 ```
 
 ### Variáveis de Ambiente (Frontend)

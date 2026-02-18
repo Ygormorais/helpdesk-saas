@@ -43,6 +43,10 @@ api.interceptors.response.use(
 
     if (error.response?.status === 403) {
       const msg = String(error.response?.data?.message || 'Acesso negado');
+      const looksLikePlanGate = /upgrade|plano|limite|dispon[ií]vel apenas/i.test(msg);
+      if (!looksLikePlanGate) {
+        return Promise.reject(error);
+      }
       const now = Date.now();
       (window as any).__lastForbiddenToastAt = (window as any).__lastForbiddenToastAt || 0;
       const last = Number((window as any).__lastForbiddenToastAt) || 0;

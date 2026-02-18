@@ -10,6 +10,7 @@ import routes from './routes/index.js';
 import { errorHandler, notFound } from './middlewares/errorHandler.js';
 import { notificationService } from './services/notificationService.js';
 import { chatService } from './services/chatService.js';
+import { sendTrialRemindersOnce } from './services/billingReminderService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,6 +64,20 @@ const startServer = () => {
     console.log(`Server running on port ${config.port}`);
     console.log(`Environment: ${config.nodeEnv}`);
   });
+
+  if (config.billing.remindersEnabled) {
+    const run = async () => {
+      try {
+        await sendTrialRemindersOnce();
+      } catch {
+        // ignore
+      }
+    };
+
+    // initial and periodic run (every 12h)
+    run();
+    setInterval(run, 12 * 60 * 60 * 1000);
+  }
 };
 
 connectDB()
