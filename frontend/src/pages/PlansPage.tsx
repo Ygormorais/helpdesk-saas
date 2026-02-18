@@ -126,6 +126,22 @@ export default function PlansPage() {
     [availablePlans, selectedPlan]
   );
 
+  const addOnById = useMemo(() => {
+    const m = new Map<string, AddOn>();
+    addons.forEach((a) => m.set(a.id, a));
+    return m;
+  }, [addons]);
+
+  const isRecurringEffective = (r: AddOnRecurring) => {
+    const status = String(r.status || '').toLowerCase();
+    if (status === 'active' || status === 'trialing') return true;
+    if (status === 'canceled' && r.currentPeriodEnd) {
+      const until = new Date(String(r.currentPeriodEnd)).getTime();
+      return Number.isFinite(until) && until > Date.now();
+    }
+    return false;
+  };
+
   useEffect(() => {
     fetchPlanDetails();
   }, []);
@@ -579,8 +595,15 @@ export default function PlansPage() {
       {/* Add-ons */}
       <Card>
         <CardHeader>
-          <CardTitle>Add-ons</CardTitle>
-          <p className="text-sm text-muted-foreground">Expanda limites e recursos sem trocar de plano</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Add-ons</CardTitle>
+              <p className="text-sm text-muted-foreground">Expanda limites e recursos sem trocar de plano</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchAddons} disabled={addonsLoading}>
+              {addonsLoading ? 'Atualizando...' : 'Atualizar'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {currentPlan?.addons ? (
@@ -590,10 +613,10 @@ export default function PlansPage() {
                   const oneTimeAgents = Number(currentPlan.addons?.extraAgents || 0) || 0;
                   const oneTimeStorage = Number(currentPlan.addons?.extraStorage || 0) || 0;
                   const oneTimeAi = Number(currentPlan.addons?.aiCredits || 0) || 0;
-                  const active = addonsRecurring.filter((r) => ['ACTIVE', 'TRIALING'].includes(String(r.status || '').toUpperCase()));
-                  const recurringAgents = active.reduce((acc, r) => acc + (Number(r.extraAgents || 0) || 0), 0);
-                  const recurringStorage = active.reduce((acc, r) => acc + (Number(r.extraStorage || 0) || 0), 0);
-                  const recurringAi = active.reduce((acc, r) => acc + (Number(r.aiCredits || 0) || 0), 0);
+                  const effective = addonsRecurring.filter(isRecurringEffective);
+                  const recurringAgents = effective.reduce((acc, r) => acc + (Number(r.extraAgents || 0) || 0), 0);
+                  const recurringStorage = effective.reduce((acc, r) => acc + (Number(r.extraStorage || 0) || 0), 0);
+                  const recurringAi = effective.reduce((acc, r) => acc + (Number(r.aiCredits || 0) || 0), 0);
 
                   return (
                     <div className="md:col-span-3 text-xs text-muted-foreground">
@@ -619,21 +642,51 @@ export default function PlansPage() {
 
           {addonsRecurring.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Assinaturas ativas</p>
-              {addonsRecurring.map((r) => (
-                <div key={r.subscriptionId} className="flex items-start justify-between gap-3 rounded-lg border p-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{r.addOnId}</p>
-                    <p className="text-xs text-muted-foreground">Status: {String(r.status || '').toUpperCase()}</p>
-                    {r.currentPeriodEnd ? (
-                      <p className="text-xs text-muted-foreground">Periodo ate: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
-                    ) : null}
+              <p className="text-sm font-medium">Assinaturas mensais</p>
+              {addonsRecurring.map((r) => {
+                const meta = addOnById.get(r.addOnId);
+                const statusRaw = String(r.status || '').toLowerCase();
+                const effective = isRecurringEffective(r);
+                const canCancel = statusRaw !== 'canceled';
+
+                const parts: string[] = [];
+                if (Number(r.extraAgents || 0)) parts.push(`+${Number(r.extraAgents || 0)} agentes`);
+                if (Number(r.extraStorage || 0)) parts.push(`+${Number(r.extraStorage || 0)}MB storage`);
+                if (Number(r.aiCredits || 0)) parts.push(`+${Number(r.aiCredits || 0)} AI`);
+
+                return (
+                  <div key={r.subscriptionId} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{meta?.name || r.addOnId}</p>
+                        <Badge
+                          variant="secondary"
+                          className={effective ? 'bg-transparent border border-border text-foreground' : 'bg-muted text-muted-foreground'}
+                        >
+                          {statusRaw ? statusRaw.toUpperCase() : 'UNKNOWN'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {meta ? `R$ ${Number(meta.priceMonthly || 0).toFixed(2).replace('.', ',')}/mes` : 'Assinatura mensal'}
+                      </p>
+                      {r.currentPeriodEnd ? (
+                        <p className="text-xs text-muted-foreground">Periodo ate: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
+                      ) : null}
+                      {parts.length > 0 ? (
+                        <p className="text-xs text-muted-foreground">{parts.join(' • ')}</p>
+                      ) : null}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => cancelAddonSubscription(r.subscriptionId)}
+                      disabled={!canCancel}
+                    >
+                      {canCancel ? 'Cancelar' : 'Cancelado'}
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => cancelAddonSubscription(r.subscriptionId)}>
-                    Cancelar
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
 
