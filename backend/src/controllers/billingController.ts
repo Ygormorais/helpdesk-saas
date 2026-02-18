@@ -138,6 +138,11 @@ export const handleWebhook = async (
   try {
     const { event, payment, subscription } = req.body || {};
 
+    const eventId = req.body?.id ? String(req.body.id) : '';
+    const extRef = String(payment?.externalReference || subscription?.externalReference || '');
+    const tenantId = extRef ? extRef.split('-')[0] : '';
+    const resourceId = String(payment?.id || subscription?.id || '');
+
     if (config.asaasWebhookSecret) {
       const token = String(req.headers['asaas-access-token'] || '');
       const secret = String(config.asaasWebhookSecret || '');
@@ -145,15 +150,31 @@ export const handleWebhook = async (
       const b = Buffer.from(secret);
 
       if (!token || a.length !== b.length || !timingSafeEqual(a, b)) {
+        if (eventId) {
+          await WebhookEvent.updateOne(
+            { provider: 'asaas', eventId },
+            {
+              $setOnInsert: {
+                provider: 'asaas',
+                eventId,
+                receivedAt: new Date(),
+              },
+              $set: {
+                status: 'unauthorized',
+                event: event ? String(event) : undefined,
+                tenant: tenantId || undefined,
+                resourceId: resourceId || undefined,
+                error: 'Unauthorized',
+                processedAt: new Date(),
+              },
+            },
+            { upsert: true }
+          ).catch(() => undefined);
+        }
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
     }
-
-    const eventId = req.body?.id ? String(req.body.id) : '';
-    const extRef = String(payment?.externalReference || subscription?.externalReference || '');
-    const tenantId = extRef ? extRef.split('-')[0] : '';
-    const resourceId = String(payment?.id || subscription?.id || '');
 
     let webhookEventDocId: any = null;
     if (eventId) {
@@ -267,7 +288,7 @@ export const listWebhookEvents = async (req: AuthRequest, res: Response): Promis
 async function handlePaymentReceived(payment: any) {
   const externalRef = payment.externalReference || '';
   const tenantId = externalRef.split('-')[0];
-  const plan = externalRef.split('-')[1];
+  const plan = parsePlanFromExternalReference(externalRef);
   
   if (!tenantId) return;
 
@@ -294,8 +315,8 @@ async function handlePaymentReceived(payment: any) {
   
   await planLimit.save();
 
-  if (plan && Object.values(PlanType).includes(plan)) {
-    await planService.upgradePlan(tenantId, plan as PlanType);
+  if (plan) {
+    await planService.upgradePlan(tenantId, plan);
   }
 
   // Email admins
@@ -307,10 +328,10 @@ async function handlePaymentReceived(payment: any) {
       const url = `${process.env.FRONTEND_URL || ''}/plans`;
       const tpl = emailTemplates.paymentConfirmed({
         tenantName: tenant.name,
-        plan: String(plan || planLimit.plan),
-        periodEnd: planLimit.subscription.currentPeriodEnd,
-        url,
-      });
+         plan: String(plan || planLimit.plan),
+         periodEnd: planLimit.subscription.currentPeriodEnd,
+         url,
+       });
       await Promise.all(to.map((email) => sendEmail({ to: email, ...tpl })));
     }
   } catch {

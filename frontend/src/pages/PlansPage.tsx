@@ -58,6 +58,16 @@ interface CurrentPlan {
   };
 }
 
+interface BillingWebhookEvent {
+  eventId: string;
+  event?: string;
+  resourceId?: string;
+  status?: string;
+  error?: string;
+  receivedAt?: string;
+  processedAt?: string;
+}
+
 export default function PlansPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentPlan, setCurrentPlan] = useState<CurrentPlan | null>(null);
@@ -74,6 +84,8 @@ export default function PlansPage() {
   const [portalData, setPortalData] = useState<any>(null);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [billingEvents, setBillingEvents] = useState<BillingWebhookEvent[]>([]);
+  const [billingEventsLoading, setBillingEventsLoading] = useState(false);
   const { toast } = useToast();
 
   const selectedPlanObj = useMemo(
@@ -109,6 +121,9 @@ export default function PlansPage() {
 
       setCurrentPlan(data || null);
       setAvailablePlans(Array.isArray(data?.availablePlans) ? data.availablePlans : []);
+
+      // Best-effort: billing events are only available for admin/manager.
+      fetchBillingEvents();
     } catch (error) {
       setLoadError('Não foi possível carregar os detalhes do plano');
       toast({
@@ -118,6 +133,22 @@ export default function PlansPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBillingEvents = async () => {
+    setBillingEventsLoading(true);
+    try {
+      const res = await api.get('/billing/webhook-events', { params: { limit: 20 } });
+      setBillingEvents(Array.isArray(res.data?.data) ? res.data.data : []);
+    } catch (error: any) {
+      if (error?.response?.status === 403) {
+        setBillingEvents([]);
+        return;
+      }
+      setBillingEvents([]);
+    } finally {
+      setBillingEventsLoading(false);
     }
   };
 
@@ -394,6 +425,52 @@ export default function PlansPage() {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {(billingEventsLoading || billingEvents.length > 0) && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle>Eventos recentes (Asaas)</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Ultimos webhooks recebidos e processados
+                </p>
+              </div>
+              <Button variant="outline" onClick={fetchBillingEvents} disabled={billingEventsLoading}>
+                {billingEventsLoading ? 'Atualizando...' : 'Atualizar'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {billingEventsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando...
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {billingEvents.slice(0, 20).map((e) => (
+                  <div key={e.eventId} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{e.event || 'evento'}</p>
+                      <p className="text-xs text-muted-foreground truncate">{e.eventId}</p>
+                      {e.error ? <p className="text-xs text-destructive mt-1 line-clamp-2">{e.error}</p> : null}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <Badge variant="secondary" className="bg-transparent border border-border text-foreground">
+                        {String(e.status || '-').toUpperCase()}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {e.receivedAt ? new Date(e.receivedAt).toLocaleString('pt-BR') : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
