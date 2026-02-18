@@ -9,11 +9,12 @@ import {
   syncSubscription,
 } from '../controllers/billingController.js';
 import { authenticate, authorize } from '../middlewares/auth.js';
+import { billingWebhookLimiter } from '../middlewares/rateLimiters.js';
 
 const router = Router();
 
 // Webhook público (não precisa de autenticação)
-router.post('/webhook', handleWebhook);
+router.post('/webhook', billingWebhookLimiter, handleWebhook);
 
 // Rotas protegidas
 router.use(authenticate);
