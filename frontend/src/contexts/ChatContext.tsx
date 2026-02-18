@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { api } from '@/config/api';
 
 interface ChatMessage {
   _id: string;
@@ -71,51 +72,38 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const currentChatIdRef = useRef<string | null>(null);
   const prevChatIdRef = useRef<string | null>(null);
 
-  const apiBaseUrl = useMemo(() => import.meta.env.VITE_API_URL || '/api', []);
-
   useEffect(() => {
     currentChatIdRef.current = currentChat?._id || null;
   }, [currentChat]);
 
   const refreshChats = useCallback(async (scopeOverride?: 'all' | 'internal' | 'ticket') => {
-    if (!token) return;
     try {
       setIsLoadingChats(true);
       const effectiveScope = scopeOverride || scope;
-      const qs = effectiveScope === 'all' ? '' : `?scope=${encodeURIComponent(effectiveScope)}`;
-      const response = await fetch(`${apiBaseUrl}/chat${qs}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error(`Failed to fetch chats (${response.status})`);
-      const data = await response.json();
-      setChats(data.chats || []);
+      const params = effectiveScope === 'all' ? undefined : { scope: effectiveScope };
+      const res = await api.get('/chat', { params });
+      setChats(res.data?.chats || []);
     } catch (error) {
-      console.error('Error fetching chats:', error);
+      if (import.meta.env.DEV) console.error('Error fetching chats:', error);
     } finally {
       setIsLoadingChats(false);
     }
-  }, [apiBaseUrl, token, scope]);
+  }, [scope]);
 
   const fetchMessages = useCallback(async (chatId: string) => {
-    if (!token) return;
     try {
       setIsLoadingMessages(true);
-      const response = await fetch(`${apiBaseUrl}/chat/${chatId}/messages`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error(`Failed to fetch messages (${response.status})`);
-      const data = await response.json();
+      const res = await api.get(`/chat/${chatId}/messages`);
+      const data = res.data;
       if (currentChatIdRef.current === chatId) {
         setMessages(data.messages || []);
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      if (import.meta.env.DEV) console.error('Error fetching messages:', error);
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [apiBaseUrl, token]);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -124,13 +112,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
 
       newSocket.on('connect', () => {
-        console.log('Socket connected');
+        if (import.meta.env.DEV) console.debug('Socket connected');
         newSocket.emit('authenticate', { token, tenantId: user?.tenant?.id || '' });
       });
 
       newSocket.on('authenticated', (data: { success: boolean }) => {
         if (data.success) {
-          console.log('Socket authenticated');
+          if (import.meta.env.DEV) console.debug('Socket authenticated');
           refreshChats();
           const chatId = currentChatIdRef.current;
           if (chatId) {

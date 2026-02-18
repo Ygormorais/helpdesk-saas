@@ -27,7 +27,6 @@ export default function CategoriesPage() {
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3B82F6' });
 
   const handleCreateCategory = () => {
-    console.log('Creating category:', newCategory);
     setIsDialogOpen(false);
     setNewCategory({ name: '', color: '#3B82F6' });
   };

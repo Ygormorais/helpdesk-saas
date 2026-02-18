@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { api } from '@/config/api';
 
 interface TimeEntry {
   _id: string;
@@ -32,11 +33,8 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
 
   const fetchActiveTimer = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/time/active', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
+      const res = await api.get('/time/active');
+      const data = res.data;
       if (data.activeTimer) {
         setActiveTimer(data.activeTimer);
         setStartTime(new Date(data.activeTimer.startTime));
@@ -46,7 +44,7 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
         setElapsedSeconds(0);
       }
     } catch (error) {
-      console.error('Error fetching active timer:', error);
+      if (import.meta.env.DEV) console.error('Error fetching active timer:', error);
     }
   }, []);
 
@@ -76,25 +74,17 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
     description?: string
   ) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/time/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ticketId,
-          description,
-          ticket: { _id: ticketId, ticketNumber, title: ticketTitle },
-        }),
+      const res = await api.post('/time/start', {
+        ticketId,
+        description,
+        ticket: { _id: ticketId, ticketNumber, title: ticketTitle },
       });
 
-      const data = await response.json();
+      const data = res.data;
       setActiveTimer(data.timeEntry);
       setStartTime(new Date(data.timeEntry.startTime));
     } catch (error) {
-      console.error('Error starting timer:', error);
+      if (import.meta.env.DEV) console.error('Error starting timer:', error);
       throw error;
     }
   };
@@ -103,17 +93,13 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
     if (!activeTimer) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/time/stop/${activeTimer._id}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.post(`/time/stop/${activeTimer._id}`);
 
       setActiveTimer(null);
       setStartTime(null);
       setElapsedSeconds(0);
     } catch (error) {
-      console.error('Error stopping timer:', error);
+      if (import.meta.env.DEV) console.error('Error stopping timer:', error);
       throw error;
     }
   };
