@@ -52,6 +52,8 @@ interface CurrentPlan {
     currentPeriodEnd?: string;
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
+    desiredPlan?: string;
+    desiredPlanEffectiveAt?: string;
   };
 }
 
@@ -68,6 +70,7 @@ export default function PlansPage() {
   const [isPortalOpen, setIsPortalOpen] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalData, setPortalData] = useState<any>(null);
+  const [isChangingPlan, setIsChangingPlan] = useState(false);
   const { toast } = useToast();
 
   const selectedPlanObj = useMemo(
@@ -187,6 +190,26 @@ export default function PlansPage() {
     }
   };
 
+  const changePlan = async (planId: string) => {
+    setIsChangingPlan(true);
+    try {
+      const res = await api.post('/billing/change-plan', { plan: planId });
+      toast({
+        title: 'Plano atualizado',
+        description: res.data?.message || 'Atualizamos sua assinatura.',
+      });
+      await fetchPlanDetails();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao trocar plano',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsChangingPlan(false);
+    }
+  };
+
   const getUsagePercentage = (current: number, max: number) => {
     if (max === -1) return 0;
     return Math.round((current / max) * 100);
@@ -267,6 +290,14 @@ export default function PlansPage() {
                     Ver assinatura
                   </Button>
                 ) : null}
+                {currentPlan.subscription?.desiredPlan ? (
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-900">
+                    Mudança agendada: {String(currentPlan.subscription.desiredPlan).toUpperCase()}
+                    {currentPlan.subscription.desiredPlanEffectiveAt
+                      ? ` em ${new Date(currentPlan.subscription.desiredPlanEffectiveAt).toLocaleDateString('pt-BR')}`
+                      : ''}
+                  </Badge>
+                ) : null}
                 {currentPlan.subscription?.stripeSubscriptionId ? (
                   <Button variant="outline" size="sm" onClick={cancel} disabled={isCancelling}>
                     {isCancelling ? 'Cancelando...' : 'Cancelar assinatura'}
@@ -328,7 +359,7 @@ export default function PlansPage() {
           </Card>
         ) : availablePlans.map((plan) => {
           const isCurrentPlan = currentPlan?.plan === plan.id;
-          const isLockedSwitch = !!currentPlan && currentPlan.plan !== 'free' && plan.id !== currentPlan.plan;
+          const canChangeInPlace = !!currentPlan && currentPlan.plan !== 'free' && !currentPlan.isTrial;
           const Icon = plan.id === 'free' ? Sparkles : plan.id === 'pro' ? Zap : Building2;
           
           return (
@@ -399,11 +430,17 @@ export default function PlansPage() {
                 <Button 
                   className="w-full"
                   variant={isCurrentPlan ? 'outline' : 'default'}
-                  disabled={isCurrentPlan || isLockedSwitch}
-                  onClick={() => openCheckout(plan.id)}
-                  title={isLockedSwitch ? 'Para trocar de plano, cancele a assinatura atual e faça um novo checkout.' : undefined}
+                  disabled={isCurrentPlan || isProcessing || isChangingPlan}
+                  onClick={() => {
+                    if (canChangeInPlace) {
+                      changePlan(plan.id);
+                      return;
+                    }
+                    openCheckout(plan.id);
+                  }}
+                  title={canChangeInPlace ? 'Atualiza a assinatura atual. Downgrades podem ser agendados para o proximo ciclo.' : undefined}
                 >
-                  {isCurrentPlan ? 'Plano Atual' : isLockedSwitch ? 'Troca indisponível' : 'Escolher Plano'}
+                  {isCurrentPlan ? 'Plano Atual' : canChangeInPlace ? 'Trocar para este plano' : 'Escolher Plano'}
                 </Button>
               </CardContent>
             </Card>

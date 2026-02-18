@@ -155,6 +155,21 @@ export class AsaasService {
     }
   }
 
+  // Atualizar assinatura (valor/descricao/referencia)
+  async updateSubscription(subscriptionId: string, data: Partial<AsaasSubscription>): Promise<any> {
+    try {
+      const response = await axios.put(
+        `${this.baseURL}/subscriptions/${subscriptionId}`,
+        data,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('Asaas updateSubscription error:', error.response?.data || error.message);
+      throw new Error(`Failed to update subscription: ${error.response?.data?.errors?.[0]?.description || error.message}`);
+    }
+  }
+
   // Criar cobrança avulsa
   async createPayment(data: AsaasPayment): Promise<any> {
     try {

@@ -1,4 +1,7 @@
 import axios from 'axios';
+import React from 'react';
+import { toast } from '@/hooks/use-toast';
+import { ToastAction, type ToastActionElement } from '@/components/ui/toast';
 
 const normalizeBaseUrl = (url: string) => {
   const trimmed = String(url || '').trim().replace(/\/+$/, '');
@@ -36,6 +39,34 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/login';
+    }
+
+    if (error.response?.status === 403) {
+      const msg = String(error.response?.data?.message || 'Acesso negado');
+      const now = Date.now();
+      (window as any).__lastForbiddenToastAt = (window as any).__lastForbiddenToastAt || 0;
+      const last = Number((window as any).__lastForbiddenToastAt) || 0;
+      if (now - last > 2500) {
+        (window as any).__lastForbiddenToastAt = now;
+        const isOnPlans = window.location.pathname.startsWith('/plans');
+        toast({
+          title: 'Funcionalidade bloqueada',
+          description: msg,
+          variant: 'destructive',
+          action: isOnPlans
+            ? undefined
+            : (React.createElement(
+                ToastAction,
+                {
+                  altText: 'Ver planos',
+                  onClick: () => {
+                    window.location.href = '/plans';
+                  },
+                },
+                'Ver planos'
+              ) as unknown as ToastActionElement),
+        });
+      }
     }
     return Promise.reject(error);
   }

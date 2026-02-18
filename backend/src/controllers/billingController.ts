@@ -171,7 +171,9 @@ export const handleWebhook = async (
       }
     }
 
-    console.log('Asaas webhook received:', event);
+     if (process.env.NODE_ENV !== 'production') {
+       console.log('Asaas webhook received:', event);
+     }
 
     // Verificar assinatura do webhook (implementar em produção)
     // const signature = req.headers['asaas-signature'];
@@ -257,10 +259,20 @@ async function handlePaymentReceived(payment: any) {
   // Atualizar status para ativo
   planLimit.subscription.status = 'active';
   planLimit.subscription.currentPeriodStart = new Date();
-  
-  const periodEnd = new Date();
-  periodEnd.setMonth(periodEnd.getMonth() + 1);
-  planLimit.subscription.currentPeriodEnd = periodEnd;
+
+  try {
+    const subId = payment?.subscription || planLimit.subscription.stripeSubscriptionId;
+    if (subId) {
+      const sub = await asaasService.getSubscription(String(subId));
+      if (sub?.nextDueDate) {
+        planLimit.subscription.currentPeriodEnd = new Date(String(sub.nextDueDate));
+      }
+    }
+  } catch {
+    const periodEnd = new Date();
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    planLimit.subscription.currentPeriodEnd = periodEnd;
+  }
   
   await planLimit.save();
 
@@ -294,9 +306,13 @@ async function handleSubscriptionUpdated(subscription: any) {
   
   if (!planLimit) return;
 
-  // Atualizar status baseado na resposta do Asaas
-  if (subscription.status === 'ACTIVE') {
-    planLimit.subscription.status = 'active';
+  const rawStatus = String(subscription?.status || '').toUpperCase();
+  if (rawStatus === 'ACTIVE') planLimit.subscription.status = 'active';
+  else if (rawStatus === 'OVERDUE') planLimit.subscription.status = 'past_due';
+  else if (rawStatus === 'INACTIVE' || rawStatus === 'CANCELED' || rawStatus === 'CANCELLED') planLimit.subscription.status = 'canceled';
+
+  if (subscription?.nextDueDate) {
+    planLimit.subscription.currentPeriodEnd = new Date(String(subscription.nextDueDate));
   }
 
   const ext = subscription.externalReference || '';
@@ -317,6 +333,10 @@ async function handleSubscriptionCancelled(subscription: any) {
   if (!planLimit) return;
 
   planLimit.subscription.status = 'canceled';
+
+  if (subscription?.nextDueDate && !planLimit.subscription.currentPeriodEnd) {
+    planLimit.subscription.currentPeriodEnd = new Date(String(subscription.nextDueDate));
+  }
   
   // Fazer downgrade para Free ao final do período pago
   const periodEnd = planLimit.subscription.currentPeriodEnd;
@@ -336,6 +356,16 @@ export const cancelSubscription = async (
   const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id });
   if (!planLimit || !planLimit.subscription.stripeSubscriptionId) {
     throw new AppError('Nenhuma assinatura ativa encontrada', 404);
+  }
+
+  // Best-effort: keep access until next due date if we have it.
+  try {
+    const sub = await asaasService.getSubscription(planLimit.subscription.stripeSubscriptionId);
+    if (sub?.nextDueDate) {
+      planLimit.subscription.currentPeriodEnd = new Date(String(sub.nextDueDate));
+    }
+  } catch {
+    // ignore
   }
 
   // Cancelar no Asaas
@@ -379,5 +409,50 @@ export const getBillingPortal = async (
     plan: planLimit.plan,
     status: planLimit.subscription.status,
     currentPeriodEnd: planLimit.subscription.currentPeriodEnd,
+  });
+};
+
+export const changePlan = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { plan } = req.body || {};
+
+  if (!Object.values(PlanType).includes(plan)) {
+    throw new AppError('Plano inválido', 400);
+  }
+  if (plan === PlanType.FREE) {
+    throw new AppError('Não é possível trocar para Free por aqui. Cancele a assinatura para voltar ao Free.', 400);
+  }
+
+  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id });
+  if (!planLimit || !planLimit.subscription.stripeSubscriptionId) {
+    throw new AppError('Nenhuma assinatura encontrada. Faça checkout para assinar um plano.', 404);
+  }
+
+  const currentPlan = planLimit.plan;
+  const currentPrice = PLAN_PRICES[currentPlan as PlanType] ?? 0;
+  const targetPrice = PLAN_PRICES[plan as PlanType] ?? 0;
+  const isDowngrade = targetPrice < currentPrice;
+
+  const effectiveAt = isDowngrade && planLimit.subscription.currentPeriodEnd
+    ? new Date(planLimit.subscription.currentPeriodEnd)
+    : new Date();
+
+  await asaasService.updateSubscription(planLimit.subscription.stripeSubscriptionId, {
+    value: targetPrice,
+    description: `DeskFlow - Plano ${String(plan).charAt(0).toUpperCase() + String(plan).slice(1)}`,
+    externalReference: `${user.tenant._id}-${plan}`,
+  });
+
+  planLimit.subscription.desiredPlan = plan;
+  planLimit.subscription.desiredPlanEffectiveAt = effectiveAt;
+  await planLimit.save();
+
+  res.json({
+    success: true,
+    message: isDowngrade
+      ? 'Mudança de plano agendada para o próximo ciclo.'
+      : 'Plano atualizado. Seu acesso será liberado imediatamente.',
+    effectiveAt,
+    desiredPlan: plan,
   });
 };

@@ -16,7 +16,13 @@ export class PlanService {
 
     if (sub.status === 'active') return true;
 
-    if (sub.status === 'trialing') return this.isActiveTrial(sub);
+    if (sub.status === 'trialing') {
+      // Active signup trial
+      if (this.isActiveTrial(sub)) return true;
+      // Some providers may report a temporary/pending state; keep access until period end if present.
+      if (sub.currentPeriodEnd && sub.currentPeriodEnd.getTime() > Date.now()) return true;
+      return false;
+    }
 
     // If the subscription was cancelled but still within the paid period,
     // keep access until the end of the current period.
@@ -48,6 +54,34 @@ export class PlanService {
         maxStorage: pro.maxStorage,
         features: pro.features,
         isPaidAccessBlocked: false,
+      };
+    }
+
+    // Apply scheduled plan change at the config level (persisted elsewhere).
+    const desired = planLimit.subscription?.desiredPlan;
+    const desiredAt = planLimit.subscription?.desiredPlanEffectiveAt;
+    if (desired && desiredAt && desiredAt.getTime() <= Date.now()) {
+      const cfg = PLAN_LIMITS[desired];
+      const isPaid = desired !== PlanType.FREE;
+      const paidAllowed = !isPaid || this.subscriptionAllowsPaidFeatures(planLimit.subscription);
+      if (paidAllowed) {
+        return {
+          plan: desired,
+          maxAgents: cfg.maxAgents,
+          maxTickets: cfg.maxTickets,
+          maxStorage: cfg.maxStorage,
+          features: cfg.features,
+          isPaidAccessBlocked: false,
+        };
+      }
+      const free = PLAN_LIMITS[PlanType.FREE];
+      return {
+        plan: PlanType.FREE,
+        maxAgents: free.maxAgents,
+        maxTickets: free.maxTickets,
+        maxStorage: free.maxStorage,
+        features: free.features,
+        isPaidAccessBlocked: true,
       };
     }
 
@@ -171,6 +205,27 @@ export class PlanService {
 
   async getPlanDetails(tenantId: string) {
     const planLimit = await this.getPlanForTenant(tenantId);
+
+    // Persist scheduled plan changes when due.
+    const desired = planLimit.subscription?.desiredPlan;
+    const desiredAt = planLimit.subscription?.desiredPlanEffectiveAt;
+    if (desired && desiredAt && desiredAt.getTime() <= Date.now()) {
+      await this.upgradePlan(tenantId, desired);
+      await PlanLimit.updateOne(
+        { tenant: tenantId },
+        { $unset: { 'subscription.desiredPlan': 1, 'subscription.desiredPlanEffectiveAt': 1 } }
+      ).catch(() => undefined);
+      const refreshed = await PlanLimit.findOne({ tenant: tenantId });
+      if (refreshed) {
+        // Use refreshed for downstream calculations
+        (planLimit as any).plan = refreshed.plan;
+        (planLimit as any).maxAgents = refreshed.maxAgents;
+        (planLimit as any).maxTickets = refreshed.maxTickets;
+        (planLimit as any).maxStorage = refreshed.maxStorage;
+        (planLimit as any).features = refreshed.features;
+        (planLimit as any).subscription = refreshed.subscription;
+      }
+    }
 
     // Refresh usage metrics (cheap counters)
     const [currentAgents, currentTickets] = await Promise.all([
