@@ -137,6 +137,8 @@ export default function ChatPage() {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatUnread = (n: number) => (n > 9 ? '9+' : String(n));
+
   const getInitials = (name: string) => {
     return String(name || '')
       .split(' ')
@@ -168,6 +170,13 @@ export default function ChatPage() {
         const ad = a.isDefault ? 0 : 1;
         const bd = b.isDefault ? 0 : 1;
         if (ad !== bd) return ad - bd;
+
+        const aTs = a.lastMessage?.createdAt || a.updatedAt;
+        const bTs = b.lastMessage?.createdAt || b.updatedAt;
+        const at = aTs ? new Date(aTs).getTime() : 0;
+        const bt = bTs ? new Date(bTs).getTime() : 0;
+        if (at !== bt) return bt - at;
+
         return String(a.name || a.channelKey).localeCompare(String(b.name || b.channelKey));
       });
   }, [chats, tab]);
@@ -177,8 +186,10 @@ export default function ChatPage() {
     return (chats as any[])
       .filter((c: any) => !(c.type === 'channel' || c.channelKey))
       .sort((a: any, b: any) => {
-        const at = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        const aTs = a.lastMessage?.createdAt || a.updatedAt;
+        const bTs = b.lastMessage?.createdAt || b.updatedAt;
+        const at = aTs ? new Date(aTs).getTime() : 0;
+        const bt = bTs ? new Date(bTs).getTime() : 0;
         return bt - at;
       });
   }, [chats, tab]);
@@ -378,7 +389,7 @@ export default function ChatPage() {
                         </p>
                         {chat.unreadCount > 0 ? (
                           <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-xs text-primary-foreground mt-1">
-                            {chat.unreadCount}
+                            {formatUnread(chat.unreadCount)}
                           </span>
                         ) : null}
                       </div>
@@ -417,7 +428,7 @@ export default function ChatPage() {
                               <span className="font-medium truncate">{title}</span>
                               {c.isDefault ? (
                                 <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                                  Padrao
+                                  Padrão
                                 </span>
                               ) : null}
                             </div>
@@ -430,7 +441,7 @@ export default function ChatPage() {
                           </p>
                           {c.unreadCount > 0 ? (
                             <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-xs text-primary-foreground mt-1">
-                              {c.unreadCount}
+                              {formatUnread(c.unreadCount)}
                             </span>
                           ) : null}
                         </div>
@@ -473,7 +484,7 @@ export default function ChatPage() {
                             <p className="text-sm text-muted-foreground truncate">{c.lastMessage?.content || 'Sem mensagens'}</p>
                             {c.unreadCount > 0 ? (
                               <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-xs text-primary-foreground mt-1">
-                                {c.unreadCount}
+                                {formatUnread(c.unreadCount)}
                               </span>
                             ) : null}
                           </div>
@@ -536,7 +547,7 @@ export default function ChatPage() {
                           const isChannel = c?.type === 'channel' || c?.channelKey;
                           if (isChannel) {
                             const key = c?.channelKey ? `#${c.channelKey}` : 'canal';
-                            return c?.isDefault ? `Canal padrao ${key}` : `Canal interno ${key}`;
+                            return c?.isDefault ? `Canal padrão ${key}` : `Canal interno ${key}`;
                           }
                           return 'Conversa direta interna';
                         })()}

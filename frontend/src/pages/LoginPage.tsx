@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { invitesApi, type InviteDto } from '@/api/invites';
+import { usePendingInvites } from '@/hooks/use-pending-invites';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -22,8 +22,6 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [pendingInvites, setPendingInvites] = useState<InviteDto[]>([]);
-  const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
 
   const {
     register,
@@ -35,36 +33,7 @@ export default function LoginPage() {
   });
 
   const emailValue = watch('email');
-  const normalizedEmail = useMemo(() => String(emailValue || '').trim().toLowerCase(), [emailValue]);
-
-  useEffect(() => {
-    const isValid = z.string().email().safeParse(normalizedEmail).success;
-    if (!isValid) {
-      setPendingInvites([]);
-      setPendingInvitesLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const t = window.setTimeout(async () => {
-      try {
-        setPendingInvitesLoading(true);
-        const res = await invitesApi.pending(normalizedEmail);
-        if (cancelled) return;
-        setPendingInvites(res.data.invites || []);
-      } catch {
-        if (cancelled) return;
-        setPendingInvites([]);
-      } finally {
-        if (!cancelled) setPendingInvitesLoading(false);
-      }
-    }, 400);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [normalizedEmail]);
+  const { pendingInvites, pendingInvitesLoading } = usePendingInvites(emailValue);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);

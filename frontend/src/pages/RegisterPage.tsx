@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { invitesApi, type InviteDto } from '@/api/invites';
+import { usePendingInvites } from '@/hooks/use-pending-invites';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
@@ -41,8 +42,6 @@ export default function RegisterPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [invite, setInvite] = useState<InviteDto | null>(null);
-  const [pendingInvites, setPendingInvites] = useState<InviteDto[]>([]);
-  const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
 
   const inviteToken = useMemo(() => {
     const raw = searchParams.get('token');
@@ -61,7 +60,9 @@ export default function RegisterPage() {
   });
 
   const emailValue = watch('email');
-  const normalizedEmail = useMemo(() => String(emailValue || '').trim().toLowerCase(), [emailValue]);
+  const { pendingInvites, pendingInvitesLoading } = usePendingInvites(emailValue, {
+    enabled: !inviteToken,
+  });
 
   useEffect(() => {
     if (!inviteToken) return;
@@ -92,36 +93,7 @@ export default function RegisterPage() {
     };
   }, [inviteToken]);
 
-  useEffect(() => {
-    if (inviteToken) return;
-
-    const isValid = z.string().email().safeParse(normalizedEmail).success;
-    if (!isValid) {
-      setPendingInvites([]);
-      setPendingInvitesLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const t = window.setTimeout(async () => {
-      try {
-        setPendingInvitesLoading(true);
-        const res = await invitesApi.pending(normalizedEmail);
-        if (cancelled) return;
-        setPendingInvites(res.data.invites || []);
-      } catch {
-        if (cancelled) return;
-        setPendingInvites([]);
-      } finally {
-        if (!cancelled) setPendingInvitesLoading(false);
-      }
-    }, 400);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [inviteToken, normalizedEmail]);
+  // pending invites handled via usePendingInvites hook
 
   const onSubmit = async (data: RegisterForm | RegisterInviteForm) => {
     setIsLoading(true);
@@ -239,16 +211,16 @@ export default function RegisterPage() {
             </div>
 
             {inviteToken ? (
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Equipe</span>
-                  <span className="font-medium">{invite?.tenant?.name || '---'}</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Funcao</span>
-                  <span className="font-medium">{roleLabels[String(invite?.role || '')] || String(invite?.role || '---')}</span>
-                </div>
-              </div>
+                      <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Equipe</span>
+                          <span className="font-medium">{invite?.tenant?.name || '---'}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Função</span>
+                          <span className="font-medium">{roleLabels[String(invite?.role || '')] || String(invite?.role || '---')}</span>
+                        </div>
+                      </div>
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="tenantName">Nome da empresa</Label>

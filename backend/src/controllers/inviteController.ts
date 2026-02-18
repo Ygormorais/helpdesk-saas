@@ -194,11 +194,20 @@ export const getPendingInvites = async (
 ): Promise<void> => {
   const { email } = req.query;
 
+  const parsedEmail = z.string().email().safeParse(String(email || ''));
+  if (!parsedEmail.success) {
+    res.json({ invites: [] });
+    return;
+  }
+
+  const normalizedEmail = parsedEmail.data.toLowerCase();
+
   const invites = await Invite.find({
-    email: (email as string)?.toLowerCase(),
+    email: normalizedEmail,
     status: 'pending',
     expiresAt: { $gt: new Date() },
   })
+    .limit(5)
     .select('email role tenant invitedBy expiresAt status createdAt')
     .populate('tenant', 'name slug logo')
     .populate('invitedBy', 'name');
