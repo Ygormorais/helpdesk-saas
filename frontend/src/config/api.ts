@@ -72,6 +72,23 @@ api.interceptors.response.use(
         });
       }
     }
+
+    if (error.response?.status === 503) {
+      const code = String(error.response?.data?.code || '');
+      if (code === 'DB_NOT_READY') {
+        const now = Date.now();
+        (window as any).__lastDbToastAt = (window as any).__lastDbToastAt || 0;
+        const last = Number((window as any).__lastDbToastAt) || 0;
+        if (now - last > 3000) {
+          (window as any).__lastDbToastAt = now;
+          toast({
+            title: 'Banco indisponivel',
+            description: 'O backend nao conseguiu conectar no MongoDB. Se voce usa Docker, suba o container do banco.',
+            variant: 'destructive',
+          });
+        }
+      }
+    }
     return Promise.reject(error);
   }
 );
