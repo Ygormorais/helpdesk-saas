@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 const ReportsCharts = lazy(() => import('@/components/charts/ReportsCharts'));
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { analyticsApi } from '@/config/analytics';
 import { downloadCSV } from '@/utils/csv';
 import { FeatureUnavailable } from '@/components/FeatureUnavailable';
@@ -252,20 +253,18 @@ export default function ReportsPage() {
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-sm text-muted-foreground">Início</label>
-            <input
+            <Input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="border rounded px-2 py-1"
             />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm text-muted-foreground">Fim</label>
-            <input
+            <Input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="border rounded px-2 py-1"
             />
           </div>
           <Button variant="secondary" onClick={() => setDateRangeMonths(2)}>
