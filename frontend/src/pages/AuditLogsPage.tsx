@@ -9,10 +9,15 @@ const actions = [
   { value: 'all', label: 'Todas as ações' },
   { value: 'ticket.created', label: 'Ticket criado' },
   { value: 'ticket.updated', label: 'Ticket atualizado' },
+  { value: 'ticket.assigned', label: 'Ticket atribuido' },
   { value: 'ticket.status_changed', label: 'Status alterado' },
+  { value: 'ticket.resolved', label: 'Ticket resolvido' },
   { value: 'comment.created', label: 'Comentário adicionado' },
   { value: 'user.login', label: 'Login de usuário' },
   { value: 'settings.updated', label: 'Configurações alteradas' },
+  { value: 'article.created', label: 'Artigo criado' },
+  { value: 'article.updated', label: 'Artigo atualizado' },
+  { value: 'article.deleted', label: 'Artigo removido' },
 ];
 
 const mockLogs = [

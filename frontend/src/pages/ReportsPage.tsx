@@ -323,6 +323,9 @@ export default function ReportsPage() {
           priorityBarData={priorityBarData}
           satisfactionBarData={satisfactionBarData}
           categoryBarData={categoryBarData}
+          csatByAgentData={report?.premium?.csatByAgent || []}
+          csatByCategoryData={report?.premium?.csatByCategory || []}
+          slaByCategoryData={report?.premium?.slaByCategory || []}
           satisfactionAverage={satisfactionQuery.data?.average ?? 0}
           onExportTrend={exportCSV_Tickets}
           onExportStatus={exportCSV_Status}

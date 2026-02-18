@@ -541,7 +541,7 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
     { $limit: agentLimit ?? 5 },
   ]);
 
-  const [createdCount, resolvedCount, backlogCount, avgTimesAgg, slaTrendAgg] = await Promise.all([
+  const [createdCount, resolvedCount, backlogCount, avgTimesAgg, slaTrendAgg, csatByAgentAgg, csatByCategoryAgg, slaByCategoryAgg] = await Promise.all([
     Ticket.countDocuments({ tenant: tenantId, createdAt: { $gte: start, $lt: endExclusive } }),
     Ticket.countDocuments({ tenant: tenantId, 'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive } }),
     Ticket.countDocuments({
@@ -592,6 +592,113 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
         },
       },
       { $sort: { _id: 1 } },
+    ]),
+
+    // CSAT by agent
+    Ticket.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          assignedTo: { $ne: null },
+          'satisfaction.rating': { $exists: true, $ne: null },
+          updatedAt: { $gte: start, $lt: endExclusive },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'assignedTo',
+          foreignField: '_id',
+          as: 'agent',
+        },
+      },
+      { $unwind: '$agent' },
+      {
+        $group: {
+          _id: '$agent._id',
+          name: { $first: '$agent.name' },
+          avgRating: { $avg: '$satisfaction.rating' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { avgRating: -1 } },
+      { $limit: 10 },
+    ]),
+
+    // CSAT by category
+    Ticket.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          category: { $ne: null },
+          'satisfaction.rating': { $exists: true, $ne: null },
+          updatedAt: { $gte: start, $lt: endExclusive },
+        },
+      },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'category',
+          foreignField: '_id',
+          as: 'cat',
+        },
+      },
+      { $unwind: '$cat' },
+      {
+        $group: {
+          _id: '$cat._id',
+          name: { $first: '$cat.name' },
+          avgRating: { $avg: '$satisfaction.rating' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { avgRating: -1 } },
+      { $limit: 10 },
+    ]),
+
+    // SLA by category
+    Ticket.aggregate([
+      {
+        $match: {
+          tenant: tenantId,
+          category: { $ne: null },
+          'sla.resolvedAt': { $ne: null, $gte: start, $lt: endExclusive },
+        },
+      },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'category',
+          foreignField: '_id',
+          as: 'cat',
+        },
+      },
+      { $unwind: '$cat' },
+      {
+        $group: {
+          _id: '$cat._id',
+          name: { $first: '$cat.name' },
+          totalResolved: { $sum: 1 },
+          withinSla: {
+            $sum: {
+              $cond: [{ $lte: ['$sla.resolvedAt', '$sla.resolutionDue'] }, 1, 0],
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          withinRate: {
+            $cond: [
+              { $gt: ['$totalResolved', 0] },
+              { $round: [{ $multiply: [{ $divide: ['$withinSla', '$totalResolved'] }, 100] }, 0] },
+              0,
+            ],
+          },
+        },
+      },
+      { $sort: { withinRate: -1, totalResolved: -1 } },
+      { $limit: 10 },
     ]),
   ]);
 
@@ -646,6 +753,26 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
       },
       slaTrend,
       agents: agentsAgg,
+      premium: {
+        csatByAgent: (csatByAgentAgg || []).map((r: any) => ({
+          id: r._id,
+          name: r.name,
+          avgRating: Math.round((r.avgRating || 0) * 10) / 10,
+          count: r.count || 0,
+        })),
+        csatByCategory: (csatByCategoryAgg || []).map((r: any) => ({
+          id: r._id,
+          name: r.name,
+          avgRating: Math.round((r.avgRating || 0) * 10) / 10,
+          count: r.count || 0,
+        })),
+        slaByCategory: (slaByCategoryAgg || []).map((r: any) => ({
+          id: r._id,
+          name: r.name,
+          totalResolved: r.totalResolved || 0,
+          withinRate: r.withinRate || 0,
+        })),
+      },
     },
   });
 };

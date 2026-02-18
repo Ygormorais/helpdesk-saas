@@ -108,6 +108,11 @@ export interface ReportsData {
   sla: ReportsSlaData;
   slaTrend: ReportsSlaTrendPoint[];
   agents: ReportsAgentData[];
+  premium?: {
+    csatByAgent?: Array<{ id: string; name: string; avgRating: number; count: number }>;
+    csatByCategory?: Array<{ id: string; name: string; avgRating: number; count: number }>;
+    slaByCategory?: Array<{ id: string; name: string; withinRate: number; totalResolved: number }>;
+  };
 }
 
 export const analyticsApi = {

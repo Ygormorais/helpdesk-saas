@@ -26,6 +26,9 @@ type Props = {
   priorityBarData: any[];
   satisfactionBarData: any[];
   categoryBarData: any[];
+  csatByAgentData: Array<{ name: string; avgRating: number; count: number }>;
+  csatByCategoryData: Array<{ name: string; avgRating: number; count: number }>;
+  slaByCategoryData: Array<{ name: string; withinRate: number; totalResolved: number }>;
   satisfactionAverage: number;
   onExportTrend: () => void;
   onExportStatus: () => void;
@@ -43,6 +46,9 @@ export default function ReportsCharts({
   priorityBarData,
   satisfactionBarData,
   categoryBarData,
+  csatByAgentData,
+  csatByCategoryData,
+  slaByCategoryData,
   satisfactionAverage,
   onExportTrend,
   onExportStatus,
@@ -209,6 +215,64 @@ export default function ReportsCharts({
           </CardContent>
         </Card>
       </div>
+
+      {(csatByAgentData.length > 0 || csatByCategoryData.length > 0 || slaByCategoryData.length > 0) && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>CSAT por agente</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={csatByAgentData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis domain={[0, 5]} />
+                  <Tooltip />
+                  <Bar dataKey="avgRating" fill="#10B981" />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="text-xs text-muted-foreground mt-2">Media de avaliacao (1 a 5)</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>CSAT por categoria</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={csatByCategoryData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis domain={[0, 5]} />
+                  <Tooltip />
+                  <Bar dataKey="avgRating" fill="#3B82F6" />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="text-xs text-muted-foreground mt-2">Media de avaliacao (1 a 5)</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>SLA por categoria</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={slaByCategoryData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip />
+                  <Bar dataKey="withinRate" fill="#F59E0B" />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="text-xs text-muted-foreground mt-2">% de resolucoes dentro do prazo</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
