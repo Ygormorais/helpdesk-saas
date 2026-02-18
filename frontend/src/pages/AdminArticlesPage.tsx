@@ -23,9 +23,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { articlesApi } from '@/api/articles';
 import { categoriesApi } from '@/api/categories';
 import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function AdminArticlesPage() {
   const [search, setSearch] = useState('');
@@ -246,13 +249,56 @@ export default function AdminArticlesPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="content">Conteúdo (Markdown)</Label>
-                <Textarea
-                  id="content"
-                  placeholder="Digite o conteúdo do artigo..."
-                  value={newArticle.content}
-                  onChange={(e) => setNewArticle({ ...newArticle, content: e.target.value })}
-                  rows={10}
-                />
+                <Tabs defaultValue="edit">
+                  <TabsList>
+                    <TabsTrigger value="edit">Editar</TabsTrigger>
+                    <TabsTrigger value="preview">Preview</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="edit">
+                    <Textarea
+                      id="content"
+                      placeholder="Digite o conteúdo do artigo..."
+                      value={newArticle.content}
+                      onChange={(e) => setNewArticle({ ...newArticle, content: e.target.value })}
+                      rows={10}
+                    />
+                  </TabsContent>
+                  <TabsContent value="preview">
+                    <Card>
+                      <CardContent className="p-4 prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          disallowedElements={['img']}
+                          unwrapDisallowed
+                          components={{
+                            a: ({ href, children, ...props }: any) => {
+                              const raw = String(href || '').trim();
+                              const isInternal = raw.startsWith('/') || raw.startsWith('#');
+                              const isHttp = raw.startsWith('http://') || raw.startsWith('https://');
+                              const isMail = raw.startsWith('mailto:');
+                              const safe = isInternal || isHttp || isMail;
+
+                              if (!safe) return <span>{children}</span>;
+                              const external = isHttp;
+                              return (
+                                <a
+                                  href={raw}
+                                  target={external ? '_blank' : undefined}
+                                  rel={external ? 'noopener noreferrer nofollow' : undefined}
+                                  {...props}
+                                >
+                                  {children}
+                                </a>
+                              );
+                            },
+                          }}
+                        >
+                          {newArticle.content || ''}
+                        </ReactMarkdown>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
             <DialogFooter>
