@@ -32,11 +32,11 @@ export const submitSatisfactionSurvey = async (
     });
 
     if (!ticket) {
-      throw new AppError('Ticket not found', 404);
+      throw new AppError('Ticket nao encontrado', 404);
     }
 
     if (ticket.status !== 'resolved' && ticket.status !== 'closed') {
-      throw new AppError('Survey can only be submitted for resolved/closed tickets', 400);
+      throw new AppError('Pesquisa so pode ser enviada para tickets resolvidos/fechados', 400);
     }
 
     if (ticket.satisfaction?.rating) {
@@ -52,12 +52,12 @@ export const submitSatisfactionSurvey = async (
     await ticket.save();
 
     res.json({
-      message: 'Survey submitted successfully',
+      message: 'Pesquisa enviada com sucesso',
       satisfaction: ticket.satisfaction,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -136,7 +136,7 @@ export const getSatisfactionStats = async (
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Invalid query parameters', errors: error.errors });
+      res.status(400).json({ message: 'Parametros de consulta invalidos', errors: error.errors });
       return;
     }
     throw error;
@@ -156,7 +156,7 @@ export const getTicketSatisfaction = async (
   }).select('satisfaction');
 
   if (!ticket) {
-    throw new AppError('Ticket not found', 404);
+    throw new AppError('Ticket nao encontrado', 404);
   }
 
   res.json({ satisfaction: ticket.satisfaction });

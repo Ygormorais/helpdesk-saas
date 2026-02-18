@@ -29,15 +29,15 @@ export const createChat = async (
     }).select('_id role');
 
     if (!participant) {
-      throw new AppError('Participant not found', 404);
+      throw new AppError('Participante nao encontrado', 404);
     }
 
     if (!data.ticketId) {
       if (user.role === 'client') {
-        throw new AppError('Forbidden', 403);
+        throw new AppError('Acesso negado', 403);
       }
       if (participant.role === 'client') {
-        throw new AppError('Internal chat can only be created with staff', 400);
+        throw new AppError('Chat interno so pode ser criado com equipe', 400);
       }
     }
 
@@ -54,7 +54,7 @@ export const createChat = async (
         .select('_id createdBy assignedTo');
 
       if (!ticket) {
-        throw new AppError('Ticket not found', 404);
+        throw new AppError('Ticket nao encontrado', 404);
       }
 
       const createdById = ticket.createdBy?.toString();
@@ -78,7 +78,7 @@ export const createChat = async (
     res.status(201).json({ chat });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -96,7 +96,7 @@ export const getMyChats = async (
 
   if (scope === 'internal') {
     if (user.role === 'client') {
-      throw new AppError('Forbidden', 403);
+      throw new AppError('Acesso negado', 403);
     }
     await chatService.ensureDefaultInternalChannels(user.tenant._id.toString());
   }
@@ -134,7 +134,7 @@ export const getChatMessages = async (
   });
 
   if (!chat) {
-    throw new AppError('Chat not found', 404);
+    throw new AppError('Chat nao encontrado', 404);
   }
 
   const result = await chatService.getChatMessages(
@@ -163,7 +163,7 @@ export const sendMessage = async (
     });
 
     if (!chat) {
-      throw new AppError('Chat not found or closed', 404);
+      throw new AppError('Chat nao encontrado ou fechado', 404);
     }
 
     const message = await Message.create({
@@ -187,7 +187,7 @@ export const sendMessage = async (
     res.status(201).json({ message });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -208,13 +208,13 @@ export const closeChat = async (
   });
 
   if (!chat) {
-    throw new AppError('Chat not found', 404);
+    throw new AppError('Chat nao encontrado', 404);
   }
 
   chat.status = 'closed';
   await chat.save();
 
-  res.json({ message: 'Chat closed', chat });
+  res.json({ message: 'Chat fechado', chat });
 };
 
 export const getOnlineUsers = async (

@@ -41,7 +41,7 @@ export const errorHandler = (
 
   if (err instanceof ZodError) {
     res.status(400).json({
-      message: 'Validation error',
+      message: 'Erro de validacao',
       errors: err.errors,
       requestId,
     });
@@ -50,7 +50,7 @@ export const errorHandler = (
 
   if (err instanceof mongoose.Error.ValidationError) {
     res.status(400).json({
-      message: 'Validation Error',
+      message: 'Erro de validacao',
       errors: Object.values(err.errors).map((e) => e.message),
       requestId,
     });
@@ -67,21 +67,21 @@ export const errorHandler = (
 
   if (err instanceof mongoose.Error.CastError) {
     res.status(400).json({
-      message: 'Invalid ID format',
+      message: 'Formato de ID invalido',
       requestId,
     });
     return;
   }
 
   res.status(500).json({
-    message: 'Internal Server Error',
+    message: 'Erro interno do servidor',
     requestId,
   });
 };
 
 export const notFound = (req: Request, res: Response): void => {
   res.status(404).json({
-    message: `Route ${req.originalUrl} not found`,
+    message: `Rota ${req.originalUrl} nao encontrada`,
     requestId: (req as any).requestId,
   });
 };

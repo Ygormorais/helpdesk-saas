@@ -164,12 +164,12 @@ export const createTicket = async (
     );
 
     res.status(201).json({
-      message: 'Ticket created successfully',
+      message: 'Ticket criado com sucesso',
       ticket,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -258,7 +258,7 @@ export const getTicketById = async (
     .populate('assignedTo', 'name email avatar');
 
   if (!ticket) {
-    throw new AppError('Ticket not found', 404);
+    throw new AppError('Ticket nao encontrado', 404);
   }
 
   const commentQuery: any = { ticket: ticket._id, tenant: user.tenant._id };
@@ -287,7 +287,7 @@ export const updateTicket = async (
   });
 
   if (!ticket) {
-    throw new AppError('Ticket not found', 404);
+    throw new AppError('Ticket nao encontrado', 404);
   }
 
   const tenant = user.tenant as any;
@@ -300,7 +300,7 @@ export const updateTicket = async (
   if (updates.assignedTo && updates.assignedTo !== oldAssignedTo) {
     newAssignee = await User.findOne({ _id: updates.assignedTo, tenant: user.tenant._id }).select('name role');
     if (!newAssignee) {
-      throw new AppError('Assigned user not found', 400);
+      throw new AppError('Usuario atribuido nao encontrado', 400);
     }
     if (!['admin', 'manager', 'agent'].includes(newAssignee.role)) {
       throw new AppError('Assigned user must be staff', 400);
@@ -464,7 +464,7 @@ export const updateTicket = async (
     );
   }
 
-  res.json({ message: 'Ticket updated successfully', ticket });
+  res.json({ message: 'Ticket atualizado com sucesso', ticket });
 };
 
 export const reopenTicket = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -478,11 +478,11 @@ export const reopenTicket = async (req: AuthRequest, res: Response): Promise<voi
 
   const ticket = await Ticket.findOne(query);
   if (!ticket) {
-    throw new AppError('Ticket not found', 404);
+    throw new AppError('Ticket nao encontrado', 404);
   }
 
   if (ticket.status !== TicketStatus.RESOLVED && ticket.status !== TicketStatus.CLOSED) {
-    throw new AppError('Ticket is not resolved/closed', 400);
+    throw new AppError('Ticket nao esta resolvido/fechado', 400);
   }
 
   const now = new Date();
@@ -513,7 +513,7 @@ export const reopenTicket = async (req: AuthRequest, res: Response): Promise<voi
     { user, ip: req.ip, userAgent: req.get('user-agent') }
   );
 
-  res.json({ message: 'Ticket reopened', ticket });
+  res.json({ message: 'Ticket reaberto', ticket });
 };
 
 export const addComment = async (
@@ -537,11 +537,11 @@ export const addComment = async (
   const ticket = await Ticket.findOne(ticketQuery);
 
   if (!ticket) {
-    throw new AppError('Ticket not found', 404);
+    throw new AppError('Ticket nao encontrado', 404);
   }
 
   if (ticket.status === TicketStatus.RESOLVED || ticket.status === TicketStatus.CLOSED) {
-    throw new AppError('Cannot add comment to resolved/closed ticket', 400);
+    throw new AppError('Nao e possivel adicionar comentario em ticket resolvido/fechado', 400);
   }
 
   const comment = await Comment.create({
@@ -616,14 +616,14 @@ export const addComment = async (
     { user, ip: req.ip, userAgent: req.get('user-agent') }
   );
 
-  res.status(201).json({ message: 'Comment added', comment });
+  res.status(201).json({ message: 'Comentario adicionado', comment });
 };
 
 export const exportTicketsCsv = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
   const parsed = exportTicketsQuerySchema.safeParse(req.query);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Invalid query', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Consulta invalida', errors: parsed.error.errors });
     return;
   }
 
@@ -638,12 +638,12 @@ export const exportTicketsCsv = async (req: AuthRequest, res: Response): Promise
       endExclusive = new Date(end.getTime() + 24 * 60 * 60 * 1000);
     }
   } catch {
-    res.status(400).json({ message: 'Invalid date (use YYYY-MM-DD)' });
+    res.status(400).json({ message: 'Data invalida (use YYYY-MM-DD)' });
     return;
   }
 
   if (start && endExclusive && endExclusive.getTime() < start.getTime()) {
-    res.status(400).json({ message: 'endDate must be >= startDate' });
+    res.status(400).json({ message: 'endDate deve ser maior ou igual a startDate' });
     return;
   }
 

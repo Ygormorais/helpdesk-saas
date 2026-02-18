@@ -48,10 +48,10 @@ export const createCategory = async (
       tenant: user.tenant._id,
     });
 
-    res.status(201).json({ message: 'Category created', category });
+    res.status(201).json({ message: 'Categoria criada', category });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -88,13 +88,13 @@ export const updateCategory = async (
   });
 
   if (!category) {
-    throw new AppError('Category not found', 404);
+    throw new AppError('Categoria nao encontrada', 404);
   }
 
   Object.assign(category, updates);
   await category.save();
 
-  res.json({ message: 'Category updated', category });
+  res.json({ message: 'Categoria atualizada', category });
 };
 
 export const deleteCategory = async (
@@ -110,8 +110,8 @@ export const deleteCategory = async (
   });
 
   if (!category) {
-    throw new AppError('Category not found', 404);
+    throw new AppError('Categoria nao encontrada', 404);
   }
 
-  res.json({ message: 'Category deleted' });
+  res.json({ message: 'Categoria removida' });
 };

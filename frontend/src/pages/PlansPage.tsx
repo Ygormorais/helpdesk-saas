@@ -620,7 +620,7 @@ export default function PlansPage() {
 
                   return (
                     <div className="md:col-span-3 text-xs text-muted-foreground">
-                      Totais (inclui assinaturas ativas): agentes {oneTimeAgents + recurringAgents} • storage {oneTimeStorage + recurringStorage}MB • AI {oneTimeAi + recurringAi}
+                      Totais (inclui assinaturas ativas): agentes {oneTimeAgents + recurringAgents} • armazenamento {oneTimeStorage + recurringStorage}MB • IA {oneTimeAi + recurringAi}
                     </div>
                   );
                 })()}
@@ -629,11 +629,11 @@ export default function PlansPage() {
                   <p className="text-sm font-medium">{Number(currentPlan.addons.extraAgents || 0)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Extra storage (MB)</p>
+                  <p className="text-xs text-muted-foreground">Extra armazenamento (MB)</p>
                   <p className="text-sm font-medium">{Number(currentPlan.addons.extraStorage || 0)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">AI credits</p>
+                  <p className="text-xs text-muted-foreground">Creditos de IA</p>
                   <p className="text-sm font-medium">{Number(currentPlan.addons.aiCredits || 0)}</p>
                 </div>
               </CardContent>
@@ -651,8 +651,8 @@ export default function PlansPage() {
 
                 const parts: string[] = [];
                 if (Number(r.extraAgents || 0)) parts.push(`+${Number(r.extraAgents || 0)} agentes`);
-                if (Number(r.extraStorage || 0)) parts.push(`+${Number(r.extraStorage || 0)}MB storage`);
-                if (Number(r.aiCredits || 0)) parts.push(`+${Number(r.aiCredits || 0)} AI`);
+                if (Number(r.extraStorage || 0)) parts.push(`+${Number(r.extraStorage || 0)}MB armazenamento`);
+                if (Number(r.aiCredits || 0)) parts.push(`+${Number(r.aiCredits || 0)} IA`);
 
                 return (
                   <div key={r.subscriptionId} className="flex items-start justify-between gap-3 rounded-lg border p-3">
@@ -663,7 +663,7 @@ export default function PlansPage() {
                           variant="secondary"
                           className={effective ? 'bg-transparent border border-border text-foreground' : 'bg-muted text-muted-foreground'}
                         >
-                          {statusRaw ? statusRaw.toUpperCase() : 'UNKNOWN'}
+                          {statusRaw ? statusRaw.toUpperCase() : 'DESCONHECIDO'}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -789,7 +789,7 @@ export default function PlansPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">{plan.limits.storage} de storage</span>
+                    <span className="text-sm">{plan.limits.storage} de armazenamento</span>
                   </div>
                 </div>
 

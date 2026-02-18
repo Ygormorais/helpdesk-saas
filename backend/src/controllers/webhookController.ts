@@ -53,7 +53,7 @@ export const createWebhook = async (
     const user = req.user!;
 
     if (!['admin', 'manager'].includes(user.role)) {
-      throw new AppError('Insufficient permissions', 403);
+      throw new AppError('Permissoes insuficientes', 403);
     }
 
     const webhook = await webhookService.createWebhook({
@@ -65,7 +65,7 @@ export const createWebhook = async (
     });
 
     res.status(201).json({
-      message: 'Webhook created',
+      message: 'Webhook criado',
       webhook: {
         id: webhook._id,
         name: webhook.name,
@@ -77,7 +77,7 @@ export const createWebhook = async (
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -94,7 +94,7 @@ export const updateWebhook = async (
     const user = req.user!;
 
     if (!['admin', 'manager'].includes(user.role)) {
-      throw new AppError('Insufficient permissions', 403);
+      throw new AppError('Permissoes insuficientes', 403);
     }
 
     const webhook = await Webhook.findOne({
@@ -103,7 +103,7 @@ export const updateWebhook = async (
     });
 
     if (!webhook) {
-      throw new AppError('Webhook not found', 404);
+      throw new AppError('Webhook nao encontrado', 404);
     }
 
     if (data.name) webhook.name = data.name;
@@ -114,10 +114,10 @@ export const updateWebhook = async (
 
     await webhook.save();
 
-    res.json({ message: 'Webhook updated', webhook: { id: webhook._id, name: webhook.name, isActive: webhook.isActive } });
+    res.json({ message: 'Webhook atualizado', webhook: { id: webhook._id, name: webhook.name, isActive: webhook.isActive } });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -132,7 +132,7 @@ export const deleteWebhook = async (
   const user = req.user!;
 
   if (!['admin', 'manager'].includes(user.role)) {
-    throw new AppError('Insufficient permissions', 403);
+    throw new AppError('Permissoes insuficientes', 403);
   }
 
   const webhook = await Webhook.findOneAndDelete({
@@ -141,10 +141,10 @@ export const deleteWebhook = async (
   });
 
   if (!webhook) {
-    throw new AppError('Webhook not found', 404);
+    throw new AppError('Webhook nao encontrado', 404);
   }
 
-  res.json({ message: 'Webhook deleted' });
+  res.json({ message: 'Webhook removido' });
 };
 
 export const testWebhook = async (
@@ -160,7 +160,7 @@ export const testWebhook = async (
   });
 
   if (!webhook) {
-    throw new AppError('Webhook not found', 404);
+    throw new AppError('Webhook nao encontrado', 404);
   }
 
   const result = await webhookService.testWebhook(webhook);

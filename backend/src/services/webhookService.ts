@@ -88,7 +88,7 @@ export class WebhookService {
       event: 'test',
       timestamp: new Date().toISOString(),
       data: {
-        message: 'This is a test webhook delivery',
+        message: 'Este e um envio de webhook de teste',
       },
     };
 

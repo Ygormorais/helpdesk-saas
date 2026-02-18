@@ -56,7 +56,7 @@ export const aiSearchLimiter = prodRateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many search requests',
+  message: 'Muitas requisicoes de busca',
   keyGenerator: keyWithUser,
 });
 
@@ -65,7 +65,7 @@ export const articleFeedbackLimiter = prodRateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many feedback requests',
+  message: 'Muitas requisicoes de feedback',
   keyGenerator: keyWithUser,
 });
 
@@ -74,7 +74,7 @@ export const commentLimiter = prodRateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many comment requests',
+  message: 'Muitas requisicoes de comentario',
   keyGenerator: keyWithUser,
 });
 
@@ -83,6 +83,6 @@ export const billingWebhookLimiter = prodRateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many webhook requests',
+  message: 'Muitas requisicoes de webhook',
   keyGenerator: (req: any) => `asaas:${req.ip}`,
 });

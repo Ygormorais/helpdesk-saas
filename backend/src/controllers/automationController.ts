@@ -24,7 +24,7 @@ const createSchema = z.object({
 const updateSchema = createSchema
   .omit({ trigger: true })
   .partial()
-  .refine((v) => Object.keys(v).length > 0, { message: 'No updates provided' });
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nenhuma atualizacao fornecida' });
 
 export const listAutomationRules = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
@@ -51,12 +51,12 @@ export const createAutomationRule = async (req: AuthRequest, res: Response): Pro
   const user = req.user!;
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
   if (!parsed.data.actions.assignTo && !parsed.data.actions.setStatus) {
-    res.status(400).json({ message: 'At least one action is required' });
+    res.status(400).json({ message: 'Pelo menos uma acao e obrigatoria' });
     return;
   }
 
@@ -91,12 +91,12 @@ export const updateAutomationRule = async (req: AuthRequest, res: Response): Pro
   const { id } = req.params;
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
   const rule = await AutomationRule.findOne({ _id: id, tenant: user.tenant._id });
-  if (!rule) throw new AppError('Rule not found', 404);
+  if (!rule) throw new AppError('Regra nao encontrada', 404);
 
   if (parsed.data.name !== undefined) rule.name = parsed.data.name;
   if (parsed.data.isActive !== undefined) rule.isActive = parsed.data.isActive;
@@ -122,6 +122,6 @@ export const deleteAutomationRule = async (req: AuthRequest, res: Response): Pro
   const user = req.user!;
   const { id } = req.params;
   const out = await AutomationRule.deleteOne({ _id: id, tenant: user.tenant._id });
-  if (out.deletedCount === 0) throw new AppError('Rule not found', 404);
+  if (out.deletedCount === 0) throw new AppError('Regra nao encontrada', 404);
   res.json({ success: true });
 };

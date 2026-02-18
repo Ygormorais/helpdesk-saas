@@ -17,7 +17,7 @@ export const authenticate = async (
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ message: 'Nao autorizado' });
       return;
     }
 
@@ -31,7 +31,7 @@ export const authenticate = async (
     const user = await User.findById(decoded.userId).populate('tenant');
 
     if (!user || !user.isActive) {
-      res.status(401).json({ message: 'User not found or inactive' });
+      res.status(401).json({ message: 'Usuario nao encontrado ou inativo' });
       return;
     }
 
@@ -40,7 +40,7 @@ export const authenticate = async (
       : String(user.tenant as any);
 
     if (decoded.tenantId && userTenantId !== decoded.tenantId) {
-      res.status(401).json({ message: 'Invalid token' });
+      res.status(401).json({ message: 'Token invalido' });
       return;
     }
 
@@ -53,19 +53,19 @@ export const authenticate = async (
 
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({ message: 'Token invalido' });
   }
 };
 
 export const authorize = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ message: 'Nao autorizado' });
       return;
     }
 
     if (!roles.includes(req.user.role)) {
-      res.status(403).json({ message: 'Forbidden' });
+      res.status(403).json({ message: 'Acesso negado' });
       return;
     }
 

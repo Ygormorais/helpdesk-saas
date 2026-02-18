@@ -43,7 +43,7 @@ export const register = async (
 
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
-      throw new AppError('Email already registered', 400);
+      throw new AppError('Email ja cadastrado', 400);
     }
 
     const tenant = await Tenant.create({
@@ -65,7 +65,7 @@ export const register = async (
     const token = generateToken(user._id.toString(), tenant._id.toString());
 
     res.status(201).json({
-      message: 'User registered successfully',
+      message: 'Usuario registrado com sucesso',
       token,
       user: {
         id: user._id,
@@ -80,7 +80,7 @@ export const register = async (
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -97,16 +97,16 @@ export const login = async (
 
     const user = await User.findOne({ email: normalizedEmail }).populate('tenant');
     if (!user) {
-      throw new AppError('Invalid credentials', 401);
+      throw new AppError('Credenciais invalidas', 401);
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      throw new AppError('Invalid credentials', 401);
+      throw new AppError('Credenciais invalidas', 401);
     }
 
     if (!user.isActive) {
-      throw new AppError('Account is inactive', 401);
+      throw new AppError('Conta inativa', 401);
     }
 
     const tenant = user.tenant as any;
@@ -114,7 +114,7 @@ export const login = async (
     const token = generateToken(user._id.toString(), tenant._id.toString());
 
     res.json({
-      message: 'Login successful',
+      message: 'Login realizado com sucesso',
       token,
       user: {
         id: user._id,
@@ -131,7 +131,7 @@ export const login = async (
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -147,23 +147,23 @@ export const registerInvite = async (
 
     const invite = await Invite.findOne({ token, status: 'pending' }).populate('tenant');
     if (!invite) {
-      throw new AppError('Invalid or expired invite', 400);
+      throw new AppError('Convite invalido ou expirado', 400);
     }
 
     if (new Date() > invite.expiresAt) {
       invite.status = 'expired';
       await invite.save();
-      throw new AppError('Invite has expired', 400);
+      throw new AppError('Convite expirado', 400);
     }
 
     const existingUser = await User.findOne({ email: invite.email });
     if (existingUser) {
-      throw new AppError('Email already registered', 400);
+      throw new AppError('Email ja cadastrado', 400);
     }
 
     const tenant: any = invite.tenant as any;
     if (!tenant?._id) {
-      throw new AppError('Tenant not found', 400);
+      throw new AppError('Tenant nao encontrado', 400);
     }
 
     const user = await User.create({
@@ -180,7 +180,7 @@ export const registerInvite = async (
     const jwtToken = generateToken(user._id.toString(), tenant._id.toString());
 
     res.status(201).json({
-      message: 'User registered successfully',
+      message: 'Usuario registrado com sucesso',
       token: jwtToken,
       user: {
         id: user._id,
@@ -196,7 +196,7 @@ export const registerInvite = async (
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -209,7 +209,7 @@ export const getMe = async (
 ): Promise<void> => {
   const user = req.user;
   if (!user) {
-    res.status(401).json({ message: 'Unauthorized' });
+    res.status(401).json({ message: 'Nao autorizado' });
     return;
   }
 

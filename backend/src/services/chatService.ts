@@ -24,7 +24,7 @@ class ChatService {
 
       socket.on('join-chat', async (chatId: string) => {
         const user = this.connectedUsers.get(socket.id);
-        if (!user) return socket.emit('error', { message: 'Not authenticated' });
+        if (!user) return socket.emit('error', { message: 'Nao autenticado' });
 
         const chat = await Chat.findOne({
           _id: chatId,
@@ -33,7 +33,7 @@ class ChatService {
           status: 'active',
         }).select('_id');
 
-        if (!chat) return socket.emit('error', { message: 'Forbidden' });
+        if (!chat) return socket.emit('error', { message: 'Acesso negado' });
 
         socket.join(`chat:${chatId}`);
       });
@@ -60,7 +60,7 @@ class ChatService {
 
       socket.on('mark-read', async (data: { chatId: string }) => {
         const user = this.connectedUsers.get(socket.id);
-        if (!user) return socket.emit('error', { message: 'Not authenticated' });
+        if (!user) return socket.emit('error', { message: 'Nao autenticado' });
         await this.markMessagesAsRead(data.chatId, user.userId, user.tenantId);
       });
 
@@ -103,7 +103,7 @@ class ChatService {
 
       this.emitOnlineUsers(decoded.tenantId);
     } catch (error) {
-      socket.emit('authenticated', { success: false, error: 'Invalid token' });
+      socket.emit('authenticated', { success: false, error: 'Token invalido' });
     }
   }
 
@@ -116,7 +116,7 @@ class ChatService {
     try {
       const user = this.connectedUsers.get(socket.id);
       if (!user) {
-        socket.emit('error', { message: 'Not authenticated' });
+        socket.emit('error', { message: 'Nao autenticado' });
         return;
       }
 
@@ -128,7 +128,7 @@ class ChatService {
       });
 
       if (!chat) {
-        socket.emit('error', { message: 'Forbidden' });
+        socket.emit('error', { message: 'Acesso negado' });
         return;
       }
 
@@ -190,7 +190,7 @@ class ChatService {
        }
 
     } catch (error) {
-      socket.emit('error', { message: 'Failed to send message' });
+      socket.emit('error', { message: 'Falha ao enviar mensagem' });
     }
   }
 

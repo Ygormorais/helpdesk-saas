@@ -20,7 +20,7 @@ export const createInvite = async (
     const user = req.user!;
 
     if (!['admin', 'manager'].includes(user.role)) {
-      throw new AppError('Insufficient permissions', 403);
+      throw new AppError('Permissoes insuficientes', 403);
     }
 
     const normalizedEmail = data.email.trim().toLowerCase();
@@ -30,7 +30,7 @@ export const createInvite = async (
     });
 
     if (existingUser) {
-      throw new AppError('Email already registered', 400);
+      throw new AppError('Email ja cadastrado', 400);
     }
 
     const existingInvite = await Invite.findOne({
@@ -40,7 +40,7 @@ export const createInvite = async (
     });
 
     if (existingInvite) {
-      throw new AppError('Invite already sent', 400);
+      throw new AppError('Convite ja enviado', 400);
     }
 
     const token = uuidv4();
@@ -61,7 +61,7 @@ export const createInvite = async (
     }
 
     res.status(201).json({
-      message: 'Invite sent',
+      message: 'Convite enviado',
       invite: {
         id: invite._id,
         email: invite.email,
@@ -71,7 +71,7 @@ export const createInvite = async (
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -99,7 +99,7 @@ export const cancelInvite = async (
   const user = req.user!;
 
   if (!['admin', 'manager'].includes(user.role)) {
-    throw new AppError('Insufficient permissions', 403);
+    throw new AppError('Permissoes insuficientes', 403);
   }
 
   const invite = await Invite.findOneAndUpdate(
@@ -109,10 +109,10 @@ export const cancelInvite = async (
   );
 
   if (!invite) {
-    throw new AppError('Invite not found or already processed', 404);
+    throw new AppError('Convite nao encontrado ou ja processado', 404);
   }
 
-  res.json({ message: 'Invite cancelled' });
+  res.json({ message: 'Convite cancelado' });
 };
 
 export const resendInvite = async (
@@ -123,7 +123,7 @@ export const resendInvite = async (
   const user = req.user!;
 
   if (!['admin', 'manager'].includes(user.role)) {
-    throw new AppError('Insufficient permissions', 403);
+    throw new AppError('Permissoes insuficientes', 403);
   }
 
   const invite = await Invite.findOne({
@@ -133,7 +133,7 @@ export const resendInvite = async (
   });
 
   if (!invite) {
-    throw new AppError('Invite not found or already processed', 404);
+    throw new AppError('Convite nao encontrado ou ja processado', 404);
   }
 
   const token = uuidv4();
@@ -148,7 +148,7 @@ export const resendInvite = async (
     await notificationService.notifyUserInvited(invite.email, user, tenant, invite.role, token);
   }
 
-  res.json({ message: 'Invite resent' });
+  res.json({ message: 'Convite reenviado' });
 };
 
 export const acceptInvite = async (
@@ -158,7 +158,7 @@ export const acceptInvite = async (
   const { token } = req.body;
 
   if (!token) {
-    throw new AppError('Token is required', 400);
+    throw new AppError('Token obrigatorio', 400);
   }
 
   const invite = await Invite.findOne({ token, status: 'pending' })
@@ -166,13 +166,13 @@ export const acceptInvite = async (
     .populate('invitedBy', 'name');
 
   if (!invite) {
-    throw new AppError('Invalid or expired invite', 400);
+    throw new AppError('Convite invalido ou expirado', 400);
   }
 
   if (new Date() > invite.expiresAt) {
     invite.status = 'expired';
     await invite.save();
-    throw new AppError('Invite has expired', 400);
+    throw new AppError('Convite expirado', 400);
   }
 
   res.json({

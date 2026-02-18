@@ -50,7 +50,7 @@ async function upsertFeedbackAndUpdateCounters(params: {
 
   const article = await Article.findOne({ _id: articleId, tenant: tenantId });
   if (!article) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   const existing = await ArticleFeedback.findOne({
@@ -120,10 +120,10 @@ export const createArticle = async (
       { user, ip: req.ip, userAgent: req.get('user-agent') }
     );
 
-    res.status(201).json({ message: 'Article created', article });
+    res.status(201).json({ message: 'Artigo criado', article });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -195,7 +195,7 @@ export const getArticleBySlug = async (
     .populate('category', 'name color');
 
   if (!article) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   article.views += 1;
@@ -260,7 +260,7 @@ export const searchArticlesAi = async (req: AuthRequest, res: Response): Promise
   const user = req.user!;
   const parsed = searchAiSchema.safeParse(req.query);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
@@ -289,7 +289,7 @@ export const updateArticle = async (
   });
 
   if (!article) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   Object.assign(article, updates);
@@ -309,7 +309,7 @@ export const updateArticle = async (
     { user, ip: req.ip, userAgent: req.get('user-agent') }
   );
 
-  res.json({ message: 'Article updated', article });
+  res.json({ message: 'Artigo atualizado', article });
 };
 
 export const deleteArticle = async (
@@ -325,7 +325,7 @@ export const deleteArticle = async (
   });
 
   if (!article) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   await auditService.log(
@@ -339,7 +339,7 @@ export const deleteArticle = async (
     { user, ip: req.ip, userAgent: req.get('user-agent') }
   );
 
-  res.json({ message: 'Article deleted' });
+  res.json({ message: 'Artigo removido' });
 };
 
 export const voteArticle = async (
@@ -350,7 +350,7 @@ export const voteArticle = async (
   const { id } = req.params;
   const parsed = articleFeedbackSchema.pick({ helpful: true }).safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
@@ -362,7 +362,7 @@ export const voteArticle = async (
   });
 
   const article = await Article.findOne({ _id: id, tenant: user.tenant._id }).select('helpful');
-  res.json({ message: 'Vote recorded', helpful: article?.helpful });
+  res.json({ message: 'Voto registrado', helpful: article?.helpful });
 };
 
 export const submitArticleFeedback = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -371,7 +371,7 @@ export const submitArticleFeedback = async (req: AuthRequest, res: Response): Pr
 
   const parsed = articleFeedbackSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
@@ -393,7 +393,7 @@ export const listArticleFeedback = async (req: AuthRequest, res: Response): Prom
 
   const article = await Article.findOne({ _id: id, tenant: user.tenant._id }).select('_id helpful');
   if (!article) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   const query: any = {
@@ -458,13 +458,13 @@ export const addRelatedTicket = async (req: AuthRequest, res: Response): Promise
   const bodySchema = z.object({ ticketId: z.string().min(1) });
   const parsed = bodySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
   const ticket = await Ticket.findOne({ _id: parsed.data.ticketId, tenant: user.tenant._id }).select('_id');
   if (!ticket) {
-    throw new AppError('Ticket not found', 404);
+    throw new AppError('Ticket nao encontrado', 404);
   }
 
   const out = await Article.updateOne(
@@ -473,7 +473,7 @@ export const addRelatedTicket = async (req: AuthRequest, res: Response): Promise
   );
 
   if (out.matchedCount === 0) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   res.json({ success: true });
@@ -489,7 +489,7 @@ export const removeRelatedTicket = async (req: AuthRequest, res: Response): Prom
   );
 
   if (out.matchedCount === 0) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   res.json({ success: true });
@@ -501,7 +501,7 @@ export const getArticlesByTicket = async (req: AuthRequest, res: Response): Prom
 
   const ticket = await Ticket.findOne({ _id: ticketId, tenant: user.tenant._id }).select('_id');
   if (!ticket) {
-    throw new AppError('Ticket not found', 404);
+    throw new AppError('Ticket nao encontrado', 404);
   }
 
   const articles = await Article.find({
@@ -528,7 +528,7 @@ export const getRelatedArticles = async (req: AuthRequest, res: Response): Promi
   }).select('_id category tags');
 
   if (!current) {
-    throw new AppError('Article not found', 404);
+    throw new AppError('Artigo nao encontrado', 404);
   }
 
   const baseQuery: any = {

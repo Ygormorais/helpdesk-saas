@@ -24,7 +24,7 @@ describe('Auth Middleware', () => {
   it('should return 401 if no authorization header', async () => {
     await authenticate(req as Request, res as Response, next);
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Unauthorized' });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Nao autorizado' });
   });
 
   it('should return 401 if token is invalid', async () => {
@@ -84,7 +84,7 @@ describe('Authorization Middleware', () => {
     const middleware = authorize('admin', 'manager');
     await middleware(req as Request, res as Response, next);
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Forbidden' });
+    expect(res.json).toHaveBeenCalledWith({ message: 'Acesso negado' });
   });
 
   it('should call next if user role is allowed', async () => {

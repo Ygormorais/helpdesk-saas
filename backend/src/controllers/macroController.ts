@@ -12,7 +12,7 @@ const createSchema = z.object({
 });
 
 const updateSchema = createSchema.partial().refine((v) => Object.keys(v).length > 0, {
-  message: 'No updates provided',
+  message: 'Nenhuma atualizacao fornecida',
 });
 
 export const listMacros = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -45,7 +45,7 @@ export const createMacro = async (req: AuthRequest, res: Response): Promise<void
   const user = req.user!;
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
@@ -72,12 +72,12 @@ export const updateMacro = async (req: AuthRequest, res: Response): Promise<void
   const { id } = req.params;
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
   const macro = await Macro.findOne({ _id: id, tenant: user.tenant._id });
-  if (!macro) throw new AppError('Macro not found', 404);
+  if (!macro) throw new AppError('Macro nao encontrada', 404);
 
   if (parsed.data.name !== undefined) macro.name = parsed.data.name;
   if (parsed.data.content !== undefined) macro.content = parsed.data.content;
@@ -92,6 +92,6 @@ export const deleteMacro = async (req: AuthRequest, res: Response): Promise<void
   const user = req.user!;
   const { id } = req.params;
   const out = await Macro.deleteOne({ _id: id, tenant: user.tenant._id });
-  if (out.deletedCount === 0) throw new AppError('Macro not found', 404);
+  if (out.deletedCount === 0) throw new AppError('Macro nao encontrada', 404);
   res.json({ success: true });
 };

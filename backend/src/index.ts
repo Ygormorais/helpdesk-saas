@@ -52,7 +52,7 @@ if (config.nodeEnv === 'production') {
     max: 300,
     standardHeaders: true,
     legacyHeaders: false,
-    message: 'Too many requests from this IP',
+    message: 'Muitas requisicoes deste IP',
   });
   app.use('/api', limiter);
 }

@@ -19,7 +19,7 @@ export const listUsers = async (req: AuthRequest, res: Response): Promise<void> 
   const parsed = listUsersQuerySchema.safeParse(req.query);
 
   if (!parsed.success) {
-    res.status(400).json({ message: 'Invalid query', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Consulta invalida', errors: parsed.error.errors });
     return;
   }
 

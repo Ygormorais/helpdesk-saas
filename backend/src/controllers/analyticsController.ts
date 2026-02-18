@@ -397,7 +397,7 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
 
   const parsed = reportsQuerySchema.safeParse(req.query);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Invalid query', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Consulta invalida', errors: parsed.error.errors });
     return;
   }
 
@@ -414,12 +414,12 @@ export const getReports = async (req: AuthRequest, res: Response): Promise<void>
       : toUtcDayStart(new Date(now.getTime() - defaultDays * 24 * 60 * 60 * 1000));
     end = endDate ? parseDay(endDate) : toUtcDayStart(now);
   } catch {
-    res.status(400).json({ message: 'Invalid date (use YYYY-MM-DD)' });
+    res.status(400).json({ message: 'Data invalida (use YYYY-MM-DD)' });
     return;
   }
 
   if (end.getTime() < start.getTime()) {
-    res.status(400).json({ message: 'endDate must be >= startDate' });
+    res.status(400).json({ message: 'endDate deve ser maior ou igual a startDate' });
     return;
   }
 

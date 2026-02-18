@@ -25,11 +25,11 @@ const webhookSchema = new Schema<IWebhook>(
     url: {
       type: String,
       required: true,
-      validate: {
-        validator: (v: string) => /^https?:\/\/.+/.test(v),
-        message: 'Invalid URL format',
+        validate: {
+          validator: (v: string) => /^https?:\/\/.+/.test(v),
+          message: 'Formato de URL invalido',
+        },
       },
-    },
     secret: {
       type: String,
       required: true,

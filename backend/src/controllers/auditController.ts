@@ -24,7 +24,7 @@ export const getAuditLogs = async (
     const user = req.user!;
 
     if (!['admin', 'manager'].includes(user.role)) {
-      res.status(403).json({ message: 'Insufficient permissions' });
+      res.status(403).json({ message: 'Permissoes insuficientes' });
       return;
     }
 
@@ -40,7 +40,7 @@ export const getAuditLogs = async (
     res.json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Invalid query parameters', errors: error.errors });
+      res.status(400).json({ message: 'Parametros de consulta invalidos', errors: error.errors });
       return;
     }
     throw error;
@@ -53,7 +53,7 @@ export const exportAuditLogsCsv = async (req: AuthRequest, res: Response): Promi
     const user = req.user!;
 
     if (!['admin', 'manager'].includes(user.role)) {
-      res.status(403).json({ message: 'Insufficient permissions' });
+      res.status(403).json({ message: 'Permissoes insuficientes' });
       return;
     }
 
@@ -104,7 +104,7 @@ export const exportAuditLogsCsv = async (req: AuthRequest, res: Response): Promi
     res.send(csv);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Invalid query parameters', errors: error.errors });
+      res.status(400).json({ message: 'Parametros de consulta invalidos', errors: error.errors });
       return;
     }
     throw error;

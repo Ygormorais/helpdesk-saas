@@ -22,7 +22,7 @@ const createSchema = z.object({
     .optional(),
 });
 
-const updateSchema = createSchema.partial().refine((v) => Object.keys(v).length > 0, { message: 'No updates provided' });
+const updateSchema = createSchema.partial().refine((v) => Object.keys(v).length > 0, { message: 'Nenhuma atualizacao fornecida' });
 
 export const listReportSchedules = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
@@ -44,12 +44,12 @@ export const createReportSchedule = async (req: AuthRequest, res: Response): Pro
   const user = req.user!;
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
   if (parsed.data.frequency === 'weekly' && parsed.data.dayOfWeek === undefined) {
-    res.status(400).json({ message: 'dayOfWeek is required for weekly schedules' });
+    res.status(400).json({ message: 'dayOfWeek e obrigatorio para agendamentos semanais' });
     return;
   }
 
@@ -87,12 +87,12 @@ export const updateReportSchedule = async (req: AuthRequest, res: Response): Pro
   const { id } = req.params;
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
   const row = await ReportSchedule.findOne({ _id: id, tenant: user.tenant._id });
-  if (!row) throw new AppError('Schedule not found', 404);
+  if (!row) throw new AppError('Agendamento nao encontrado', 404);
 
   if (parsed.data.name !== undefined) row.name = parsed.data.name;
   if (parsed.data.isActive !== undefined) row.isActive = parsed.data.isActive;
@@ -120,6 +120,6 @@ export const deleteReportSchedule = async (req: AuthRequest, res: Response): Pro
   const user = req.user!;
   const { id } = req.params;
   const out = await ReportSchedule.deleteOne({ _id: id, tenant: user.tenant._id });
-  if (out.deletedCount === 0) throw new AppError('Schedule not found', 404);
+  if (out.deletedCount === 0) throw new AppError('Agendamento nao encontrado', 404);
   res.json({ success: true });
 };

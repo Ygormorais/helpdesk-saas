@@ -208,7 +208,7 @@ export const createAddOnCheckout = async (req: AuthRequest, res: Response): Prom
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
@@ -252,7 +252,7 @@ export const createAddOnSubscription = async (req: AuthRequest, res: Response): 
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
@@ -314,7 +314,7 @@ export const cancelAddOnSubscription = async (req: AuthRequest, res: Response): 
   const schema = z.object({ subscriptionId: z.string().min(1) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
     return;
   }
 
@@ -364,14 +364,14 @@ export const handleWebhook = async (
                 event: event ? String(event) : undefined,
                 tenant: tenantId || undefined,
                 resourceId: resourceId || undefined,
-                error: 'Unauthorized',
+                error: 'Nao autorizado',
                 processedAt: new Date(),
               },
             },
             { upsert: true }
           ).catch(() => undefined);
         }
-        res.status(401).json({ error: 'Unauthorized' });
+        res.status(401).json({ error: 'Nao autorizado' });
         return;
       }
     }

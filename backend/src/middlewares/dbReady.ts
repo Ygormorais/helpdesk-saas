@@ -14,7 +14,7 @@ export const requireDbConnection: RequestHandler = (req, res, next) => {
     (res as any).locals = (res as any).locals || {};
     (res as any).locals.errorCode = 'DB_NOT_READY';
     res.status(503).json({
-      message: 'Database not connected',
+      message: 'Banco de dados nao conectado',
       code: 'DB_NOT_READY',
     });
     return;

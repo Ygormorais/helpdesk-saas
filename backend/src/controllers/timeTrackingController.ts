@@ -35,7 +35,7 @@ export const startTimer = async (
     });
 
     if (!ticket) {
-      throw new AppError('Ticket not found', 404);
+      throw new AppError('Ticket nao encontrado', 404);
     }
 
     const existingTimer = await TimeEntry.findOne({
@@ -62,7 +62,7 @@ export const startTimer = async (
     res.status(201).json({ timeEntry });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -83,7 +83,7 @@ export const stopTimer = async (
   });
 
   if (!timeEntry) {
-    throw new AppError('Timer not found or already stopped', 404);
+    throw new AppError('Timer nao encontrado ou ja parado', 404);
   }
 
   timeEntry.endTime = new Date();
@@ -109,7 +109,7 @@ export const createManualEntry = async (
     });
 
     if (!ticket) {
-      throw new AppError('Ticket not found', 404);
+      throw new AppError('Ticket nao encontrado', 404);
     }
 
     const startTime = data.startTime ? new Date(data.startTime) : new Date();
@@ -133,7 +133,7 @@ export const createManualEntry = async (
     res.status(201).json({ timeEntry });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -156,7 +156,7 @@ export const updateTimeEntry = async (
     });
 
     if (!timeEntry) {
-      throw new AppError('Time entry not found', 404);
+      throw new AppError('Lancamento de tempo nao encontrado', 404);
     }
 
     if (data.description !== undefined) timeEntry.description = data.description;
@@ -172,7 +172,7 @@ export const updateTimeEntry = async (
     res.json({ timeEntry });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
       return;
     }
     throw error;
@@ -193,10 +193,10 @@ export const deleteTimeEntry = async (
   });
 
   if (!timeEntry) {
-    throw new AppError('Time entry not found', 404);
+    throw new AppError('Lancamento de tempo nao encontrado', 404);
   }
 
-  res.json({ message: 'Time entry deleted' });
+  res.json({ message: 'Lancamento de tempo removido' });
 };
 
 export const getTicketTimeEntries = async (
