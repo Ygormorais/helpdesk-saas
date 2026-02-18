@@ -1,9 +1,10 @@
 import { Response } from 'express';
-import { Ticket, TicketStatus, Comment, CommentType, User, TicketCounter } from '../models/index.js';
+import { Ticket, TicketStatus, Comment, CommentType, User, TicketCounter, AuditAction } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
 import { notificationService } from '../services/notificationService.js';
+import { auditService } from '../services/auditService.js';
 import { addBusinessMs, businessMsBetween, type BusinessCalendar } from '../utils/businessTime.js';
 import { csvLine } from '../utils/csv.js';
 import { once } from 'events';
@@ -139,6 +140,20 @@ export const createTicket = async (
 
     // Enviar notificação de ticket criado
     await notificationService.notifyTicketCreated(ticket, user);
+
+    await auditService.log(
+      AuditAction.TICKET_CREATED,
+      'ticket',
+      ticket._id.toString(),
+      {
+        ticketNumber: ticket.ticketNumber,
+        title: ticket.title,
+        priority: ticket.priority,
+        categoryId: ticket.category?._id?.toString?.() || String(ticket.category || ''),
+        createdById: user._id.toString(),
+      },
+      { user, ip: req.ip, userAgent: req.get('user-agent') }
+    );
 
     res.status(201).json({
       message: 'Ticket created successfully',
@@ -307,6 +322,19 @@ export const updateTicket = async (
 
   // Pause/resume clocks based on GLPI-like behavior
   const newStatus = (updates.status || ticket.status) as TicketStatus;
+
+  // Reopen: allow moving out of resolved/closed and clear resolved timestamps
+  if (
+    (oldStatus === TicketStatus.RESOLVED || oldStatus === TicketStatus.CLOSED) &&
+    newStatus !== TicketStatus.RESOLVED &&
+    newStatus !== TicketStatus.CLOSED
+  ) {
+    ticket.sla.resolvedAt = undefined;
+    if (ticket.ola) {
+      ticket.ola.resolvedAt = undefined;
+    }
+  }
+
   if (newStatus === TicketStatus.WAITING_CUSTOMER && oldStatus !== TicketStatus.WAITING_CUSTOMER) {
     pauseTicketClocks(ticket, now);
   }
@@ -372,7 +400,112 @@ export const updateTicket = async (
     await notificationService.notifyTicketResolved(ticket, user);
   }
 
+  await auditService.log(
+    AuditAction.TICKET_UPDATED,
+    'ticket',
+    ticket._id.toString(),
+    {
+      ticketNumber: ticket.ticketNumber,
+      oldStatus,
+      newStatus: ticket.status,
+      oldAssignedTo,
+      newAssignedTo: ticket.assignedTo ? ticket.assignedTo.toString() : null,
+      updates,
+    },
+    { user, ip: req.ip, userAgent: req.get('user-agent') }
+  );
+
+  if (oldAssignedTo !== (ticket.assignedTo ? ticket.assignedTo.toString() : null) && ticket.assignedTo) {
+    await auditService.log(
+      AuditAction.TICKET_ASSIGNED,
+      'ticket',
+      ticket._id.toString(),
+      {
+        ticketNumber: ticket.ticketNumber,
+        oldAssignedTo,
+        newAssignedTo: ticket.assignedTo.toString(),
+      },
+      { user, ip: req.ip, userAgent: req.get('user-agent') }
+    );
+  }
+
+  if (oldStatus !== ticket.status) {
+    await auditService.log(
+      AuditAction.TICKET_STATUS_CHANGED,
+      'ticket',
+      ticket._id.toString(),
+      {
+        ticketNumber: ticket.ticketNumber,
+        oldStatus,
+        newStatus: ticket.status,
+      },
+      { user, ip: req.ip, userAgent: req.get('user-agent') }
+    );
+  }
+
+  if (updates.status === 'resolved' && oldStatus !== 'resolved') {
+    await auditService.log(
+      AuditAction.TICKET_RESOLVED,
+      'ticket',
+      ticket._id.toString(),
+      {
+        ticketNumber: ticket.ticketNumber,
+        resolvedById: user._id.toString(),
+      },
+      { user, ip: req.ip, userAgent: req.get('user-agent') }
+    );
+  }
+
   res.json({ message: 'Ticket updated successfully', ticket });
+};
+
+export const reopenTicket = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { id } = req.params;
+
+  const query: any = { _id: id, tenant: user.tenant._id };
+  if (user.role === 'client') {
+    query.createdBy = user._id;
+  }
+
+  const ticket = await Ticket.findOne(query);
+  if (!ticket) {
+    throw new AppError('Ticket not found', 404);
+  }
+
+  if (ticket.status !== TicketStatus.RESOLVED && ticket.status !== TicketStatus.CLOSED) {
+    throw new AppError('Ticket is not resolved/closed', 400);
+  }
+
+  const now = new Date();
+  const oldStatus = ticket.status;
+
+  ticket.status = TicketStatus.OPEN;
+  ticket.sla.resolvedAt = undefined;
+  if (ticket.ola) ticket.ola.resolvedAt = undefined;
+  resumeTicketClocks(ticket, now);
+
+  await ticket.save();
+  await ticket.populate('createdBy', 'name email avatar');
+  await ticket.populate('category', 'name color');
+  await ticket.populate('assignedTo', 'name email avatar');
+
+  await notificationService.notifyTicketUpdated(ticket, user, oldStatus);
+
+  await auditService.log(
+    AuditAction.TICKET_STATUS_CHANGED,
+    'ticket',
+    ticket._id.toString(),
+    {
+      ticketNumber: ticket.ticketNumber,
+      oldStatus,
+      newStatus: ticket.status,
+      action: 'reopen',
+    },
+    { user, ip: req.ip, userAgent: req.get('user-agent') }
+  );
+
+  res.json({ message: 'Ticket reopened', ticket });
 };
 
 export const addComment = async (
@@ -416,12 +549,17 @@ export const addComment = async (
     ticket.sla.firstResponseAt = now;
   }
 
-  if (user.role === 'client' && ticket.status === TicketStatus.IN_PROGRESS) {
-    ticket.status = TicketStatus.WAITING_CUSTOMER;
-    pauseTicketClocks(ticket, now);
+  // Status flow on public comments:
+  // - Staff replies (public): ticket waits for customer
+  // - Customer replies while waiting: ticket goes back in progress
+  if (user.role !== 'client' && !comment.isInternal) {
+    if (ticket.status === TicketStatus.OPEN || ticket.status === TicketStatus.IN_PROGRESS) {
+      ticket.status = TicketStatus.WAITING_CUSTOMER;
+      pauseTicketClocks(ticket, now);
+    }
   }
 
-  if (user.role !== 'client' && ticket.status === TicketStatus.WAITING_CUSTOMER) {
+  if (user.role === 'client' && ticket.status === TicketStatus.WAITING_CUSTOMER) {
     ticket.status = TicketStatus.IN_PROGRESS;
 
     const tenant = user.tenant as any;
@@ -456,6 +594,19 @@ export const addComment = async (
 
   // Enviar notificação de novo comentário
   await notificationService.notifyNewComment(ticket, comment, user);
+
+  await auditService.log(
+    AuditAction.COMMENT_CREATED,
+    'ticket',
+    ticket._id.toString(),
+    {
+      ticketNumber: ticket.ticketNumber,
+      commentId: comment._id.toString(),
+      isInternal: comment.isInternal,
+      authorId: user._id.toString(),
+    },
+    { user, ip: req.ip, userAgent: req.get('user-agent') }
+  );
 
   res.status(201).json({ message: 'Comment added', comment });
 };

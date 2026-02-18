@@ -4,11 +4,13 @@ import {
   getTickets,
   getTicketById,
   updateTicket,
+  reopenTicket,
   addComment,
   exportTicketsCsv,
 } from '../controllers/ticketController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { authorize } from '../middlewares/auth.js';
+import { commentLimiter } from '../middlewares/rateLimiters.js';
 import { checkPlanLimit } from '../services/planService.js';
 
 const router = Router();
@@ -119,6 +121,9 @@ router.get('/:id', getTicketById);
  */
 router.put('/:id', authorize('admin', 'manager', 'agent'), updateTicket);
 
+// Cliente pode reabrir o proprio ticket resolvido/fechado
+router.post('/:id/reopen', reopenTicket);
+
 /**
  * @swagger
  * /tickets/{id}/comments:
@@ -142,6 +147,6 @@ router.put('/:id', authorize('admin', 'manager', 'agent'), updateTicket);
  *       201:
  *         description: Comentário adicionado
  */
-router.post('/:id/comments', addComment);
+router.post('/:id/comments', commentLimiter, addComment);
 
 export default router;

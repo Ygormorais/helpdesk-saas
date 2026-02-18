@@ -202,6 +202,24 @@ export default function TicketDetailPage() {
     },
   });
 
+  const reopenMutation = useMutation({
+    mutationFn: async () => {
+      await ticketsApi.reopen(id!);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast({ title: 'Ticket reaberto' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao reabrir ticket',
+        description: error.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleSend = () => {
     const content = newComment.trim();
     if (!content || !id) return;
@@ -304,16 +322,25 @@ export default function TicketDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <Link to="/tickets">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold">{ticket.title}</h1>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold truncate">{ticket.title}</h1>
           <p className="text-muted-foreground">{ticket.ticketNumber}</p>
         </div>
+        {(ticket.status === 'resolved' || ticket.status === 'closed') && (
+          <Button
+            variant="outline"
+            onClick={() => reopenMutation.mutate()}
+            disabled={reopenMutation.isPending}
+          >
+            {reopenMutation.isPending ? 'Reabrindo...' : 'Reabrir'}
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -393,30 +420,52 @@ export default function TicketDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Adicionar Resposta</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Textarea
-                  placeholder="Digite sua resposta..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={4}
-                />
-                <div className="flex justify-end gap-2">
+          {(ticket.status === 'resolved' || ticket.status === 'closed') ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Responder</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Este ticket esta {ticket.status === 'resolved' ? 'resolvido' : 'fechado'}. Para enviar uma nova mensagem, reabra o ticket.
+                </p>
+                <div>
                   <Button
-                    onClick={handleSend}
-                    disabled={addCommentMutation.isPending || !newComment.trim()}
+                    variant="outline"
+                    onClick={() => reopenMutation.mutate()}
+                    disabled={reopenMutation.isPending}
                   >
-                    <Send className="mr-2 h-4 w-4" />
-                    {addCommentMutation.isPending ? 'Enviando...' : 'Enviar Resposta'}
+                    {reopenMutation.isPending ? 'Reabrindo...' : 'Reabrir ticket'}
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Adicionar Resposta</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Textarea
+                    placeholder="Digite sua resposta..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={4}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      onClick={handleSend}
+                      disabled={addCommentMutation.isPending || !newComment.trim()}
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      {addCommentMutation.isPending ? 'Enviando...' : 'Enviar Resposta'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">

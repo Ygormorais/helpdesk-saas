@@ -28,4 +28,5 @@ export const ticketsApi = {
   create: (data: CreateTicketInput) => api.post('/tickets', data),
   addComment: (ticketId: string, data: AddCommentInput) => api.post(`/tickets/${ticketId}/comments`, data),
   update: (ticketId: string, data: Record<string, unknown>) => api.put(`/tickets/${ticketId}`, data),
+  reopen: (ticketId: string) => api.post(`/tickets/${ticketId}/reopen`),
 };
