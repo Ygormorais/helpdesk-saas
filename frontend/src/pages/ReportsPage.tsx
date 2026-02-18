@@ -10,7 +10,7 @@ import { FeatureUnavailable } from '@/components/FeatureUnavailable';
 
 function KPI({ title, value }: { title: string; value: string | number }) {
   return (
-    <Card className="bg-white">
+    <Card className="bg-card">
       <CardHeader>
         <CardTitle className="text-sm">{title}</CardTitle>
       </CardHeader>
