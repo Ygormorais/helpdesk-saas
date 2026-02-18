@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { analyticsApi } from '@/config/analytics';
 import { downloadCSV } from '@/utils/csv';
+import { FeatureUnavailable } from '@/components/FeatureUnavailable';
 
 function KPI({ title, value }: { title: string; value: string | number }) {
   return (
@@ -201,6 +202,27 @@ export default function ReportsPage() {
     exportCSV_SLA();
     exportCSV_Agents();
   };
+
+  const forbidden =
+    (reportsQuery.error as any)?.response?.status === 403 ||
+    (priorityQuery.error as any)?.response?.status === 403 ||
+    (satisfactionQuery.error as any)?.response?.status === 403 ||
+    (categoryQuery.error as any)?.response?.status === 403;
+
+  if (forbidden) {
+    return (
+      <div className="space-y-6 p-4">
+        <div>
+          <h1 className="text-3xl font-bold">Relatórios</h1>
+          <p className="text-muted-foreground">Relatórios avançados indisponíveis no seu plano.</p>
+        </div>
+        <FeatureUnavailable
+          title="Relatórios bloqueados"
+          description="Sua empresa precisa de um plano superior para acessar relatórios avançados."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4">

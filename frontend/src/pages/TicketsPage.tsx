@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Plus, Search } from 'lucide-react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { chatApi } from '@/api/chat';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { api } from '@/config/api';
 
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -61,34 +62,78 @@ const getPriorityBadge = (priority: string) => {
 };
 
 export default function TicketsPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialSearch = searchParams.get('q') || '';
+  const initialStatus = searchParams.get('status') || 'all';
+  const initialPriority = searchParams.get('priority') || 'all';
+  const initialMine = searchParams.get('mine') === '1';
+  const initialPage = Math.max(1, Number(searchParams.get('page') || 1) || 1);
+
+  const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [priorityFilter, setPriorityFilter] = useState(initialPriority);
+  const [mineOnly, setMineOnly] = useState(initialMine);
+  const [page, setPage] = useState(initialPage);
+  const [limit, setLimit] = useState(20);
   const [isExporting, setIsExporting] = useState(false);
   const [openingChatId, setOpeningChatId] = useState<string | null>(null);
-
-  const apiBaseUrl = useMemo(() => import.meta.env.VITE_API_URL || '/api', []);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
       setDebouncedSearch(search);
+      setPage(1);
     }, 400);
     return () => window.clearTimeout(id);
   }, [search]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, priorityFilter]);
+
+  useEffect(() => {
+    // Support back/forward navigation by reading URL state
+    const q = searchParams.get('q') || '';
+    const status = searchParams.get('status') || 'all';
+    const priority = searchParams.get('priority') || 'all';
+    const mine = searchParams.get('mine') === '1';
+    const nextPage = Math.max(1, Number(searchParams.get('page') || 1) || 1);
+
+    if (q !== debouncedSearch) {
+      setSearch(q);
+      setDebouncedSearch(q);
+    }
+    if (status !== statusFilter) setStatusFilter(status);
+    if (priority !== priorityFilter) setPriorityFilter(priority);
+    if (mine !== mineOnly) setMineOnly(mine);
+    if (nextPage !== page) setPage(nextPage);
+  }, [debouncedSearch, mineOnly, page, priorityFilter, searchParams, statusFilter]);
+
+  useEffect(() => {
+    // keep URL in sync (shareable state)
+    const next = new URLSearchParams();
+    if (debouncedSearch.trim()) next.set('q', debouncedSearch.trim());
+    if (statusFilter !== 'all') next.set('status', statusFilter);
+    if (priorityFilter !== 'all') next.set('priority', priorityFilter);
+    if (mineOnly) next.set('mine', '1');
+    if (page > 1) next.set('page', String(page));
+    setSearchParams(next, { replace: true });
+  }, [debouncedSearch, mineOnly, page, priorityFilter, setSearchParams, statusFilter]);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['tickets', { search: debouncedSearch, statusFilter, priorityFilter }],
+    queryKey: ['tickets', { page, limit, search: debouncedSearch, statusFilter, priorityFilter, mineOnly }],
     queryFn: async () => {
       const res = await ticketsApi.list({
-        page: 1,
-        limit: 50,
+        page,
+        limit,
         search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+        assignedTo: mineOnly && user?.id ? user.id : undefined,
       });
       return res.data as {
         tickets: Array<any>;
@@ -100,8 +145,10 @@ export default function TicketsPage() {
   });
 
   const tickets = useMemo(() => data?.tickets || [], [data]);
+  const pagination = data?.pagination;
 
   const canExport = user?.role !== 'client';
+  const canUseMineFilter = user?.role !== 'client';
 
   const openTicketChat = async (ticket: any) => {
     try {
@@ -137,24 +184,15 @@ export default function TicketsPage() {
   };
 
   const exportCsv = async () => {
-    if (!token) return;
     setIsExporting(true);
     try {
-      const params = new URLSearchParams();
-      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
-      if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (priorityFilter !== 'all') params.set('priority', priorityFilter);
-      params.set('limit', '50000');
+      const params: Record<string, string> = { limit: '50000' };
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (priorityFilter !== 'all') params.priority = priorityFilter;
 
-      const response = await fetch(`${apiBaseUrl}/tickets/export/csv?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Export failed (${response.status})`);
-      }
-
-      const blob = await response.blob();
+      const res = await api.get('/tickets/export/csv', { params, responseType: 'blob' });
+      const blob = res.data as Blob;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -163,6 +201,12 @@ export default function TicketsPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao exportar',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
     } finally {
       setIsExporting(false);
     }
@@ -227,6 +271,36 @@ export default function TicketsPage() {
                 <SelectItem value="low">Baixa</SelectItem>
               </SelectContent>
             </Select>
+
+            {canUseMineFilter ? (
+              <Button
+                type="button"
+                variant={mineOnly ? 'default' : 'outline'}
+                onClick={() => {
+                  setMineOnly((v) => !v);
+                  setPage(1);
+                }}
+              >
+                Meus tickets
+              </Button>
+            ) : null}
+
+            <Select
+              value={String(limit)}
+              onValueChange={(v) => {
+                setLimit(Number(v));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Por pagina" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="20">20 / pagina</SelectItem>
+                <SelectItem value="50">50 / pagina</SelectItem>
+                <SelectItem value="100">100 / pagina</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -264,7 +338,14 @@ export default function TicketsPage() {
               {!isLoading && !isError && tickets.length === 0 && (
                 <tr>
                   <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={8}>
-                    Nenhum ticket encontrado
+                    <div className="space-y-2">
+                      <div>Nenhum ticket encontrado</div>
+                      <div>
+                        <Link to="/tickets/new" className="text-primary hover:underline">
+                          Criar um ticket
+                        </Link>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -305,6 +386,34 @@ export default function TicketsPage() {
           </table>
         </CardContent>
       </Card>
+
+      {pagination ? (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Pagina {pagination.page} de {pagination.pages} • {pagination.total} tickets
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pagination.page <= 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(pagination.pages || p + 1, p + 1))}
+              disabled={pagination.page >= pagination.pages}
+            >
+              Proxima
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

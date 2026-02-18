@@ -24,6 +24,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { webhooksApi } from '@/api/webhooks';
 import { useToast } from '@/hooks/use-toast';
+import { FeatureUnavailable } from '@/components/FeatureUnavailable';
 
 const events = [
   'ticket.created',
@@ -104,6 +105,22 @@ export default function WebhooksPage() {
   });
 
   const webhooks = listQuery.data || [];
+
+  const isForbidden = (listQuery.error as any)?.response?.status === 403;
+  if (isForbidden) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Webhooks</h1>
+          <p className="text-muted-foreground">Integrações indisponíveis no seu plano.</p>
+        </div>
+        <FeatureUnavailable
+          title="Webhooks bloqueados"
+          description="Sua empresa precisa de um plano superior para configurar webhooks."
+        />
+      </div>
+    );
+  }
 
   const copyToClipboard = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);

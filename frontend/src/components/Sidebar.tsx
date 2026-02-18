@@ -1,21 +1,56 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Ticket, FolderOpen, BookOpen, PenTool, Users, Webhook, History, Settings, MessageCircle, LogOut, Star, Clock, CreditCard } from 'lucide-react';
+import {
+  BarChart3,
+  BookOpen,
+  Clock,
+  CreditCard,
+  FolderOpen,
+  History,
+  LayoutDashboard,
+  LogOut,
+  MessageCircle,
+  PenTool,
+  Settings,
+  Star,
+  Ticket,
+  Users,
+  Webhook,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/config/api';
 
 type Role = 'admin' | 'manager' | 'agent' | 'client';
 
-const navigation: Array<{ name: string; href: string; icon: any; roles?: Role[] }> = [
+type PlanFeatures = {
+  knowledgeBase: boolean;
+  timeTracking: boolean;
+  webhooks: boolean;
+  satisfactionSurvey: boolean;
+  advancedReports: boolean;
+  api: boolean;
+  customDomain: boolean;
+  whiteLabel: boolean;
+};
+
+type PlanDetails = {
+  plan: string;
+  features: PlanFeatures;
+};
+
+const navigation: Array<{ name: string; href: string; icon: any; roles?: Role[]; feature?: keyof PlanFeatures }> = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Tickets', href: '/tickets', icon: Ticket },
   { name: 'Chat', href: '/chat', icon: MessageCircle },
   { name: 'Categorias', href: '/categories', icon: FolderOpen, roles: ['admin', 'manager', 'agent'] },
-  { name: 'Base de Conhecimento', href: '/knowledge', icon: BookOpen },
+  { name: 'Relatorios', href: '/reports', icon: BarChart3, roles: ['admin', 'manager', 'agent'], feature: 'advancedReports' },
+  { name: 'Base de Conhecimento', href: '/knowledge', icon: BookOpen, feature: 'knowledgeBase' },
   { name: 'Equipe', href: '/team', icon: Users, roles: ['admin', 'manager'] },
-  { name: 'Admin Artigos', href: '/admin/articles', icon: PenTool, roles: ['admin', 'manager', 'agent'] },
-  { name: 'Webhooks', href: '/webhooks', icon: Webhook, roles: ['admin', 'manager'] },
-  { name: 'Satisfação', href: '/satisfaction', icon: Star, roles: ['admin', 'manager', 'agent'] },
-  { name: 'Tempo', href: '/time', icon: Clock, roles: ['admin', 'manager', 'agent'] },
+  { name: 'Admin Artigos', href: '/admin/articles', icon: PenTool, roles: ['admin', 'manager', 'agent'], feature: 'knowledgeBase' },
+  { name: 'Webhooks', href: '/webhooks', icon: Webhook, roles: ['admin', 'manager'], feature: 'webhooks' },
+  { name: 'Satisfação', href: '/satisfaction', icon: Star, roles: ['admin', 'manager', 'agent'], feature: 'satisfactionSurvey' },
+  { name: 'Tempo', href: '/time', icon: Clock, roles: ['admin', 'manager', 'agent'], feature: 'timeTracking' },
   { name: 'Planos', href: '/plans', icon: CreditCard, roles: ['admin', 'manager'] },
   { name: 'Audit Log', href: '/audit', icon: History, roles: ['admin'] },
   { name: 'Configurações', href: '/settings', icon: Settings },
@@ -25,8 +60,26 @@ export default function Sidebar() {
   const location = useLocation();
   const { logout, user } = useAuth();
 
+  const planQuery = useQuery({
+    queryKey: ['plan'],
+    enabled: !!user,
+    queryFn: async () => {
+      const res = await api.get('/plan');
+      return res.data as PlanDetails;
+    },
+    staleTime: 60_000,
+  });
+
+  const features = planQuery.data?.features;
+
   const role = (user?.role || 'client') as Role;
-  const items = navigation.filter((i) => !i.roles || i.roles.includes(role));
+  const items = navigation
+    .filter((i) => !i.roles || i.roles.includes(role))
+    .filter((i) => {
+      if (!i.feature) return true;
+      if (!features) return true; // unknown yet
+      return features[i.feature] !== false;
+    });
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">

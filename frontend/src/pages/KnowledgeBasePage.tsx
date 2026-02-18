@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 
 import { articlesApi } from '@/api/articles';
+import { FeatureUnavailable } from '@/components/FeatureUnavailable';
 
 export default function KnowledgeBasePage() {
   const [search, setSearch] = useState('');
@@ -67,6 +68,22 @@ export default function KnowledgeBasePage() {
     const list = Array.from(counts.values()).sort((a, b) => a.name.localeCompare(b.name));
     return [{ id: 'all', name: 'Todas', color: '#6B7280', count: articles.length }, ...list];
   }, [articles]);
+
+  const isForbidden = (listQuery.error as any)?.response?.status === 403;
+  if (isForbidden) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-4xl font-bold">Central de Ajuda</h1>
+          <p className="text-lg text-muted-foreground">Base de conhecimento indisponivel no seu plano.</p>
+        </div>
+        <FeatureUnavailable
+          title="Base de conhecimento bloqueada"
+          description="Sua empresa precisa de um plano superior para acessar a base de conhecimento."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

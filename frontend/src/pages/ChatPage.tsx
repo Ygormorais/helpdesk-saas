@@ -71,6 +71,8 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [unseenCount, setUnseenCount] = useState(0);
 
   useEffect(() => {
     const desiredScope = chatIdParam ? 'all' : (tab === 'internal' ? 'internal' : 'ticket');
@@ -116,6 +118,22 @@ export default function ChatPage() {
     if (!shouldAutoScrollRef.current) return;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!currentChat) {
+      setShowJumpToBottom(false);
+      setUnseenCount(0);
+      return;
+    }
+
+    if (!shouldAutoScrollRef.current) {
+      setShowJumpToBottom(true);
+      setUnseenCount((c) => Math.min(99, c + 1));
+    } else {
+      setShowJumpToBottom(false);
+      setUnseenCount(0);
+    }
+  }, [currentChat, messages.length]);
 
   useEffect(() => {
     // When switching chats, always jump to bottom.
@@ -573,16 +591,23 @@ export default function ChatPage() {
             </CardHeader>
 
             <CardContent className="flex-1 flex flex-col p-0">
-              <ScrollArea
-                ref={scrollRef}
-                className="flex-1 p-4"
-                onScroll={() => {
-                  const el = scrollRef.current;
-                  if (!el) return;
-                  const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
-                  shouldAutoScrollRef.current = remaining < 120;
-                }}
-              >
+              <div className="relative flex-1">
+                <ScrollArea
+                  ref={scrollRef}
+                  className="h-full p-4"
+                  onScroll={() => {
+                    const el = scrollRef.current;
+                    if (!el) return;
+                    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+                    shouldAutoScrollRef.current = remaining < 120;
+                    if (shouldAutoScrollRef.current) {
+                      setShowJumpToBottom(false);
+                      setUnseenCount(0);
+                    } else {
+                      setShowJumpToBottom(true);
+                    }
+                  }}
+                >
                 <div className="space-y-4">
                   {isLoadingMessages ? (
                     <div className="text-sm text-muted-foreground">Carregando mensagens...</div>
@@ -632,7 +657,26 @@ export default function ChatPage() {
 
                   <div ref={messagesEndRef} />
                 </div>
-              </ScrollArea>
+                </ScrollArea>
+
+                {showJumpToBottom ? (
+                  <div className="absolute bottom-4 right-4">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="shadow"
+                      onClick={() => {
+                        shouldAutoScrollRef.current = true;
+                        setShowJumpToBottom(false);
+                        setUnseenCount(0);
+                        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Ir para o fim{unseenCount > 0 ? ` (${unseenCount > 9 ? '9+' : unseenCount})` : ''}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
 
               <div className="border-t p-4">
                 <div className="flex gap-2">

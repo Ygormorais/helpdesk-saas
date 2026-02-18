@@ -18,6 +18,8 @@ import {
   Cell,
   Legend,
 } from 'recharts';
+import { api } from '@/config/api';
+import { FeatureUnavailable } from '@/components/FeatureUnavailable';
 
 interface TimeStats {
   totalDuration: number;
@@ -55,6 +57,8 @@ export default function TimeReportsPage() {
   const [byTicket, setByTicket] = useState<TicketTime[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('7');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -62,7 +66,9 @@ export default function TimeReportsPage() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
+      setLoadError(null);
+      setForbidden(false);
+      setLoading(true);
       const endDate = new Date();
       const startDate = new Date();
       
@@ -81,20 +87,24 @@ export default function TimeReportsPage() {
           break;
       }
 
-      const params = new URLSearchParams({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+      const res = await api.get('/time/stats', {
+        params: {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        },
       });
-
-      const response = await fetch(`/api/time/stats?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
+      const data = res.data;
       setStats(data.stats);
       setByUser(data.byUser || []);
       setByTicket(data.byTicket || []);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 403) {
+        setForbidden(true);
+      } else {
+        if (import.meta.env.DEV) console.error('Error fetching stats:', error);
+        setLoadError('Nao foi possivel carregar o relatorio de tempo');
+      }
     } finally {
       setLoading(false);
     }
@@ -131,11 +141,46 @@ export default function TimeReportsPage() {
     );
   }
 
+  if (forbidden) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Relatório de Tempo</h1>
+          <p className="text-muted-foreground">Controle de tempo indisponível no seu plano.</p>
+        </div>
+        <FeatureUnavailable
+          title="Controle de tempo bloqueado"
+          description="Sua empresa precisa de um plano superior para acessar o controle de tempo e relatórios."
+        />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Relatório de Tempo</h1>
+          <p className="text-muted-foreground">Acompanhe o tempo gasto em tickets</p>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Falha ao carregar</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+            <Button onClick={fetchStats}>Tentar novamente</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="3xl font-bold">Relatório de Tempo</h1>
+          <h1 className="text-3xl font-bold">Relatório de Tempo</h1>
           <p className="text-muted-foreground">
             Acompanhe o tempo gasto em tickets
           </p>
