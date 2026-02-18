@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ThumbsUp, ThumbsDown, Eye, Clock, User, Share2 } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, Eye, Clock, Share2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { articlesApi } from '@/api/articles';
+import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function ArticleDetailPage() {
   const { slug } = useParams();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [feedback, setFeedback] = useState<'yes' | 'no' | null>(null);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackComment, setFeedbackComment] = useState('');
@@ -26,32 +30,42 @@ export default function ArticleDetailPage() {
 
   const article: any = articleQuery.data;
 
-  const html = useMemo(() => {
-    const content = article?.content || '';
-    return content
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-      .replace(/\n\n/g, '<br/><br/>');
-  }, [article?.content]);
-
-  const voteMutation = useMutation({
-    mutationFn: async (helpful: boolean) => {
-      if (!article?._id) return;
-      await articlesApi.vote(article._id, helpful);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['article', slug] });
+  const relatedQuery = useQuery({
+    queryKey: ['article-related', slug],
+    enabled: !!slug,
+    queryFn: async () => {
+      const res = await articlesApi.related(slug!, { limit: 6 });
+      return res.data.articles as any[];
     },
   });
 
-  const handleFeedback = (type: 'yes' | 'no') => {
+  const feedbackMutation = useMutation({
+    mutationFn: async (payload: { helpful: boolean; comment?: string }) => {
+      if (!article?._id) return;
+      await articlesApi.feedback(article._id, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['article', slug] });
+      toast({ title: 'Feedback enviado' });
+      setShowFeedbackForm(false);
+    },
+    onError: () => {
+      toast({ title: 'Erro ao enviar feedback', variant: 'destructive' });
+    },
+  });
+
+  const handleFeedbackPick = (type: 'yes' | 'no') => {
     setFeedback(type);
     setShowFeedbackForm(true);
-    voteMutation.mutate(type === 'yes');
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast({ title: 'Link copiado' });
+    } catch {
+      toast({ title: 'Nao foi possivel copiar o link', variant: 'destructive' });
+    }
   };
 
   if (!slug) {
@@ -97,7 +111,7 @@ export default function ArticleDetailPage() {
             {article.category?.name || 'Sem categoria'}
           </span>
         </div>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" onClick={handleShare} aria-label="Copiar link">
           <Share2 className="h-4 w-4" />
         </Button>
       </div>
@@ -123,11 +137,7 @@ export default function ArticleDetailPage() {
 
       <Card>
         <CardContent className="pt-6 prose prose-sm max-w-none dark:prose-invert">
-          <div dangerouslySetInnerHTML={{
-            __html: article.content
-              ? html
-              : ''
-          }} />
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.content || ''}</ReactMarkdown>
         </CardContent>
       </Card>
 
@@ -138,16 +148,13 @@ export default function ArticleDetailPage() {
         <CardContent className="space-y-4">
           {!feedback ? (
             <div className="flex gap-4">
-              <Button
-                variant="outline"
-                onClick={() => handleFeedback('yes')}
-              >
+              <Button variant="outline" onClick={() => handleFeedbackPick('yes')}>
                 <ThumbsUp className="mr-2 h-4 w-4" />
                 Sim
               </Button>
               <Button
                 variant="outline"
-                onClick={() => handleFeedback('no')}
+                onClick={() => handleFeedbackPick('no')}
               >
                 <ThumbsDown className="mr-2 h-4 w-4" />
                 Não
@@ -166,9 +173,28 @@ export default function ArticleDetailPage() {
                     value={feedbackComment}
                     onChange={(e) => setFeedbackComment(e.target.value)}
                   />
-                  <Button onClick={() => setShowFeedbackForm(false)}>
-                    Enviar feedback
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        const helpful = feedback === 'yes';
+                        const comment = feedbackComment.trim();
+                        feedbackMutation.mutate({ helpful, comment: comment ? comment : undefined });
+                      }}
+                      disabled={feedbackMutation.isPending}
+                    >
+                      Enviar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const helpful = feedback === 'yes';
+                        feedbackMutation.mutate({ helpful });
+                      }}
+                      disabled={feedbackMutation.isPending}
+                    >
+                      Enviar sem comentario
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -181,6 +207,25 @@ export default function ArticleDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {!relatedQuery.isError && (relatedQuery.data || []).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Artigos relacionados</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {(relatedQuery.data || []).map((a: any) => (
+              <Link key={a._id} to={`/knowledge/${a.slug}`} className="block rounded-lg border p-3 hover:bg-muted/40">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-sm line-clamp-2">{a.title}</p>
+                  <span className="text-xs text-muted-foreground shrink-0">{a.views || 0} views</span>
+                </div>
+                {a.excerpt && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{a.excerpt}</p>}
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="text-center py-8 border-t">
         <p className="text-muted-foreground mb-4">Ainda tem dúvidas?</p>

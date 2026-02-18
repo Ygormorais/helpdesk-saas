@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import Timer from '@/components/Timer';
 import { ticketsApi } from '@/api/tickets';
 import { chatApi } from '@/api/chat';
+import { articlesApi } from '@/api/articles';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -93,6 +94,55 @@ export default function TicketDetailPage() {
 
   const ticket = data?.ticket;
   const comments = useMemo(() => data?.comments || [], [data]);
+
+  const isStaff = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'agent';
+
+  const linkedArticlesQuery = useQuery({
+    queryKey: ['ticket', id, 'kb-articles'],
+    enabled: !!id && isStaff,
+    queryFn: async () => {
+      const res = await articlesApi.byTicket(id!);
+      return res.data.articles as any[];
+    },
+  });
+
+  const kbQueryText = `${ticket?.title || ''}\n\n${ticket?.description || ''}`.trim();
+  const suggestedArticlesQuery = useQuery({
+    queryKey: ['ticket', id, 'kb-suggested', kbQueryText],
+    enabled: !!id && isStaff && kbQueryText.length >= 2,
+    queryFn: async () => {
+      const res = await articlesApi.searchAi({ q: kbQueryText.slice(0, 500), limit: 6 });
+      return res.data.results as any[];
+    },
+  });
+
+  const linkArticleMutation = useMutation({
+    mutationFn: async (articleId: string) => {
+      if (!id) return;
+      await articlesApi.linkTicket(articleId, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id, 'kb-articles'] });
+      toast({ title: 'Artigo vinculado' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao vincular artigo', variant: 'destructive' });
+    },
+  });
+
+  const unlinkArticleMutation = useMutation({
+    mutationFn: async (articleId: string) => {
+      if (!id) return;
+      await articlesApi.unlinkTicket(articleId, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id, 'kb-articles'] });
+      toast({ title: 'Artigo desvinculado' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao desvincular artigo', variant: 'destructive' });
+    },
+  });
 
   const takeOwnershipMutation = useMutation({
     mutationFn: async () => {
@@ -339,6 +389,79 @@ export default function TicketDetailPage() {
             ticketNumber={ticket.ticketNumber}
             ticketTitle={ticket.title}
           />
+
+          {isStaff &&
+            !(((linkedArticlesQuery.error as any)?.response?.status === 403) ||
+              ((suggestedArticlesQuery.error as any)?.response?.status === 403)) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Base de Conhecimento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-muted-foreground">Vinculados</Label>
+                    {linkedArticlesQuery.isLoading ? (
+                      <p className="text-sm text-muted-foreground mt-1">Carregando...</p>
+                    ) : (linkedArticlesQuery.data || []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground mt-1">Nenhum artigo vinculado</p>
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        {(linkedArticlesQuery.data || []).map((a: any) => (
+                          <div key={a._id} className="flex items-start justify-between gap-3 rounded-lg border p-2">
+                            <div className="min-w-0">
+                              <Link to={`/knowledge/${a.slug}`} className="text-sm font-medium hover:underline">
+                                {a.title}
+                              </Link>
+                              {a.excerpt && <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{a.excerpt}</p>}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => unlinkArticleMutation.mutate(String(a._id))}
+                              disabled={unlinkArticleMutation.isPending}
+                            >
+                              Desvincular
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label className="text-muted-foreground">Sugestoes</Label>
+                    {suggestedArticlesQuery.isLoading ? (
+                      <p className="text-sm text-muted-foreground mt-1">Carregando...</p>
+                    ) : (suggestedArticlesQuery.data || []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground mt-1">Nenhuma sugestao no momento</p>
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        {(suggestedArticlesQuery.data || [])
+                          .filter((a: any) => !new Set((linkedArticlesQuery.data || []).map((x: any) => String(x._id))).has(String(a._id)))
+                          .slice(0, 6)
+                          .map((a: any) => (
+                            <div key={a._id} className="flex items-start justify-between gap-3 rounded-lg border p-2">
+                              <div className="min-w-0">
+                                <Link to={`/knowledge/${a.slug}`} className="text-sm font-medium hover:underline">
+                                  {a.title}
+                                </Link>
+                                {a.excerpt && <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{a.excerpt}</p>}
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => linkArticleMutation.mutate(String(a._id))}
+                                disabled={linkArticleMutation.isPending}
+                              >
+                                Vincular
+                              </Button>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           <Card>
             <CardHeader>

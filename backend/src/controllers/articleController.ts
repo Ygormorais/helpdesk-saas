@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Article } from '../models/index.js';
+import { Article, ArticleFeedback, Ticket } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ const createArticleSchema = z.object({
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   isPublished: z.boolean().optional(),
+  relatedTickets: z.array(z.string()).optional(),
   seo: z.object({
     metaTitle: z.string().optional(),
     metaDescription: z.string().optional(),
@@ -25,11 +26,69 @@ const updateArticleSchema = z.object({
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   isPublished: z.boolean().optional(),
+  relatedTickets: z.array(z.string()).optional(),
   seo: z.object({
     metaTitle: z.string().optional(),
     metaDescription: z.string().optional(),
   }).optional(),
 });
+
+const articleFeedbackSchema = z.object({
+  helpful: z.boolean(),
+  comment: z.string().trim().min(1).max(1000).optional(),
+});
+
+async function upsertFeedbackAndUpdateCounters(params: {
+  tenantId: any;
+  articleId: any;
+  userId: any;
+  helpful: boolean;
+  comment?: string;
+}) {
+  const { tenantId, articleId, userId, helpful, comment } = params;
+
+  const article = await Article.findOne({ _id: articleId, tenant: tenantId });
+  if (!article) {
+    throw new AppError('Article not found', 404);
+  }
+
+  const existing = await ArticleFeedback.findOne({
+    tenant: tenantId,
+    article: articleId,
+    user: userId,
+  });
+
+  if (!existing) {
+    await ArticleFeedback.create({
+      tenant: tenantId,
+      article: articleId,
+      user: userId,
+      helpful,
+      comment,
+    });
+
+    if (helpful) article.helpful.yes += 1;
+    else article.helpful.no += 1;
+    await article.save();
+    return;
+  }
+
+  const prevHelpful = existing.helpful;
+  existing.helpful = helpful;
+  if (comment !== undefined) {
+    existing.comment = comment;
+  }
+  await existing.save();
+
+  if (prevHelpful !== helpful) {
+    if (prevHelpful) article.helpful.yes = Math.max(0, article.helpful.yes - 1);
+    else article.helpful.no = Math.max(0, article.helpful.no - 1);
+
+    if (helpful) article.helpful.yes += 1;
+    else article.helpful.no += 1;
+    await article.save();
+  }
+}
 
 export const createArticle = async (
   req: AuthRequest,
@@ -237,26 +296,173 @@ export const voteArticle = async (
 ): Promise<void> => {
   const user = req.user!;
   const { id } = req.params;
-  const { helpful } = req.body;
+  const parsed = articleFeedbackSchema.pick({ helpful: true }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    return;
+  }
 
-  const article = await Article.findOne({
-    _id: id,
-    tenant: user.tenant._id,
+  await upsertFeedbackAndUpdateCounters({
+    tenantId: user.tenant._id,
+    articleId: id,
+    userId: user._id,
+    helpful: parsed.data.helpful,
   });
 
-  if (!article) {
+  const article = await Article.findOne({ _id: id, tenant: user.tenant._id }).select('helpful');
+  res.json({ message: 'Vote recorded', helpful: article?.helpful });
+};
+
+export const submitArticleFeedback = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { id } = req.params;
+
+  const parsed = articleFeedbackSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    return;
+  }
+
+  await upsertFeedbackAndUpdateCounters({
+    tenantId: user.tenant._id,
+    articleId: id,
+    userId: user._id,
+    helpful: parsed.data.helpful,
+    comment: parsed.data.comment,
+  });
+
+  res.json({ success: true });
+};
+
+export const addRelatedTicket = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { id } = req.params;
+  const bodySchema = z.object({ ticketId: z.string().min(1) });
+  const parsed = bodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
+    return;
+  }
+
+  const ticket = await Ticket.findOne({ _id: parsed.data.ticketId, tenant: user.tenant._id }).select('_id');
+  if (!ticket) {
+    throw new AppError('Ticket not found', 404);
+  }
+
+  const out = await Article.updateOne(
+    { _id: id, tenant: user.tenant._id },
+    { $addToSet: { relatedTickets: ticket._id } }
+  );
+
+  if (out.matchedCount === 0) {
     throw new AppError('Article not found', 404);
   }
 
-  if (helpful === true) {
-    article.helpful.yes += 1;
-  } else if (helpful === false) {
-    article.helpful.no += 1;
+  res.json({ success: true });
+};
+
+export const removeRelatedTicket = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { id, ticketId } = req.params;
+
+  const out = await Article.updateOne(
+    { _id: id, tenant: user.tenant._id },
+    { $pull: { relatedTickets: ticketId } }
+  );
+
+  if (out.matchedCount === 0) {
+    throw new AppError('Article not found', 404);
   }
 
-  await article.save();
+  res.json({ success: true });
+};
 
-  res.json({ message: 'Vote recorded', helpful: article.helpful });
+export const getArticlesByTicket = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { ticketId } = req.params;
+
+  const ticket = await Ticket.findOne({ _id: ticketId, tenant: user.tenant._id }).select('_id');
+  if (!ticket) {
+    throw new AppError('Ticket not found', 404);
+  }
+
+  const articles = await Article.find({
+    tenant: user.tenant._id,
+    relatedTickets: ticket._id,
+  })
+    .select('title slug excerpt category tags views isPublished createdAt updatedAt')
+    .populate('category', 'name color')
+    .sort({ updatedAt: -1 });
+
+  res.json({ articles });
+};
+
+export const getRelatedArticles = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { slug } = req.params;
+  const limitRaw = parseInt(req.query.limit as string, 10) || 6;
+  const limit = Math.min(12, Math.max(1, limitRaw));
+
+  const current = await Article.findOne({
+    slug,
+    tenant: user.tenant._id,
+    isPublished: true,
+  }).select('_id category tags');
+
+  if (!current) {
+    throw new AppError('Article not found', 404);
+  }
+
+  const baseQuery: any = {
+    tenant: user.tenant._id,
+    isPublished: true,
+    _id: { $ne: current._id },
+  };
+
+  const picked: any[] = [];
+  const pickedIds = new Set<string>();
+
+  const pushUnique = (items: any[]) => {
+    for (const a of items) {
+      const key = String(a._id);
+      if (pickedIds.has(key)) continue;
+      pickedIds.add(key);
+      picked.push(a);
+      if (picked.length >= limit) break;
+    }
+  };
+
+  if (current.category) {
+    const sameCategory = await Article.find({ ...baseQuery, category: current.category })
+      .select('title slug excerpt category tags views createdAt updatedAt')
+      .populate('category', 'name color')
+      .sort({ views: -1, updatedAt: -1 })
+      .limit(limit);
+    pushUnique(sameCategory);
+  }
+
+  if (picked.length < limit && Array.isArray(current.tags) && current.tags.length > 0) {
+    const byTags = await Article.find({
+      ...baseQuery,
+      tags: { $in: current.tags },
+    })
+      .select('title slug excerpt category tags views createdAt updatedAt')
+      .populate('category', 'name color')
+      .sort({ views: -1, updatedAt: -1 })
+      .limit(limit);
+    pushUnique(byTags);
+  }
+
+  if (picked.length < limit) {
+    const latest = await Article.find(baseQuery)
+      .select('title slug excerpt category tags views createdAt updatedAt')
+      .populate('category', 'name color')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+    pushUnique(latest);
+  }
+
+  res.json({ articles: picked });
 };
 
 export const getPopularArticles = async (

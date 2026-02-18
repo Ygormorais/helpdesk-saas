@@ -6,6 +6,7 @@ export * from './Comment.js';
 export * from './Category.js';
 
 export * from './Article.js';
+export * from './ArticleFeedback.js';
 export * from './AuditLog.js';
 export * from './Chat.js';
 export * from './Invite.js';

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Edit, Trash, Eye, FileText } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,7 @@ export default function AdminArticlesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [newArticle, setNewArticle] = useState({
@@ -39,7 +40,10 @@ export default function AdminArticlesPage() {
     excerpt: '',
     category: '',
     tags: '',
+    isPublished: false,
   });
+
+  const isEditing = !!editingId;
 
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
@@ -64,32 +68,47 @@ export default function AdminArticlesPage() {
 
   const articles = listQuery.data || [];
 
-  const createMutation = useMutation({
-    mutationFn: async (isPublished: boolean) => {
+  const upsertMutation = useMutation({
+    mutationFn: async () => {
       const tags = newArticle.tags
         .split(',')
         .map((t) => t.trim())
         .filter(Boolean);
 
-      await articlesApi.create({
+      const payload = {
         title: newArticle.title,
         content: newArticle.content,
         excerpt: newArticle.excerpt || undefined,
         category: newArticle.category || undefined,
-        tags: tags.length ? tags : undefined,
-        isPublished,
+        tags: tags,
+        isPublished: newArticle.isPublished,
+      };
+
+      if (editingId) {
+        await articlesApi.update(editingId, payload);
+        return;
+      }
+
+      await articlesApi.create({
+        title: payload.title,
+        content: payload.content,
+        excerpt: payload.excerpt,
+        category: payload.category,
+        tags: payload.tags.length ? payload.tags : undefined,
+        isPublished: payload.isPublished,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['articles', 'admin'] });
       queryClient.invalidateQueries({ queryKey: ['articles', 'public'] });
-      toast({ title: 'Artigo salvo' });
+      toast({ title: isEditing ? 'Artigo atualizado' : 'Artigo criado' });
       setIsDialogOpen(false);
-      setNewArticle({ title: '', content: '', excerpt: '', category: '', tags: '' });
+      setEditingId(null);
+      setNewArticle({ title: '', content: '', excerpt: '', category: '', tags: '', isPublished: false });
     },
     onError: (error: any) => {
       toast({
-        title: 'Erro ao salvar artigo',
+        title: isEditing ? 'Erro ao atualizar artigo' : 'Erro ao criar artigo',
         description: error.response?.data?.message || 'Tente novamente',
         variant: 'destructive',
       });
@@ -103,8 +122,35 @@ export default function AdminArticlesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['articles', 'admin'] });
       queryClient.invalidateQueries({ queryKey: ['articles', 'public'] });
+      toast({ title: 'Artigo excluido' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao excluir artigo',
+        description: error.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
     },
   });
+
+  const openCreateDialog = () => {
+    setEditingId(null);
+    setNewArticle({ title: '', content: '', excerpt: '', category: '', tags: '', isPublished: false });
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (article: any) => {
+    setEditingId(article._id);
+    setNewArticle({
+      title: article.title || '',
+      content: article.content || '',
+      excerpt: article.excerpt || '',
+      category: article.category?._id || '',
+      tags: Array.isArray(article.tags) ? article.tags.join(', ') : '',
+      isPublished: !!article.isPublished,
+    });
+    setIsDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -112,14 +158,14 @@ export default function AdminArticlesPage() {
         <h1 className="text-3xl font-bold">Base de Conhecimento</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={openCreateDialog}>
               <Plus className="mr-2 h-4 w-4" />
               Novo Artigo
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Criar Novo Artigo</DialogTitle>
+              <DialogTitle>{isEditing ? 'Editar Artigo' : 'Criar Novo Artigo'}</DialogTitle>
               <DialogDescription>
                 Crie artigos para a base de conhecimento dos seus clientes.
               </DialogDescription>
@@ -173,6 +219,21 @@ export default function AdminArticlesPage() {
                 </div>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={newArticle.isPublished ? 'published' : 'draft'}
+                  onValueChange={(value) => setNewArticle({ ...newArticle, isPublished: value === 'published' })}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Rascunho</SelectItem>
+                    <SelectItem value="published">Publicado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="content">Conteúdo (Markdown)</Label>
                 <Textarea
                   id="content"
@@ -187,15 +248,8 @@ export default function AdminArticlesPage() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => createMutation.mutate(false)}
-                disabled={createMutation.isPending}
-              >
-                Salvar Rascunho
-              </Button>
-              <Button onClick={() => createMutation.mutate(true)} disabled={createMutation.isPending}>
-                Publicar
+              <Button onClick={() => upsertMutation.mutate()} disabled={upsertMutation.isPending}>
+                {isEditing ? 'Salvar' : 'Criar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -275,7 +329,12 @@ export default function AdminArticlesPage() {
                       <Eye className="h-4 w-4" />
                     </Button>
                   </Link>
-                  <Button variant="ghost" size="icon">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openEditDialog(article)}
+                    aria-label="Editar artigo"
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button

@@ -32,6 +32,12 @@ export const articlesApi = {
 
   getBySlug: (slug: string) => api.get<{ article: ArticleDetail }>(`/articles/${slug}`),
 
+  related: (slug: string, params?: { limit?: number }) =>
+    api.get<{ articles: ArticleListItem[] }>(`/articles/${slug}/related`, { params }),
+
+  byTicket: (ticketId: string) =>
+    api.get<{ articles: ArticleListItem[] }>(`/articles/by-ticket/${ticketId}`),
+
   create: (data: { title: string; content: string; excerpt?: string; category?: string; tags?: string[]; isPublished?: boolean }) =>
     api.post('/articles', data),
 
@@ -40,4 +46,13 @@ export const articlesApi = {
   remove: (id: string) => api.delete(`/articles/${id}`),
 
   vote: (id: string, helpful: boolean) => api.post(`/articles/${id}/vote`, { helpful }),
+
+  feedback: (id: string, data: { helpful: boolean; comment?: string }) =>
+    api.post(`/articles/${id}/feedback`, data),
+
+  linkTicket: (articleId: string, ticketId: string) =>
+    api.post(`/articles/${articleId}/related-tickets`, { ticketId }),
+
+  unlinkTicket: (articleId: string, ticketId: string) =>
+    api.delete(`/articles/${articleId}/related-tickets/${ticketId}`),
 };
