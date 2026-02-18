@@ -1,5 +1,4 @@
 import { Response } from 'express';
-import crypto from 'crypto';
 import { Invite, User, Tenant } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
@@ -24,17 +23,18 @@ export const createInvite = async (
       throw new AppError('Insufficient permissions', 403);
     }
 
+    const normalizedEmail = data.email.trim().toLowerCase();
+
     const existingUser = await User.findOne({
-      email: data.email.toLowerCase(),
-      tenant: user.tenant._id,
+      email: normalizedEmail,
     });
 
     if (existingUser) {
-      throw new AppError('User already exists in this tenant', 400);
+      throw new AppError('Email already registered', 400);
     }
 
     const existingInvite = await Invite.findOne({
-      email: data.email.toLowerCase(),
+      email: normalizedEmail,
       tenant: user.tenant._id,
       status: 'pending',
     });
@@ -47,7 +47,7 @@ export const createInvite = async (
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const invite = await Invite.create({
-      email: data.email.toLowerCase(),
+      email: normalizedEmail,
       role: data.role,
       tenant: user.tenant._id,
       invitedBy: user._id,
@@ -57,7 +57,7 @@ export const createInvite = async (
 
     const tenant = await Tenant.findById(user.tenant._id);
     if (tenant) {
-      await notificationService.notifyUserInvited(data.email, user, tenant, data.role);
+      await notificationService.notifyUserInvited(normalizedEmail, user, tenant, data.role, token);
     }
 
     res.status(201).json({
@@ -115,6 +115,42 @@ export const cancelInvite = async (
   res.json({ message: 'Invite cancelled' });
 };
 
+export const resendInvite = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  const user = req.user!;
+
+  if (!['admin', 'manager'].includes(user.role)) {
+    throw new AppError('Insufficient permissions', 403);
+  }
+
+  const invite = await Invite.findOne({
+    _id: id,
+    tenant: user.tenant._id,
+    status: 'pending',
+  });
+
+  if (!invite) {
+    throw new AppError('Invite not found or already processed', 404);
+  }
+
+  const token = uuidv4();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+  invite.token = token;
+  invite.expiresAt = expiresAt;
+  await invite.save();
+
+  const tenant = await Tenant.findById(user.tenant._id);
+  if (tenant) {
+    await notificationService.notifyUserInvited(invite.email, user, tenant, invite.role, token);
+  }
+
+  res.json({ message: 'Invite resent' });
+};
+
 export const acceptInvite = async (
   req: AuthRequest,
   res: Response
@@ -125,10 +161,9 @@ export const acceptInvite = async (
     throw new AppError('Token is required', 400);
   }
 
-  const invite = await Invite.findOne({
-    token,
-    status: 'pending',
-  });
+  const invite = await Invite.findOne({ token, status: 'pending' })
+    .populate('tenant', 'name slug logo')
+    .populate('invitedBy', 'name');
 
   if (!invite) {
     throw new AppError('Invalid or expired invite', 400);
@@ -143,9 +178,12 @@ export const acceptInvite = async (
   res.json({
     valid: true,
     invite: {
+      _id: invite._id,
       email: invite.email,
       role: invite.role,
       tenant: invite.tenant,
+      invitedBy: invite.invitedBy,
+      expiresAt: invite.expiresAt,
     },
   });
 };
@@ -161,6 +199,7 @@ export const getPendingInvites = async (
     status: 'pending',
     expiresAt: { $gt: new Date() },
   })
+    .select('email role tenant invitedBy expiresAt status createdAt')
     .populate('tenant', 'name slug logo')
     .populate('invitedBy', 'name');
 

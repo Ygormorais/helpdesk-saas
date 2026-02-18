@@ -307,14 +307,20 @@ export class NotificationService {
     }
   }
 
-  async notifyUserInvited(invitedEmail: string, inviter: IUser, tenant: ITenant, role: string): Promise<void> {
+  async notifyUserInvited(
+    invitedEmail: string,
+    inviter: IUser,
+    tenant: ITenant,
+    role: string,
+    inviteToken: string
+  ): Promise<void> {
     await sendEmail({
       to: invitedEmail,
       ...emailTemplates.inviteUser({
         inviterName: inviter.name,
         tenantName: tenant.name,
         role,
-        url: `${process.env.FRONTEND_URL}/register?invite=true&email=${encodeURIComponent(invitedEmail)}`,
+        url: `${process.env.FRONTEND_URL}/register?invite=true&token=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(invitedEmail)}`,
       }),
     });
   }

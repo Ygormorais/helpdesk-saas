@@ -9,6 +9,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
+  registerInvite: (data: RegisterInviteData) => Promise<void>;
   logout: () => void;
 }
 
@@ -17,6 +18,12 @@ interface RegisterData {
   password: string;
   name: string;
   tenantName: string;
+}
+
+interface RegisterInviteData {
+  token: string;
+  password: string;
+  name: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.data.user);
   };
 
+  const registerInvite = async (data: RegisterInviteData) => {
+    const response = await api.post('/auth/register-invite', data);
+    localStorage.setItem('token', response.data.token);
+    setToken(response.data.token);
+    setUser(response.data.user);
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
@@ -77,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         register,
+        registerInvite,
         logout,
       }}
     >

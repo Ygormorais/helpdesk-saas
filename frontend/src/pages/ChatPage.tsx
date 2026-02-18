@@ -22,6 +22,7 @@ type ChatItem = {
   type?: 'dm' | 'channel';
   name?: string;
   channelKey?: string;
+  isDefault?: boolean;
   updatedAt?: string;
 };
 
@@ -163,7 +164,12 @@ export default function ChatPage() {
     if (tab !== 'internal') return [];
     return (chats as any[])
       .filter((c: any) => c.type === 'channel' || c.channelKey)
-      .sort((a: any, b: any) => String(a.name || a.channelKey).localeCompare(String(b.name || b.channelKey)));
+      .sort((a: any, b: any) => {
+        const ad = a.isDefault ? 0 : 1;
+        const bd = b.isDefault ? 0 : 1;
+        if (ad !== bd) return ad - bd;
+        return String(a.name || a.channelKey).localeCompare(String(b.name || b.channelKey));
+      });
   }, [chats, tab]);
 
   const internalDms = useMemo(() => {
@@ -393,6 +399,7 @@ export default function ChatPage() {
                   ) : internalChannels.map((c: any) => {
                     const isActive = currentChat?._id === c._id;
                     const title = c.name || `#${c.channelKey}`;
+                    const channelKeyLabel = c.channelKey ? `#${c.channelKey}` : null;
                     return (
                       <div
                         key={c._id}
@@ -406,12 +413,21 @@ export default function ChatPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium truncate">{title}</span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium truncate">{title}</span>
+                              {c.isDefault ? (
+                                <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                  Padrao
+                                </span>
+                              ) : null}
+                            </div>
                             {c.lastMessage?.createdAt ? (
                               <span className="text-xs text-muted-foreground">{formatTime(c.lastMessage.createdAt)}</span>
                             ) : null}
                           </div>
-                          <p className="text-sm text-muted-foreground truncate">{c.lastMessage?.content || 'Sem mensagens ainda'}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {c.lastMessage?.content || (channelKeyLabel ? `Canal ${channelKeyLabel}` : 'Sem mensagens ainda')}
+                          </p>
                           {c.unreadCount > 0 ? (
                             <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-xs text-primary-foreground mt-1">
                               {c.unreadCount}
@@ -432,6 +448,7 @@ export default function ChatPage() {
                       const isActive = currentChat?._id === c._id;
                       const other = (c.participants || []).find((p: any) => p?._id !== user?.id);
                       const title = other?.name || 'Conversa';
+                      const isOnline = other?._id ? onlineUsers.includes(other._id) : false;
                       return (
                         <div
                           key={c._id}
@@ -440,8 +457,11 @@ export default function ChatPage() {
                             isActive ? 'bg-primary/10' : 'hover:bg-muted'
                           }`}
                         >
-                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                          <div className="relative h-10 w-10 rounded-full bg-muted flex items-center justify-center">
                             <MessageCircle className="h-5 w-5" />
+                            {isOnline ? (
+                              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+                            ) : null}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
@@ -510,7 +530,17 @@ export default function ChatPage() {
                         })()}
                       </p>
                     ) : (
-                      <p className="text-xs text-muted-foreground">Duvidas internas (vendas, suporte, CS)</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(() => {
+                          const c: any = currentChat;
+                          const isChannel = c?.type === 'channel' || c?.channelKey;
+                          if (isChannel) {
+                            const key = c?.channelKey ? `#${c.channelKey}` : 'canal';
+                            return c?.isDefault ? `Canal padrao ${key}` : `Canal interno ${key}`;
+                          }
+                          return 'Conversa direta interna';
+                        })()}
+                      </p>
                     )}
                   </div>
                 </div>

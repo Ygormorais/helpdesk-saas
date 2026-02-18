@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, getMe } from '../controllers/authController.js';
+import { register, registerInvite, login, getMe } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 
 const router = Router();
@@ -39,6 +39,8 @@ const router = Router();
  *         description: Erro de validação
  */
 router.post('/register', register);
+
+router.post('/register-invite', registerInvite);
 
 /**
  * @swagger

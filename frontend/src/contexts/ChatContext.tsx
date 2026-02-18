@@ -27,6 +27,7 @@ interface Chat {
   type?: 'dm' | 'channel';
   name?: string;
   channelKey?: string;
+  isDefault?: boolean;
   status: 'active' | 'closed';
   createdAt: string;
   updatedAt: string;

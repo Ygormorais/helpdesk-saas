@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
 import { config } from '../config/index.js';
-import { Tenant, User, UserRole } from '../models/index.js';
+import { Invite, Tenant, User, UserRole } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { planService } from '../services/planService.js';
@@ -17,6 +17,12 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
+});
+
+const registerInviteSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(6),
+  name: z.string().min(2),
 });
 
 const generateToken = (userId: string, tenantId: string): string => {
@@ -132,6 +138,71 @@ export const login = async (
   }
 };
 
+export const registerInvite = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { token, password, name } = registerInviteSchema.parse(req.body);
+
+    const invite = await Invite.findOne({ token, status: 'pending' }).populate('tenant');
+    if (!invite) {
+      throw new AppError('Invalid or expired invite', 400);
+    }
+
+    if (new Date() > invite.expiresAt) {
+      invite.status = 'expired';
+      await invite.save();
+      throw new AppError('Invite has expired', 400);
+    }
+
+    const existingUser = await User.findOne({ email: invite.email });
+    if (existingUser) {
+      throw new AppError('Email already registered', 400);
+    }
+
+    const tenant: any = invite.tenant as any;
+    if (!tenant?._id) {
+      throw new AppError('Tenant not found', 400);
+    }
+
+    const user = await User.create({
+      email: invite.email,
+      password,
+      name,
+      role: invite.role,
+      tenant: tenant._id,
+    });
+
+    invite.status = 'accepted';
+    await invite.save();
+
+    const jwtToken = generateToken(user._id.toString(), tenant._id.toString());
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token: jwtToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        tenant: {
+          id: tenant._id,
+          name: tenant.name,
+          slug: tenant.slug,
+        },
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ message: 'Validation error', errors: error.errors });
+      return;
+    }
+    throw error;
+  }
+};
+
 export const getMe = async (
   req: AuthRequest,
   res: Response
@@ -142,6 +213,8 @@ export const getMe = async (
     return;
   }
 
+  const tenant: any = user.tenant as any;
+
   res.json({
     user: {
       id: user._id,
@@ -149,6 +222,13 @@ export const getMe = async (
       name: user.name,
       role: user.role,
       avatar: user.avatar,
+      tenant: tenant?._id
+        ? {
+            id: tenant._id,
+            name: tenant.name,
+            slug: tenant.slug,
+          }
+        : undefined,
     },
   });
 };

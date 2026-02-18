@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Mail, UserPlus, X } from 'lucide-react';
+import { Mail, RefreshCw, UserPlus, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,6 +64,7 @@ export default function TeamPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newInvite, setNewInvite] = useState({ email: '', role: 'agent' as string });
+  const [resendingInviteId, setResendingInviteId] = useState<string | null>(null);
 
   const canManageInvites = user?.role === 'admin' || user?.role === 'manager';
 
@@ -77,6 +78,7 @@ export default function TeamPage() {
 
   const invitesQuery = useQuery({
     queryKey: ['invites'],
+    enabled: canManageInvites,
     queryFn: async () => {
       const res = await invitesApi.list();
       return (res.data.invites || []) as InviteDto[];
@@ -122,6 +124,24 @@ export default function TeamPage() {
         description: error?.response?.data?.message || 'Tente novamente',
         variant: 'destructive',
       });
+    },
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: async (id: string) => invitesApi.resend(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invites'] });
+      toast({ title: 'Convite reenviado' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao reenviar convite',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      setResendingInviteId(null);
     },
   });
 
@@ -232,36 +252,53 @@ export default function TeamPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Convites Pendentes</CardTitle>
-            <CardDescription>Convites enviados aguardando resposta</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {invitesQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Carregando convites...</p>
-            ) : invitesQuery.isError ? (
-              <p className="text-sm text-destructive">Erro ao carregar convites</p>
-            ) : pendingInvites.length > 0 ? (
-              <div className="space-y-4">
-                {pendingInvites.map((invite) => (
-                  <div key={invite._id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <Mail className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{invite.email}</p>
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                          <span>Enviado: {invite.createdAt ? new Date(invite.createdAt).toLocaleString('pt-BR') : '-'}</span>
-                          <span>•</span>
-                          <span>Expira: {invite.expiresAt ? new Date(invite.expiresAt).toLocaleString('pt-BR') : '-'}</span>
+        {canManageInvites ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Convites Pendentes</CardTitle>
+              <CardDescription>Convites enviados aguardando resposta</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invitesQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">Carregando convites...</p>
+              ) : invitesQuery.isError ? (
+                <p className="text-sm text-destructive">Erro ao carregar convites</p>
+              ) : pendingInvites.length > 0 ? (
+                <div className="space-y-4">
+                  {pendingInvites.map((invite) => (
+                    <div key={invite._id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                          <Mail className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{invite.email}</p>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <span>
+                              Enviado: {invite.createdAt ? new Date(invite.createdAt).toLocaleString('pt-BR') : '-'}
+                            </span>
+                            <span>•</span>
+                            <span>
+                              Expira: {invite.expiresAt ? new Date(invite.expiresAt).toLocaleString('pt-BR') : '-'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getRoleBadge(invite.role)}
-                      {canManageInvites ? (
+                      <div className="flex items-center gap-2">
+                        {getRoleBadge(invite.role)}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setResendingInviteId(invite._id);
+                            resendInviteMutation.mutate(invite._id);
+                          }}
+                          disabled={resendInviteMutation.isPending}
+                          title="Reenviar convite"
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          {resendInviteMutation.isPending && resendingInviteId === invite._id ? 'Reenviando...' : 'Reenviar'}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -272,18 +309,18 @@ export default function TeamPage() {
                         >
                           <X className="h-4 w-4" />
                         </Button>
-                      ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Nenhum convite pendente</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Nenhum convite pendente</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

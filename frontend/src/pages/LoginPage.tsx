@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { invitesApi, type InviteDto } from '@/api/invites';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -21,14 +22,49 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<InviteDto[]>([]);
+  const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
+
+  const emailValue = watch('email');
+  const normalizedEmail = useMemo(() => String(emailValue || '').trim().toLowerCase(), [emailValue]);
+
+  useEffect(() => {
+    const isValid = z.string().email().safeParse(normalizedEmail).success;
+    if (!isValid) {
+      setPendingInvites([]);
+      setPendingInvitesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      try {
+        setPendingInvitesLoading(true);
+        const res = await invitesApi.pending(normalizedEmail);
+        if (cancelled) return;
+        setPendingInvites(res.data.invites || []);
+      } catch {
+        if (cancelled) return;
+        setPendingInvites([]);
+      } finally {
+        if (!cancelled) setPendingInvitesLoading(false);
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [normalizedEmail]);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -66,6 +102,25 @@ export default function LoginPage() {
               {errors.email && (
                 <p className="text-sm text-destructive">{errors.email.message}</p>
               )}
+
+              {pendingInvitesLoading ? (
+                <p className="text-xs text-muted-foreground">Verificando convites pendentes...</p>
+              ) : pendingInvites.length > 0 ? (
+                <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                  <p className="font-medium">Convite pendente encontrado</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Verifique seu email para o link de acesso (incluindo spam/lixo eletronico).
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {pendingInvites.map((inv) => (
+                      <div key={inv._id} className="flex items-center justify-between gap-3 text-xs">
+                        <span className="truncate">{inv.tenant?.name || 'Equipe'}</span>
+                        <span className="text-muted-foreground">expira {inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString('pt-BR') : '-'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-2">
