@@ -1,9 +1,10 @@
 import { Response } from 'express';
-import { Article, ArticleFeedback, Ticket } from '../models/index.js';
+import { Article, ArticleFeedback, Ticket, AuditAction } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
 import { aiArticleSearchService } from '../services/aiArticleSearchService.js';
+import { auditService } from '../services/auditService.js';
 
 const createArticleSchema = z.object({
   title: z.string().min(5),
@@ -106,6 +107,18 @@ export const createArticle = async (
 
     await article.populate('author', 'name email');
     await article.populate('category', 'name color');
+
+    await auditService.log(
+      AuditAction.ARTICLE_CREATED,
+      'article',
+      article._id.toString(),
+      {
+        title: article.title,
+        slug: article.slug,
+        isPublished: article.isPublished,
+      },
+      { user, ip: req.ip, userAgent: req.get('user-agent') }
+    );
 
     res.status(201).json({ message: 'Article created', article });
   } catch (error) {
@@ -285,6 +298,17 @@ export const updateArticle = async (
   await article.populate('author', 'name email');
   await article.populate('category', 'name color');
 
+  await auditService.log(
+    AuditAction.ARTICLE_UPDATED,
+    'article',
+    article._id.toString(),
+    {
+      slug: article.slug,
+      updates,
+    },
+    { user, ip: req.ip, userAgent: req.get('user-agent') }
+  );
+
   res.json({ message: 'Article updated', article });
 };
 
@@ -303,6 +327,17 @@ export const deleteArticle = async (
   if (!article) {
     throw new AppError('Article not found', 404);
   }
+
+  await auditService.log(
+    AuditAction.ARTICLE_DELETED,
+    'article',
+    article._id.toString(),
+    {
+      title: article.title,
+      slug: article.slug,
+    },
+    { user, ip: req.ip, userAgent: req.get('user-agent') }
+  );
 
   res.json({ message: 'Article deleted' });
 };
