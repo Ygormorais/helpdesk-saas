@@ -5,6 +5,7 @@ import {
   Clock,
   CreditCard,
   FolderOpen,
+  Filter,
   History,
   LayoutDashboard,
   LogOut,
@@ -29,6 +30,9 @@ type PlanFeatures = {
   webhooks: boolean;
   satisfactionSurvey: boolean;
   advancedReports: boolean;
+  macros: boolean;
+  automations: boolean;
+  auditExport: boolean;
   api: boolean;
   customDomain: boolean;
   whiteLabel: boolean;
@@ -48,11 +52,13 @@ const navigation: Array<{ name: string; href: string; icon: any; roles?: Role[];
   { name: 'Base de Conhecimento', href: '/knowledge', icon: BookOpen, feature: 'knowledgeBase' },
   { name: 'Equipe', href: '/team', icon: Users, roles: ['admin', 'manager'] },
   { name: 'Admin Artigos', href: '/admin/articles', icon: PenTool, roles: ['admin', 'manager', 'agent'], feature: 'knowledgeBase' },
+  { name: 'Macros', href: '/macros', icon: PenTool, roles: ['admin', 'manager', 'agent'], feature: 'macros' },
+  { name: 'Automacoes', href: '/automations', icon: Filter, roles: ['admin', 'manager'], feature: 'automations' },
   { name: 'Webhooks', href: '/webhooks', icon: Webhook, roles: ['admin', 'manager'], feature: 'webhooks' },
   { name: 'Satisfação', href: '/satisfaction', icon: Star, roles: ['admin', 'manager', 'agent'], feature: 'satisfactionSurvey' },
   { name: 'Tempo', href: '/time', icon: Clock, roles: ['admin', 'manager', 'agent'], feature: 'timeTracking' },
   { name: 'Planos', href: '/plans', icon: CreditCard, roles: ['admin', 'manager'] },
-  { name: 'Audit Log', href: '/audit', icon: History, roles: ['admin'] },
+  { name: 'Audit Log', href: '/audit', icon: History, roles: ['admin', 'manager'] },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 

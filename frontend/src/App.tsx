@@ -34,6 +34,8 @@ const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const PricingPage = lazy(() => import('@/pages/PricingPage'));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
 const PlatformAdminTenantsPage = lazy(() => import('@/pages/PlatformAdminTenantsPage'));
+const MacrosPage = lazy(() => import('@/pages/MacrosPage'));
+const AutomationsPage = lazy(() => import('@/pages/AutomationsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -106,6 +108,8 @@ function AppRoutes() {
           <Route path="satisfaction" element={<SatisfactionPage />} />
           <Route path="time" element={<TimeReportsPage />} />
           <Route path="plans" element={<PlansPage />} />
+          <Route path="macros" element={<MacrosPage />} />
+          <Route path="automations" element={<AutomationsPage />} />
           <Route path="platform/tenants" element={<PlatformAdminTenantsPage />} />
         </Route>
       </Routes>

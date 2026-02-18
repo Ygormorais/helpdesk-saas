@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+ 
 import Timer from '@/components/Timer';
 import { ticketsApi } from '@/api/tickets';
 import { chatApi } from '@/api/chat';
 import { articlesApi } from '@/api/articles';
+import { macrosApi } from '@/api/macros';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -97,6 +99,21 @@ export default function TicketDetailPage() {
 
   const isStaff = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'agent';
   const isClient = user?.role === 'client';
+
+  const macrosQuery = useQuery({
+    queryKey: ['macros', 'active'],
+    enabled: !!id && isStaff,
+    queryFn: async () => {
+      try {
+        const res = await macrosApi.list({ active: true });
+        return res.data.macros;
+      } catch (e: any) {
+        if (e?.response?.status === 403) return [];
+        throw e;
+      }
+    },
+    staleTime: 60_000,
+  });
 
   const linkedArticlesQuery = useQuery({
     queryKey: ['ticket', id, 'kb-articles'],
@@ -447,6 +464,35 @@ export default function TicketDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {isStaff && (macrosQuery.data || []).length > 0 ? (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label>Inserir macro</Label>
+                        <Select
+                          onValueChange={(macroId) => {
+                            const m = (macrosQuery.data || []).find((x: any) => String(x._id) === String(macroId));
+                            if (!m?.content) return;
+                            setNewComment((prev) => {
+                              const p = String(prev || '');
+                              const sep = p.trim().length ? '\n\n' : '';
+                              return `${p}${sep}${m.content}`;
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(macrosQuery.data || []).map((m: any) => (
+                              <SelectItem key={m._id} value={m._id}>
+                                {m.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ) : null}
                   <Textarea
                     placeholder="Digite sua resposta..."
                     value={newComment}

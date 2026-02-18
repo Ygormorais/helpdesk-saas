@@ -17,11 +17,15 @@ import userRoutes from './userRoutes.js';
 import platformAdminRoutes from './platformAdminRoutes.js';
 import metricsRoutes from './metricsRoutes.js';
 import healthRoutes from './healthRoutes.js';
+import macroRoutes from './macroRoutes.js';
+import automationRoutes from './automationRoutes.js';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/health', healthRoutes);
+router.use('/macros', macroRoutes);
+router.use('/automations', automationRoutes);
 router.use('/tickets', ticketRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/articles', articleRoutes);

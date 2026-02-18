@@ -5,6 +5,7 @@ import { AppError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
 import { notificationService } from '../services/notificationService.js';
 import { auditService } from '../services/auditService.js';
+import { automationService } from '../services/automationService.js';
 import { addBusinessMs, businessMsBetween, type BusinessCalendar } from '../utils/businessTime.js';
 import { csvLine } from '../utils/csv.js';
 import { once } from 'events';
@@ -132,6 +133,13 @@ export const createTicket = async (
         ip: req.ip,
         userAgent: req.get('user-agent'),
       },
+    });
+
+    // Apply paid automation rules (best-effort)
+    await automationService.applyTicketCreated({
+      tenantId: user.tenant._id.toString(),
+      ticketId: ticket._id.toString(),
+      actorUserId: user._id.toString(),
     });
 
     await ticket.populate('createdBy', 'name email');
