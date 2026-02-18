@@ -167,9 +167,10 @@ Solução: Normal, o sistema reutiliza clientes existentes
 
 ### Webhook não chega
 ```
-Solução 1: Verifique se a URL está pública (não localhost)
-Solução 2: Verifique se o SSL está válido (HTTPS)
-Solução 3: Teste manualmente via Postman
+Solução 1: Se estiver testando localmente, exponha o backend com ngrok (veja `NGROK.md`)
+Solução 2: Verifique se a URL está pública (não localhost)
+Solução 3: Verifique se o SSL está válido (HTTPS)
+Solução 4: Teste manualmente via Postman
 ```
 
 ### Plano não ativa após pagamento

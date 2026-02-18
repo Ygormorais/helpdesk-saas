@@ -120,6 +120,12 @@ VITE_API_URL=/api
 - Webhook: configure no painel do Asaas para apontar para `POST /api/billing/webhook`
 - Header de seguranca (opcional): se `ASAAS_WEBHOOK_SECRET` estiver definido, o backend valida o header `asaas-access-token`
 
+### Testar webhook local (ngrok)
+
+Para testar o webhook do Asaas apontando para sua maquina (localhost), use ngrok para expor o backend com HTTPS.
+
+- Guia rapido: `NGROK.md`
+
 ### Smoke test (cobranca)
 
 1) Crie um tenant e entre como admin/manager
