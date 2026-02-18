@@ -13,6 +13,7 @@ import { categoriesApi } from '@/api/categories';
 import { api } from '@/config/api';
 import { useToast } from '@/hooks/use-toast';
 import { FeatureUnavailable } from '@/components/FeatureUnavailable';
+import { Link } from 'react-router-dom';
 
 type StaffUser = { _id: string; name: string; email?: string };
 
@@ -35,7 +36,7 @@ export default function AutomationsPage() {
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const res = await automationsApi.list();
-      return res.data.rules;
+      return res.data;
     },
     staleTime: 60_000,
   });
@@ -115,7 +116,9 @@ export default function AutomationsPage() {
     },
   });
 
-  const rows = useMemo(() => rulesQuery.data || [], [rulesQuery.data]);
+  const rows = useMemo(() => rulesQuery.data?.rules || [], [rulesQuery.data?.rules]);
+  const usage = rulesQuery.data?.usage;
+  const limitReached = usage?.max !== undefined && usage?.max !== -1 && (usage?.current || 0) >= usage.max;
 
   const openCreate = () => {
     setEditing(null);
@@ -171,7 +174,20 @@ export default function AutomationsPage() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openCreate}>
+            <Button
+              onClick={() => {
+                if (limitReached) {
+                  toast({
+                    title: 'Limite de regras atingido',
+                    description: 'Faça upgrade para criar mais regras de automacao.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                openCreate();
+              }}
+              disabled={limitReached}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Nova regra
             </Button>
@@ -268,7 +284,14 @@ export default function AutomationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Regras</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Regras</CardTitle>
+            {usage ? (
+              <p className="text-xs text-muted-foreground">
+                {usage.current} / {usage.max === -1 ? '∞' : usage.max}
+              </p>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {rulesQuery.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : null}
@@ -308,6 +331,19 @@ export default function AutomationsPage() {
           ))}
         </CardContent>
       </Card>
+
+      {limitReached ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-amber-900">
+              Voce atingiu o limite de regras de automacao do seu plano.
+            </p>
+            <Link to="/plans">
+              <Button variant="secondary">Ver planos</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AutomationRule } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
+import { planService } from '../services/planService.js';
 
 const createSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -33,7 +34,17 @@ export const listAutomationRules = async (req: AuthRequest, res: Response): Prom
     .populate('actions.assignTo', 'name email')
     .select('name isActive trigger conditions actions createdAt updatedAt');
 
-  res.json({ rules });
+  const plan = await planService.getPlanDetails(user.tenant._id.toString());
+  const max = (plan as any)?.limits?.automations?.max ?? -1;
+  const current = (plan as any)?.limits?.automations?.current ?? rules.length;
+
+  res.json({
+    rules,
+    usage: {
+      current,
+      max,
+    },
+  });
 };
 
 export const createAutomationRule = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -47,6 +58,13 @@ export const createAutomationRule = async (req: AuthRequest, res: Response): Pro
   if (!parsed.data.actions.assignTo && !parsed.data.actions.setStatus) {
     res.status(400).json({ message: 'At least one action is required' });
     return;
+  }
+
+  const plan = await planService.getPlanDetails(user.tenant._id.toString());
+  const max = (plan as any)?.limits?.automations?.max ?? -1;
+  const current = (plan as any)?.limits?.automations?.current ?? 0;
+  if (max !== -1 && current >= max) {
+    throw new AppError(`Limite de regras de automacao atingido (${current}/${max}). Faça upgrade para criar mais regras.`, 403);
   }
 
   const rule = await AutomationRule.create({

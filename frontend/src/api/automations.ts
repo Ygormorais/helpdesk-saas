@@ -18,7 +18,7 @@ export type AutomationRule = {
 };
 
 export const automationsApi = {
-  list: () => api.get<{ rules: AutomationRule[] }>('/automations'),
+  list: () => api.get<{ rules: AutomationRule[]; usage?: { current: number; max: number } }>('/automations'),
   create: (data: any) => api.post('/automations', data),
   update: (id: string, data: any) => api.put(`/automations/${id}`, data),
   remove: (id: string) => api.delete(`/automations/${id}`),

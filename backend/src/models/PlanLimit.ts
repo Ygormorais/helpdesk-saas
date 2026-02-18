@@ -52,6 +52,8 @@ export interface PlanLimitConfig {
   maxAgents: number;
   maxTickets: number;
   maxStorage: number;
+  maxMacros: number;
+  maxAutomationRules: number;
   features: IPlanLimit['features'];
 }
 
@@ -61,6 +63,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxAgents: 1,
     maxTickets: 50,
     maxStorage: 100,
+    maxMacros: 0,
+    maxAutomationRules: 0,
     features: {
       knowledgeBase: false,
       timeTracking: false,
@@ -80,6 +84,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxAgents: 5,
     maxTickets: -1, // ilimitado
     maxStorage: 1000,
+    maxMacros: 50,
+    maxAutomationRules: 20,
     features: {
       knowledgeBase: true,
       timeTracking: true,
@@ -99,6 +105,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimitConfig> = {
     maxAgents: -1, // ilimitado
     maxTickets: -1,
     maxStorage: 10000,
+    maxMacros: -1,
+    maxAutomationRules: -1,
     features: {
       knowledgeBase: true,
       timeTracking: true,

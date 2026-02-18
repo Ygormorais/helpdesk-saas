@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { PlanLimit, PLAN_LIMITS, PlanType, User, Ticket, type IPlanLimit } from '../models/index.js';
+import { PlanLimit, PLAN_LIMITS, PlanType, User, Ticket, Macro, AutomationRule, type IPlanLimit } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
@@ -40,6 +40,8 @@ export class PlanService {
     maxAgents: number;
     maxTickets: number;
     maxStorage: number;
+    maxMacros: number;
+    maxAutomationRules: number;
     features: IPlanLimit['features'];
     isPaidAccessBlocked: boolean;
   } {
@@ -58,6 +60,8 @@ export class PlanService {
         maxAgents: pro.maxAgents,
         maxTickets: pro.maxTickets,
         maxStorage: pro.maxStorage,
+        maxMacros: pro.maxMacros,
+        maxAutomationRules: pro.maxAutomationRules,
         features: mergeFeatures(pro.features),
         isPaidAccessBlocked: false,
       };
@@ -76,6 +80,8 @@ export class PlanService {
           maxAgents: cfg.maxAgents,
           maxTickets: cfg.maxTickets,
           maxStorage: cfg.maxStorage,
+          maxMacros: cfg.maxMacros,
+          maxAutomationRules: cfg.maxAutomationRules,
           features: mergeFeatures(cfg.features),
           isPaidAccessBlocked: false,
         };
@@ -86,6 +92,8 @@ export class PlanService {
         maxAgents: free.maxAgents,
         maxTickets: free.maxTickets,
         maxStorage: free.maxStorage,
+        maxMacros: free.maxMacros,
+        maxAutomationRules: free.maxAutomationRules,
         features: mergeFeatures(free.features),
         isPaidAccessBlocked: true,
       };
@@ -100,6 +108,8 @@ export class PlanService {
         maxAgents: planLimit.maxAgents,
         maxTickets: planLimit.maxTickets,
         maxStorage: planLimit.maxStorage,
+        maxMacros: PLAN_LIMITS[planLimit.plan].maxMacros,
+        maxAutomationRules: PLAN_LIMITS[planLimit.plan].maxAutomationRules,
         features: mergeFeatures(PLAN_LIMITS[planLimit.plan].features),
         isPaidAccessBlocked: false,
       };
@@ -111,6 +121,8 @@ export class PlanService {
       maxAgents: free.maxAgents,
       maxTickets: free.maxTickets,
       maxStorage: free.maxStorage,
+      maxMacros: free.maxMacros,
+      maxAutomationRules: free.maxAutomationRules,
       features: mergeFeatures(free.features),
       isPaidAccessBlocked: true,
     };
@@ -234,12 +246,14 @@ export class PlanService {
     }
 
     // Refresh usage metrics (cheap counters)
-    const [currentAgents, currentTickets] = await Promise.all([
+    const [currentAgents, currentTickets, currentMacros, currentAutomationRules] = await Promise.all([
       User.countDocuments({
         tenant: tenantId,
         role: { $in: ['admin', 'manager', 'agent'] },
       }),
       Ticket.countDocuments({ tenant: tenantId }),
+      Macro.countDocuments({ tenant: tenantId }),
+      AutomationRule.countDocuments({ tenant: tenantId }),
     ]);
 
     planLimit.currentUsage.agents = currentAgents;
@@ -262,6 +276,8 @@ export class PlanService {
         agents: { current: planLimit.currentUsage.agents, max: effective.maxAgents },
         tickets: { current: planLimit.currentUsage.tickets, max: effective.maxTickets },
         storage: { current: planLimit.currentUsage.storage, max: effective.maxStorage },
+        macros: { current: currentMacros, max: effective.maxMacros },
+        automations: { current: currentAutomationRules, max: effective.maxAutomationRules },
       },
       features: effective.features,
       subscription: planLimit.subscription,

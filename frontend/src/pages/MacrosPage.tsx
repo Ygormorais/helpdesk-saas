@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { macrosApi, type Macro } from '@/api/macros';
 import { useToast } from '@/hooks/use-toast';
 import { FeatureUnavailable } from '@/components/FeatureUnavailable';
+import { Link } from 'react-router-dom';
 
 export default function MacrosPage() {
   const [search, setSearch] = useState('');
@@ -30,7 +31,7 @@ export default function MacrosPage() {
         search: search.trim() || undefined,
         active: status === 'all' ? undefined : status === 'active',
       });
-      return res.data.macros;
+      return res.data;
     },
     staleTime: 60_000,
   });
@@ -82,8 +83,11 @@ export default function MacrosPage() {
     },
   });
 
-  const macros = query.data || [];
+  const macros = query.data?.macros || [];
+  const usage = query.data?.usage;
   const rows = useMemo(() => macros, [macros]);
+
+  const limitReached = usage?.max !== undefined && usage?.max !== -1 && (usage?.current || 0) >= usage.max;
 
   const openCreate = () => {
     setEditing(null);
@@ -121,7 +125,20 @@ export default function MacrosPage() {
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openCreate}>
+            <Button
+              onClick={() => {
+                if (limitReached) {
+                  toast({
+                    title: 'Limite de macros atingido',
+                    description: 'Faça upgrade para criar mais macros.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                openCreate();
+              }}
+              disabled={limitReached}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Nova macro
             </Button>
@@ -199,7 +216,14 @@ export default function MacrosPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Lista</CardTitle>
+            {usage ? (
+              <p className="text-xs text-muted-foreground">
+                {usage.current} / {usage.max === -1 ? '∞' : usage.max}
+              </p>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {query.isLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : null}
@@ -238,6 +262,19 @@ export default function MacrosPage() {
           ))}
         </CardContent>
       </Card>
+
+      {limitReached ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4 flex items-center justify-between gap-3">
+            <p className="text-sm text-amber-900">
+              Voce atingiu o limite de macros do seu plano.
+            </p>
+            <Link to="/plans">
+              <Button variant="secondary">Ver planos</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

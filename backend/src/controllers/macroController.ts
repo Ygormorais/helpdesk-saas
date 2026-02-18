@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Macro } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
+import { planService } from '../services/planService.js';
 
 const createSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -27,7 +28,17 @@ export const listMacros = async (req: AuthRequest, res: Response): Promise<void>
     .sort({ name: 1 })
     .select('name content isActive createdAt updatedAt');
 
-  res.json({ macros });
+  const plan = await planService.getPlanDetails(user.tenant._id.toString());
+  const max = (plan as any)?.limits?.macros?.max ?? -1;
+  const current = (plan as any)?.limits?.macros?.current ?? macros.length;
+
+  res.json({
+    macros,
+    usage: {
+      current,
+      max,
+    },
+  });
 };
 
 export const createMacro = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -36,6 +47,13 @@ export const createMacro = async (req: AuthRequest, res: Response): Promise<void
   if (!parsed.success) {
     res.status(400).json({ message: 'Validation error', errors: parsed.error.errors });
     return;
+  }
+
+  const plan = await planService.getPlanDetails(user.tenant._id.toString());
+  const max = (plan as any)?.limits?.macros?.max ?? -1;
+  const current = (plan as any)?.limits?.macros?.current ?? 0;
+  if (max !== -1 && current >= max) {
+    throw new AppError(`Limite de macros atingido (${current}/${max}). Faça upgrade para criar mais macros.`, 403);
   }
 
   const macro = await Macro.create({

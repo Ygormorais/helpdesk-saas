@@ -11,7 +11,7 @@ export type Macro = {
 
 export const macrosApi = {
   list: (params?: { active?: boolean; search?: string }) =>
-    api.get<{ macros: Macro[] }>('/macros', { params }),
+    api.get<{ macros: Macro[]; usage?: { current: number; max: number } }>('/macros', { params }),
 
   create: (data: { name: string; content: string; isActive?: boolean }) =>
     api.post<{ macro: Macro }>('/macros', data),
