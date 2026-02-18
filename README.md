@@ -80,6 +80,12 @@ cd ../frontend
 npm install
 ```
 
+Se o backend estiver rodando em outra porta/URL no modo dev, ajuste o proxy do Vite em `frontend/.env.development`:
+
+```env
+VITE_PROXY_TARGET=http://localhost:3000
+```
+
 ### Variáveis de Ambiente (Backend)
 
 ```env
