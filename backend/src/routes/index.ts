@@ -15,6 +15,7 @@ import planRoutes from './planRoutes.js';
 import billingRoutes from './billingRoutes.js';
 import userRoutes from './userRoutes.js';
 import platformAdminRoutes from './platformAdminRoutes.js';
+import metricsRoutes from './metricsRoutes.js';
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use('/plan', planRoutes);
 router.use('/billing', billingRoutes);
 router.use('/users', userRoutes);
 router.use('/platform-admin', platformAdminRoutes);
+router.use('/metrics', metricsRoutes);
 
 export default router;
