@@ -35,6 +35,8 @@ interface Plan {
 
 interface CurrentPlan {
   plan: string;
+  effectivePlan?: string;
+  isPaidAccessBlocked?: boolean;
   isTrial: boolean;
   trialDaysLeft: number;
   limits: {
@@ -43,6 +45,14 @@ interface CurrentPlan {
     storage: { current: number; max: number };
   };
   features: Record<string, boolean>;
+  subscription?: {
+    status?: string;
+    trialEndsAt?: string;
+    currentPeriodStart?: string;
+    currentPeriodEnd?: string;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+  };
 }
 
 export default function PlansPage() {
@@ -54,6 +64,10 @@ export default function PlansPage() {
   const [billingType, setBillingType] = useState<'CREDIT_CARD' | 'BOLETO' | 'PIX'>('CREDIT_CARD');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isPortalOpen, setIsPortalOpen] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalData, setPortalData] = useState<any>(null);
   const { toast } = useToast();
 
   const selectedPlanObj = useMemo(
@@ -123,13 +137,53 @@ export default function PlansPage() {
         variant: 'destructive',
       });
     } catch (error) {
+      const msg = (error as any)?.response?.data?.message;
       toast({
         title: 'Erro',
-        description: 'Não foi possível iniciar o checkout',
+        description: msg || 'Não foi possível iniciar o checkout',
         variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const openPortal = async () => {
+    setPortalLoading(true);
+    setPortalData(null);
+    setIsPortalOpen(true);
+    try {
+      const res = await api.get('/billing/portal');
+      setPortalData(res.data);
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error?.response?.data?.message || 'Não foi possível carregar os dados da assinatura',
+        variant: 'destructive',
+      });
+      setIsPortalOpen(false);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  const cancel = async () => {
+    setIsCancelling(true);
+    try {
+      const res = await api.post('/billing/cancel');
+      toast({
+        title: 'Assinatura cancelada',
+        description: res.data?.messageDetail || 'Seu acesso continuará até o final do período pago.',
+      });
+      await fetchPlanDetails();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao cancelar',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -176,19 +230,50 @@ export default function PlansPage() {
             Escolha o plano ideal para sua equipe
           </p>
         </div>
-        {currentPlan?.isTrial && (
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            <Sparkles className="mr-2 h-4 w-4" />
-            Trial: {currentPlan.trialDaysLeft} dias restantes
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {currentPlan?.isTrial ? (
+            <Badge variant="secondary" className="text-lg px-4 py-2">
+              <Sparkles className="mr-2 h-4 w-4" />
+              Trial PRO: {currentPlan.trialDaysLeft} dias
+            </Badge>
+          ) : null}
+          <Button variant="outline" onClick={fetchPlanDetails} disabled={loading}>
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Uso Atual */}
       {currentPlan && (
         <Card>
           <CardHeader>
-            <CardTitle>Seu Plano Atual: {currentPlan.plan.toUpperCase()}</CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle>
+                Seu Plano Atual: {(currentPlan.effectivePlan || currentPlan.plan).toUpperCase()}
+              </CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                {currentPlan.isPaidAccessBlocked ? (
+                  <Badge variant="secondary" className="bg-red-100 text-red-800">
+                    Acesso pago bloqueado
+                  </Badge>
+                ) : null}
+                {currentPlan.subscription?.status ? (
+                  <Badge variant="secondary" className="bg-transparent border border-border text-foreground">
+                    Status: {String(currentPlan.subscription.status).toUpperCase()}
+                  </Badge>
+                ) : null}
+                {currentPlan.subscription?.stripeSubscriptionId ? (
+                  <Button variant="secondary" size="sm" onClick={openPortal}>
+                    Ver assinatura
+                  </Button>
+                ) : null}
+                {currentPlan.subscription?.stripeSubscriptionId ? (
+                  <Button variant="outline" size="sm" onClick={cancel} disabled={isCancelling}>
+                    {isCancelling ? 'Cancelando...' : 'Cancelar assinatura'}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 md:grid-cols-3">
@@ -218,7 +303,7 @@ export default function PlansPage() {
                 <div className="flex justify-between text-sm">
                   <span>Storage</span>
                   <span className="text-muted-foreground">
-                    {Math.round(currentPlan.limits.storage.current / 1024)}MB / {currentPlan.limits.storage.max === -1 ? '∞' : currentPlan.limits.storage.max}MB
+                    {currentPlan.limits.storage.current}MB / {currentPlan.limits.storage.max === -1 ? '∞' : currentPlan.limits.storage.max}MB
                   </span>
                 </div>
                 <Progress 
@@ -243,6 +328,7 @@ export default function PlansPage() {
           </Card>
         ) : availablePlans.map((plan) => {
           const isCurrentPlan = currentPlan?.plan === plan.id;
+          const isLockedSwitch = !!currentPlan && currentPlan.plan !== 'free' && plan.id !== currentPlan.plan;
           const Icon = plan.id === 'free' ? Sparkles : plan.id === 'pro' ? Zap : Building2;
           
           return (
@@ -313,16 +399,61 @@ export default function PlansPage() {
                 <Button 
                   className="w-full"
                   variant={isCurrentPlan ? 'outline' : 'default'}
-                  disabled={isCurrentPlan}
+                  disabled={isCurrentPlan || isLockedSwitch}
                   onClick={() => openCheckout(plan.id)}
+                  title={isLockedSwitch ? 'Para trocar de plano, cancele a assinatura atual e faça um novo checkout.' : undefined}
                 >
-                  {isCurrentPlan ? 'Plano Atual' : 'Escolher Plano'}
+                  {isCurrentPlan ? 'Plano Atual' : isLockedSwitch ? 'Troca indisponível' : 'Escolher Plano'}
                 </Button>
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      {/* Portal/Subscription Dialog */}
+      <Dialog open={isPortalOpen} onOpenChange={setIsPortalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assinatura</DialogTitle>
+            <DialogDescription>Detalhes da sua assinatura atual</DialogDescription>
+          </DialogHeader>
+          {portalLoading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">Carregando...</div>
+          ) : portalData ? (
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Plano</span>
+                <span className="font-medium">{String(portalData.plan || currentPlan?.plan || '-').toUpperCase()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <span className="font-medium">{String(portalData.status || currentPlan?.subscription?.status || '-').toUpperCase()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Periodo ate</span>
+                <span className="font-medium">
+                  {portalData.currentPeriodEnd
+                    ? new Date(portalData.currentPeriodEnd).toLocaleDateString('pt-BR')
+                    : '-'}
+                </span>
+              </div>
+              {portalData.subscription?.nextDueDate ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Proximo vencimento</span>
+                  <span className="font-medium">{String(portalData.subscription.nextDueDate)}</span>
+                </div>
+              ) : null}
+              {portalData.subscription?.value ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Valor</span>
+                  <span className="font-medium">R$ {Number(portalData.subscription.value).toFixed(2).replace('.', ',')}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {/* Checkout Dialog */}
       <Dialog

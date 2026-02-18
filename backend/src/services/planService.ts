@@ -4,15 +4,19 @@ import { AuthRequest } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
 export class PlanService {
+  private isActiveTrial(sub: IPlanLimit['subscription'] | undefined): boolean {
+    if (!sub) return false;
+    if (sub.status !== 'trialing') return false;
+    if (!sub.trialEndsAt) return false;
+    return sub.trialEndsAt.getTime() > Date.now();
+  }
+
   private subscriptionAllowsPaidFeatures(sub: IPlanLimit['subscription'] | undefined): boolean {
     if (!sub) return false;
 
     if (sub.status === 'active') return true;
 
-    if (sub.status === 'trialing') {
-      if (!sub.trialEndsAt) return true;
-      return sub.trialEndsAt.getTime() > Date.now();
-    }
+    if (sub.status === 'trialing') return this.isActiveTrial(sub);
 
     // If the subscription was cancelled but still within the paid period,
     // keep access until the end of the current period.
@@ -33,6 +37,20 @@ export class PlanService {
     features: IPlanLimit['features'];
     isPaidAccessBlocked: boolean;
   } {
+    // During the initial trial (created on tenant signup) we grant PRO access,
+    // even though the stored plan is FREE.
+    if (planLimit.plan === PlanType.FREE && this.isActiveTrial(planLimit.subscription)) {
+      const pro = PLAN_LIMITS[PlanType.PRO];
+      return {
+        plan: PlanType.PRO,
+        maxAgents: pro.maxAgents,
+        maxTickets: pro.maxTickets,
+        maxStorage: pro.maxStorage,
+        features: pro.features,
+        isPaidAccessBlocked: false,
+      };
+    }
+
     const isPaidPlan = planLimit.plan !== PlanType.FREE;
     const paidAllowed = !isPaidPlan || this.subscriptionAllowsPaidFeatures(planLimit.subscription);
 
@@ -153,8 +171,22 @@ export class PlanService {
 
   async getPlanDetails(tenantId: string) {
     const planLimit = await this.getPlanForTenant(tenantId);
+
+    // Refresh usage metrics (cheap counters)
+    const [currentAgents, currentTickets] = await Promise.all([
+      User.countDocuments({
+        tenant: tenantId,
+        role: { $in: ['admin', 'manager', 'agent'] },
+      }),
+      Ticket.countDocuments({ tenant: tenantId }),
+    ]);
+
+    planLimit.currentUsage.agents = currentAgents;
+    planLimit.currentUsage.tickets = currentTickets;
+    await planLimit.save();
+
     const effective = this.getEffectiveConfig(planLimit);
-    const isTrial = planLimit.subscription.status === 'trialing';
+    const isTrial = this.isActiveTrial(planLimit.subscription);
     const trialDaysLeft = isTrial && planLimit.subscription.trialEndsAt
       ? Math.max(0, Math.ceil((planLimit.subscription.trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       : 0;
