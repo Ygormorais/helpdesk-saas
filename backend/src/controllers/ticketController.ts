@@ -359,6 +359,8 @@ export const updateTicket = async (
         ticket.tenant.toString(),
         ticket._id.toString(),
         ticket.title,
+        ticket.ticketNumber,
+        String(updates.assignedTo),
         assignedUserName,
         user.name
       );

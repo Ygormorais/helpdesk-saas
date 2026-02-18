@@ -78,6 +78,27 @@ export const emailTemplates = {
     `,
   }),
 
+  ticketAssigned: (data: {
+    ticketNumber?: string;
+    title: string;
+    assignedByName: string;
+    url: string;
+  }) => ({
+    subject: `${data.ticketNumber ? `[${data.ticketNumber}] ` : ''}Ticket atribuido a voce`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #3B82F6;">Novo Ticket Atribuido</h1>
+        <p>Um ticket foi atribuido a voce por ${data.assignedByName}.</p>
+        <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          ${data.ticketNumber ? `<p><strong>Numero:</strong> ${data.ticketNumber}</p>` : ''}
+          <p><strong>Titulo:</strong> ${data.title}</p>
+        </div>
+        <a href="${data.url}" style="display: inline-block; background: #3B82F6; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Abrir Ticket</a>
+        <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">Equipe HelpDesk</p>
+      </div>
+    `,
+  }),
+
   newComment: (data: {
     ticketNumber: string;
     title: string;

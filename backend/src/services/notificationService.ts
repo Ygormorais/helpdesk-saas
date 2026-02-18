@@ -182,6 +182,8 @@ export class NotificationService {
     tenantId: string,
     ticketId: string,
     ticketTitle: string,
+    ticketNumber: string,
+    assignedToId: string,
     assignedToName: string,
     assignedByName: string
   ): Promise<void> {
@@ -189,6 +191,7 @@ export class NotificationService {
       type: 'TICKET_ASSIGNED',
       data: {
         ticketId,
+        ticketNumber,
         title: ticketTitle,
         assignedTo: assignedToName,
         assignedBy: assignedByName,
@@ -205,6 +208,24 @@ export class NotificationService {
       data: payload.data,
       ticketId,
     });
+
+    const assignee = await User.findOne({
+      _id: assignedToId,
+      tenant: tenantId,
+      isActive: true,
+    }).select('email');
+
+    if (assignee?.email) {
+      await sendEmail({
+        to: assignee.email,
+        ...emailTemplates.ticketAssigned({
+          ticketNumber,
+          title: ticketTitle,
+          assignedByName,
+          url: `${process.env.FRONTEND_URL}/tickets/${ticketId}`,
+        }),
+      });
+    }
   }
 
   async notifyNewComment(ticket: any, comment: any, author: IUser): Promise<void> {
