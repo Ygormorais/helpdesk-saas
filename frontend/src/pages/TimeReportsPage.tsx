@@ -1,25 +1,14 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { Clock, Calendar, Download, TrendingUp, User, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts';
+const TimeReportsCharts = lazy(() => import('@/components/charts/TimeReportsCharts'));
 import { api } from '@/config/api';
 import { FeatureUnavailable } from '@/components/FeatureUnavailable';
+import { DataStateCard } from '@/components/DataStateCard';
 
 interface TimeStats {
   totalDuration: number;
@@ -103,7 +92,7 @@ export default function TimeReportsPage() {
         setForbidden(true);
       } else {
         if (import.meta.env.DEV) console.error('Error fetching stats:', error);
-        setLoadError('Nao foi possivel carregar o relatorio de tempo');
+        setLoadError('Não foi possível carregar o relatório de tempo');
       }
     } finally {
       setLoading(false);
@@ -163,15 +152,7 @@ export default function TimeReportsPage() {
           <h1 className="text-3xl font-bold">Relatório de Tempo</h1>
           <p className="text-muted-foreground">Acompanhe o tempo gasto em tickets</p>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Falha ao carregar</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">{loadError}</p>
-            <Button onClick={fetchStats}>Tentar novamente</Button>
-          </CardContent>
-        </Card>
+        <DataStateCard title="Falha ao carregar" description={loadError} actionLabel="Tentar novamente" onAction={fetchStats} />
       </div>
     );
   }
@@ -187,7 +168,7 @@ export default function TimeReportsPage() {
         </div>
         <div className="flex gap-2">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[150px]" aria-label="Selecionar período">
               <Calendar className="mr-2 h-4 w-4" />
               <SelectValue />
             </SelectTrigger>
@@ -268,51 +249,21 @@ export default function TimeReportsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Billável vs Não Billável</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#10B981' : '#F59E0B'} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => formatDuration(value)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Por Usuário</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={userChartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" className="text-xs" />
-                <YAxis className="text-xs" unit="h" />
-                <Tooltip formatter={(value: number) => `${value}h`} />
-                <Bar dataKey="hours" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      <Suspense
+        fallback={
+          <div className="grid gap-6 md:grid-cols-2">
+            {Array.from({ length: 2 }).map((_, idx) => (
+              <Card key={`time-charts-skel-${idx}`}>
+                <CardContent className="py-10">
+                  <div className="h-5 w-56 animate-pulse rounded bg-muted" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        }
+      >
+        <TimeReportsCharts pieData={pieData} userChartData={userChartData} formatDuration={formatDuration} />
+      </Suspense>
 
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
@@ -326,10 +277,10 @@ export default function TimeReportsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="px-4 py-3 text-left text-sm font-medium">Usuário</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Tempo Total</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Entradas</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Média por Entrada</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Usuário</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Tempo Total</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Entradas</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Média por Entrada</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,10 +313,10 @@ export default function TimeReportsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Título</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Tempo Total</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Entradas</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Título</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Tempo Total</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Entradas</th>
                   </tr>
                 </thead>
                 <tbody>

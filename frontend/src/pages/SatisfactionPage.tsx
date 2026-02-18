@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { Star, TrendingUp, MessageSquare, Download, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,19 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SatisfactionCard } from '@/components/SatisfactionSurvey';
 import { api } from '@/config/api';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts';
+import { DataStateCard } from '@/components/DataStateCard';
+const SatisfactionCharts = lazy(() => import('@/components/charts/SatisfactionCharts'));
 
 const COLORS = ['#EF4444', '#F97316', '#EAB308', '#3B82F6', '#22C55E'];
 
@@ -113,15 +102,7 @@ export default function SatisfactionPage() {
           <p className="text-muted-foreground">Acompanhe a satisfação dos seus clientes</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Não foi possível carregar</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">{loadError}</p>
-            <Button onClick={fetchStats}>Tentar novamente</Button>
-          </CardContent>
-        </Card>
+        <DataStateCard title="Não foi possível carregar" description={loadError} actionLabel="Tentar novamente" onAction={fetchStats} />
       </div>
     );
   }
@@ -137,7 +118,7 @@ export default function SatisfactionPage() {
         </div>
         <div className="flex gap-2">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[150px]" aria-label="Selecionar período">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -227,63 +208,21 @@ export default function SatisfactionPage() {
             </Card>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribuição de Notas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="name" className="text-xs" />
-                    <YAxis className="text-xs" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>NPS Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={npsData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {npsData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
+          <Suspense
+            fallback={
+              <div className="grid gap-6 md:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, idx) => (
+                  <Card key={`sat-charts-skel-${idx}`}>
+                    <CardContent className="py-10">
+                      <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            }
+          >
+            <SatisfactionCharts chartData={chartData} npsData={npsData} />
+          </Suspense>
 
           <Tabs defaultValue="comments" className="space-y-4">
             <TabsList>

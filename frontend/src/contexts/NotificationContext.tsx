@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Bell, Ticket, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
+import { getSocketUrl } from '@/config/socket';
 
 export interface Notification {
   id: string;
@@ -35,7 +36,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
-  const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+  const socketUrl = getSocketUrl();
   // api is handled via axios instance
 
   // Calcular contagem de não lidas

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Plus, Search } from 'lucide-react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/config/api';
+import { downloadCSV } from '@/utils/csv';
 
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -65,6 +66,7 @@ export default function TicketsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialSearch = searchParams.get('q') || '';
@@ -82,6 +84,8 @@ export default function TicketsPage() {
   const [limit, setLimit] = useState(20);
   const [isExporting, setIsExporting] = useState(false);
   const [openingChatId, setOpeningChatId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -94,6 +98,11 @@ export default function TicketsPage() {
   useEffect(() => {
     setPage(1);
   }, [statusFilter, priorityFilter]);
+
+  useEffect(() => {
+    // Keep selection scoped to current filters/page
+    setSelectedIds([]);
+  }, [debouncedSearch, statusFilter, priorityFilter, mineOnly, page]);
 
   useEffect(() => {
     // Support back/forward navigation by reading URL state
@@ -147,6 +156,9 @@ export default function TicketsPage() {
   const tickets = useMemo(() => data?.tickets || [], [data]);
   const pagination = data?.pagination;
 
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const allSelectedOnPage = tickets.length > 0 && tickets.every((t) => selectedSet.has(String(t._id)));
+
   const hasActiveFilters =
     !!debouncedSearch.trim() || statusFilter !== 'all' || priorityFilter !== 'all' || mineOnly;
 
@@ -193,6 +205,7 @@ export default function TicketsPage() {
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter !== 'all') params.status = statusFilter;
       if (priorityFilter !== 'all') params.priority = priorityFilter;
+      if (mineOnly && user?.id) params.assignedTo = user.id;
 
       const res = await api.get('/tickets/export/csv', { params, responseType: 'blob' });
       const blob = res.data as Blob;
@@ -212,6 +225,54 @@ export default function TicketsPage() {
       });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const exportSelectedCsv = () => {
+    const selected = tickets.filter((t) => selectedSet.has(String(t._id)));
+    if (selected.length === 0) return;
+
+    downloadCSV(
+      ['ticketNumber', 'title', 'status', 'priority', 'category', 'createdBy', 'createdAt'],
+      selected.map((t) => [
+        t.ticketNumber,
+        t.title,
+        t.status,
+        t.priority,
+        t.category?.name || '',
+        t.createdBy?.name || '',
+        t.createdAt ? new Date(t.createdAt).toISOString() : '',
+      ]),
+      'tickets-selected.csv'
+    );
+  };
+
+  const bulkUpdateStatus = async (status: string) => {
+    if (selectedIds.length === 0) return;
+    setIsBulkUpdating(true);
+    try {
+      const results = await Promise.allSettled(
+        selectedIds.map((id) => ticketsApi.update(id, { status }))
+      );
+
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - ok;
+      toast({
+        title: failed ? 'Ação concluída com falhas' : 'Ação concluída',
+        description: failed ? `${ok} atualizado(s), ${failed} falhou(aram).` : `${ok} ticket(s) atualizado(s).`,
+        variant: failed ? 'destructive' : 'default',
+      });
+
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+    } catch (error: any) {
+      toast({
+        title: 'Erro na ação em massa',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBulkUpdating(false);
     }
   };
 
@@ -329,10 +390,56 @@ export default function TicketsPage() {
       </Card>
 
       <Card>
+        {selectedIds.length ? (
+          <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm font-medium">{selectedIds.length} selecionado(s)</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={exportSelectedCsv}>
+                Exportar selecionados
+              </Button>
+              {user?.role !== 'client' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => bulkUpdateStatus('resolved')}
+                    disabled={isBulkUpdating}
+                  >
+                    Marcar como resolvido
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => bulkUpdateStatus('closed')}
+                    disabled={isBulkUpdating}
+                  >
+                    Fechar
+                  </Button>
+                </>
+              ) : null}
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
+                Limpar seleção
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <CardContent className="p-0">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium w-10">
+                  <input
+                    type="checkbox"
+                    checked={allSelectedOnPage}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(tickets.map((t) => String(t._id)));
+                      else setSelectedIds([]);
+                    }}
+                    aria-label="Selecionar todos os tickets da página"
+                  />
+                </th>
                 <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Ticket</th>
                 <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Título</th>
                 <th scope="col" className="px-4 py-3 text-left text-sm font-medium">Status</th>
@@ -347,13 +454,13 @@ export default function TicketsPage() {
               {isLoading && (
                 <>
                   <tr>
-                    <td className="px-4 py-4 text-left text-xs text-muted-foreground" colSpan={8}>
+                    <td className="px-4 py-4 text-left text-xs text-muted-foreground" colSpan={9}>
                       Carregando tickets...
                     </td>
                   </tr>
                   {Array.from({ length: 8 }).map((_, idx) => (
                     <tr key={`skeleton-${idx}`} className="border-b last:border-0">
-                      <td className="px-4 py-3" colSpan={8}>
+                      <td className="px-4 py-3" colSpan={9}>
                         <div className="h-5 w-full animate-pulse rounded bg-muted" />
                       </td>
                     </tr>
@@ -362,14 +469,14 @@ export default function TicketsPage() {
               )}
               {isError && (
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={8}>
+                  <td className="px-4 py-8 text-center text-sm text-destructive" colSpan={9}>
                     Erro ao carregar tickets
                   </td>
                 </tr>
               )}
               {!isLoading && !isError && tickets.length === 0 && (
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={8}>
+                  <td className="px-4 py-8 text-center text-sm text-muted-foreground" colSpan={9}>
                     <div className="space-y-2">
                       <div>Nenhum ticket encontrado</div>
                       <div>
@@ -383,6 +490,17 @@ export default function TicketsPage() {
               )}
               {!isLoading && !isError && tickets.map((ticket) => (
                 <tr key={ticket._id} className="border-b last:border-0 hover:bg-muted/50">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedSet.has(String(ticket._id))}
+                      onChange={() => {
+                        const id = String(ticket._id);
+                        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+                      }}
+                      aria-label={`Selecionar ticket ${ticket.ticketNumber}`}
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <Link to={`/tickets/${ticket._id}`} className="font-medium text-primary hover:underline">
                       {ticket.ticketNumber}

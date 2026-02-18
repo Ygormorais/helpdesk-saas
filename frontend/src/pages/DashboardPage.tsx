@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -24,21 +24,8 @@ import {
 } from '@/components/ui/select';
 import { analyticsApi } from '@/config/analytics';
 import { ticketsApi } from '@/api/tickets';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  Legend,
-} from 'recharts';
+
+const DashboardCharts = lazy(() => import('@/components/charts/DashboardCharts'));
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
@@ -395,276 +382,89 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Tickets por Período</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {trendQuery.isError ? (
-              <div className="py-10 text-center text-sm text-destructive">Não foi possível carregar o gráfico.</div>
-            ) : trendQuery.isLoading && !trendQuery.data ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Carregando...</div>
-            ) : !hasTrendData ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Sem dados no período.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="created"
-                    stroke="#3B82F6"
-                    fill="#3B82F6"
-                    fillOpacity={0.3}
-                    name="Criados"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="resolved"
-                    stroke="#10B981"
-                    fill="#10B981"
-                    fillOpacity={0.3}
-                    name="Resolvidos"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Por Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {statusQuery.isError ? (
-              <div className="py-10 text-center text-sm text-destructive">Não foi possível carregar os dados.</div>
-            ) : statusQuery.isLoading && !statusQuery.data ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Carregando...</div>
-            ) : !hasStatusData ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Sem dados.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Por Prioridade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {priorityQuery.isError ? (
-              <div className="py-10 text-center text-sm text-destructive">Não foi possível carregar os dados.</div>
-            ) : priorityQuery.isLoading && !priorityQuery.data ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Carregando...</div>
-            ) : !hasPriorityData ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Sem dados.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={priorityData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" className="text-xs" />
-                  <YAxis dataKey="name" type="category" className="text-xs" width={60} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Por Categoria</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {categoryQuery.isError ? (
-              <div className="py-10 text-center text-sm text-destructive">Não foi possível carregar os dados.</div>
-            ) : categoryQuery.isLoading && !categoryQuery.data ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Carregando...</div>
-            ) : !hasCategoryData ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Sem dados.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={categoryData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Bar dataKey="count" fill="#10B981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Agentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {topAgentsQuery.isError ? (
-              <div className="py-10 text-center text-sm text-destructive">Não foi possível carregar os dados.</div>
-            ) : topAgentsQuery.isLoading && !topAgentsQuery.data ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Carregando...</div>
-            ) : !hasAgentData ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Sem dados.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={agentData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="total" fill="#3B82F6" name="Total" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="resolved" fill="#10B981" name="Resolvidos" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Satisfação do Cliente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {satisfactionQuery.isError ? (
-              <div className="py-10 text-center text-sm text-destructive">Não foi possível carregar os dados.</div>
-            ) : satisfactionQuery.isLoading && !satisfactionQuery.data ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Carregando...</div>
-            ) : !hasSatisfactionData ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Sem dados.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={satisfactionData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="rating" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Bar dataKey="count" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Compliance SLA</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {slaQuery.isError ? (
-              <div className="py-10 text-center text-sm text-destructive">Não foi possível carregar os dados.</div>
-            ) : slaQuery.isLoading && !slaQuery.data ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Carregando...</div>
-            ) : (
-              <>
-                <div className="flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={slaData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {slaData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex justify-center gap-6 mt-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-500">{slaData[0]?.value || 0}%</div>
-                    <div className="text-xs text-muted-foreground">Dentro do SLA</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-500">{slaData[1]?.value || 0}%</div>
-                    <div className="text-xs text-muted-foreground">Fora do SLA</div>
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+              <Card className="col-span-4">
+                <CardContent className="py-10">
+                  <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+                </CardContent>
+              </Card>
+              <Card className="col-span-3">
+                <CardContent className="py-10">
+                  <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+                </CardContent>
+              </Card>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <Card key={`dash-charts-skel-${idx}`}>
+                  <CardContent className="py-10">
+                    <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+              <Card className="col-span-4">
+                <CardContent className="py-10">
+                  <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+                </CardContent>
+              </Card>
+              <Card className="col-span-3">
+                <CardContent className="py-10">
+                  <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        }
+      >
+        <DashboardCharts
+          trendData={trendData}
+          trend={{
+            isLoading: trendQuery.isLoading && !trendQuery.data,
+            isError: trendQuery.isError,
+            hasData: hasTrendData,
+          }}
+          statusData={statusData}
+          status={{
+            isLoading: statusQuery.isLoading && !statusQuery.data,
+            isError: statusQuery.isError,
+            hasData: hasStatusData,
+          }}
+          priorityData={priorityData}
+          priority={{
+            isLoading: priorityQuery.isLoading && !priorityQuery.data,
+            isError: priorityQuery.isError,
+            hasData: hasPriorityData,
+          }}
+          categoryData={categoryData}
+          category={{
+            isLoading: categoryQuery.isLoading && !categoryQuery.data,
+            isError: categoryQuery.isError,
+            hasData: hasCategoryData,
+          }}
+          agentData={agentData}
+          agents={{
+            isLoading: topAgentsQuery.isLoading && !topAgentsQuery.data,
+            isError: topAgentsQuery.isError,
+            hasData: hasAgentData,
+          }}
+          satisfactionData={satisfactionData}
+          satisfaction={{
+            isLoading: satisfactionQuery.isLoading && !satisfactionQuery.data,
+            isError: satisfactionQuery.isError,
+            hasData: hasSatisfactionData,
+          }}
+          slaData={slaData}
+          sla={{
+            isLoading: slaQuery.isLoading && !slaQuery.data,
+            isError: slaQuery.isError,
+          }}
+        />
+      </Suspense>
 
       <Tabs defaultValue="recent" className="space-y-4">
         <TabsList>

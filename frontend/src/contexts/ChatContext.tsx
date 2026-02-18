@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, ReactNode, use
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { api } from '@/config/api';
+import { getSocketUrl } from '@/config/socket';
 
 interface ChatMessage {
   _id: string;
@@ -55,7 +56,7 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+const SOCKET_URL = getSocketUrl();
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, user, token } = useAuth();

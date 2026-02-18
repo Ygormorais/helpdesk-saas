@@ -1,21 +1,7 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+const ReportsCharts = lazy(() => import('@/components/charts/ReportsCharts'));
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { analyticsApi } from '@/config/analytics';
@@ -228,10 +214,10 @@ export default function ReportsPage() {
     <div className="space-y-6 p-4">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold">Relatorios</h1>
+          <h1 className="text-3xl font-bold">Relatórios</h1>
           {report?.range ? (
             <div className="text-sm text-muted-foreground">
-              Periodo: {report.range.start} a {report.range.end}
+              Período: {report.range.start} a {report.range.end}
             </div>
           ) : null}
         </div>
@@ -249,11 +235,11 @@ export default function ReportsPage() {
         <KPI title="Criados (periodo)" value={report?.kpis?.createdCount ?? totalTickets} />
         <KPI title="Resolvidos (periodo)" value={report?.kpis?.resolvedCount ?? (status?.resolved ?? 0)} />
         <KPI title="Backlog (agora)" value={report?.kpis?.backlogCount ?? 0} />
-        <KPI title="SLA (resolucao)" value={`${report?.sla?.withinRate ?? 0}%`} />
+        <KPI title="SLA (resolução)" value={`${report?.sla?.withinRate ?? 0}%`} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPI title="Tempo medio resolucao" value={`${avgResolutionHours}h`} />
+        <KPI title="Tempo médio resolução" value={`${avgResolutionHours}h`} />
         <KPI title="Tempo medio 1a resposta" value={`${avgFirstResponseHours}h`} />
         <KPI title="Abertos" value={status?.open ?? 0} />
         <KPI title="Dias no grafico" value={trend.length} />
@@ -265,7 +251,7 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">Inicio</label>
+            <label className="text-sm text-muted-foreground">Início</label>
             <input
               type="date"
               value={startDate}
@@ -283,10 +269,10 @@ export default function ReportsPage() {
             />
           </div>
           <Button variant="secondary" onClick={() => setDateRangeMonths(2)}>
-            Ultimos 2 meses
+            Últimos 2 meses
           </Button>
           <Button variant="secondary" onClick={() => setDateRangeMonths(3)}>
-            Ultimos 3 meses
+            Últimos 3 meses
           </Button>
           <Button variant="ghost" onClick={() => {
             setStartDate('');
@@ -301,165 +287,50 @@ export default function ReportsPage() {
       </Card>
 
       {reportsQuery.isError ? (
-        <div className="text-sm text-red-600">Falha ao carregar relatorios.</div>
+        <div className="text-sm text-red-600">Falha ao carregar relatórios.</div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex items-center justify-between sm:flex-row">
-            <CardTitle>Tickets por dia</CardTitle>
-            <Button variant="secondary" onClick={exportCSV_Tickets} disabled={!report}>
-              CSV
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={trend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Area type="monotone" dataKey="created" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.25} name="Criados" />
-                <Area type="monotone" dataKey="resolved" stroke="#10B981" fill="#10B981" fillOpacity={0.18} name="Resolvidos" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex items-center justify-between sm:flex-row">
-            <CardTitle>Status de tickets</CardTitle>
-            <Button variant="secondary" onClick={exportCSV_Status} disabled={!report}>
-              CSV
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={statusPieData} dataKey="value" cx="50%" cy="50%" outerRadius={84} label>
-                  {statusPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex items-center justify-between sm:flex-row">
-            <CardTitle>SLA (resolucao)</CardTitle>
-            <Button variant="secondary" onClick={exportCSV_SLA} disabled={!report}>
-              CSV
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground mb-2">
-              Dentro do SLA: {report?.sla.withinRate ?? 0}% (base: {report?.sla.totalResolved ?? 0} tickets)
+      <Suspense
+        fallback={
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <Card key={`reports-charts-skel-a-${idx}`}>
+                  <CardContent className="py-10">
+                    <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={slaPieData} dataKey="value" cx="50%" cy="50%" outerRadius={84} label>
-                  {slaPieData.map((entry, idx) => (
-                    <Cell key={`sla-${idx}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex items-center justify-between sm:flex-row">
-            <CardTitle>Top agentes (resolvidos)</CardTitle>
-            <Button variant="secondary" onClick={exportCSV_Agents} disabled={!report}>
-              CSV
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={agentsBarData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="resolved" fill="#10B981" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>SLA trend (dentro do prazo)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={slaTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
-                <Area type="monotone" dataKey="withinRate" stroke="#10B981" fill="#10B981" fillOpacity={0.18} name="% dentro" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tickets por prioridade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={priorityBarData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#3B82F6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Satisfacao</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground mb-2">Media: {satisfactionQuery.data?.average ?? 0}</div>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={satisfactionBarData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="rating" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#10B981" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Tickets por categoria</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={categoryBarData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#8B5CF6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <Card key={`reports-charts-skel-b-${idx}`}>
+                  <CardContent className="py-10">
+                    <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        }
+      >
+        <ReportsCharts
+          report={report}
+          trend={trend}
+          statusPieData={statusPieData}
+          slaPieData={slaPieData}
+          agentsBarData={agentsBarData}
+          slaTrend={slaTrend}
+          priorityBarData={priorityBarData}
+          satisfactionBarData={satisfactionBarData}
+          categoryBarData={categoryBarData}
+          satisfactionAverage={satisfactionQuery.data?.average ?? 0}
+          onExportTrend={exportCSV_Tickets}
+          onExportStatus={exportCSV_Status}
+          onExportSla={exportCSV_SLA}
+          onExportAgents={exportCSV_Agents}
+        />
+      </Suspense>
     </div>
   );
 }
