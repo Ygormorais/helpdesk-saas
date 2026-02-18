@@ -16,10 +16,12 @@ import billingRoutes from './billingRoutes.js';
 import userRoutes from './userRoutes.js';
 import platformAdminRoutes from './platformAdminRoutes.js';
 import metricsRoutes from './metricsRoutes.js';
+import healthRoutes from './healthRoutes.js';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/health', healthRoutes);
 router.use('/tickets', ticketRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/articles', articleRoutes);

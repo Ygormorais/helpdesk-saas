@@ -13,8 +13,7 @@ import { requestLogger } from './middlewares/requestLogger.js';
 import { notificationService } from './services/notificationService.js';
 import { chatService } from './services/chatService.js';
 import { sendTrialRemindersOnce } from './services/billingReminderService.js';
-import mongoose from 'mongoose';
-import net from 'net';
+import { getReadiness } from './services/healthService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,87 +62,13 @@ app.get('/health/live', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-async function pingRedis(urlRaw: string): Promise<boolean> {
-  try {
-    const u = new URL(urlRaw);
-    const host = u.hostname;
-    const port = u.port ? parseInt(u.port, 10) : 6379;
-
-    return await new Promise<boolean>((resolve) => {
-      const socket = net.createConnection({ host, port });
-      const timer = setTimeout(() => {
-        try {
-          socket.destroy();
-        } catch {
-          // ignore
-        }
-        resolve(false);
-      }, 500);
-
-      socket.on('error', () => {
-        clearTimeout(timer);
-        resolve(false);
-      });
-
-      socket.on('connect', () => {
-        socket.write('*1\r\n$4\r\nPING\r\n');
-      });
-
-      let buf = '';
-      socket.on('data', (d) => {
-        buf += d.toString('utf8');
-        if (buf.includes('PONG')) {
-          clearTimeout(timer);
-          try {
-            socket.end();
-          } catch {
-            // ignore
-          }
-          resolve(true);
-        }
-      });
-    });
-  } catch {
-    return false;
-  }
-}
-
 app.get('/health', async (_req, res) => {
-  const mongoReadyState = mongoose.connection.readyState;
-  const mongoConnected = mongoReadyState === 1;
-  let mongoPingOk = false;
-
-  if (mongoConnected) {
-    try {
-      await mongoose.connection.db?.admin().ping();
-      mongoPingOk = true;
-    } catch {
-      mongoPingOk = false;
-    }
-  }
-
-  const redisUrl = String(process.env.REDIS_URL || '').trim();
-  const redisConfigured = !!redisUrl;
-  const redisOk = redisConfigured ? await pingRedis(redisUrl) : true;
-
-  const ready = mongoConnected && mongoPingOk && redisOk;
-  const statusCode = ready ? 200 : 503;
-
-  res.status(statusCode).json({
-    status: ready ? 'ok' : 'degraded',
-    ready,
+  const out = await getReadiness();
+  res.status(out.ready ? 200 : 503).json({
+    status: out.ready ? 'ok' : 'degraded',
+    ready: out.ready,
     timestamp: new Date().toISOString(),
-    deps: {
-      mongo: {
-        readyState: mongoReadyState,
-        connected: mongoConnected,
-        ping: mongoPingOk,
-      },
-      redis: {
-        configured: redisConfigured,
-        ok: redisOk,
-      },
-    },
+    deps: out.deps,
   });
 });
 

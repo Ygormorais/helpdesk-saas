@@ -100,6 +100,7 @@ const options = {
       { name: 'Webhooks', description: 'Integrações via webhooks' },
       { name: 'Team', description: 'Gestão de equipe' },
       { name: 'Audit', description: 'Logs de auditoria' },
+      { name: 'Ops', description: 'Health e observabilidade' },
     ],
   },
   apis: ['./src/routes/*.ts'],
