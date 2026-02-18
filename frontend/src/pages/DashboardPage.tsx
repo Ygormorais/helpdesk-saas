@@ -15,6 +15,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { analyticsApi } from '@/config/analytics';
 import { ticketsApi } from '@/api/tickets';
 import {
@@ -305,16 +312,17 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <div className="flex gap-2">
-          <select
-            className="px-3 py-2 border rounded-md text-sm"
-            value={trendDays}
-            onChange={(e) => setTrendDays(parseInt(e.target.value, 10))}
-          >
-            <option value={7}>Ultimos 7 dias</option>
-            <option value={30}>Ultimos 30 dias</option>
-            <option value={90}>Ultimos 90 dias</option>
-            <option value={365}>Este ano</option>
-          </select>
+          <Select value={String(trendDays)} onValueChange={(v) => setTrendDays(parseInt(v, 10))}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Últimos 7 dias</SelectItem>
+              <SelectItem value="30">Últimos 30 dias</SelectItem>
+              <SelectItem value="90">Últimos 90 dias</SelectItem>
+              <SelectItem value="365">Este ano</SelectItem>
+            </SelectContent>
+          </Select>
           <Link to="/tickets">
             <Button>Novo Ticket</Button>
           </Link>
