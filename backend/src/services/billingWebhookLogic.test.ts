@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ensureAddOns,
+  applyOneTimeAddOnPaymentReceived,
   mapAsaasSubscriptionStatus,
   setPendingOneTimeStatus,
   upsertPendingOneTime,
@@ -28,6 +29,31 @@ describe('billingWebhookLogic', () => {
     });
 
     const a2 = setPendingOneTimeStatus(a1, 'pay_123', 'received');
+    expect(a2.pendingOneTime?.[0].status).toBe('received');
+  });
+
+  it('applies one-time add-on deltas only once (idempotent)', () => {
+    const base: any = {};
+
+    const a1 = applyOneTimeAddOnPaymentReceived(base, {
+      addOnId: 'extra_agents_5',
+      paymentId: 'pay_1',
+      extraAgents: 5,
+      extraStorage: 0,
+      aiCredits: 0,
+    });
+
+    expect(a1.extraAgents).toBe(5);
+    expect(a1.pendingOneTime?.[0].status).toBe('received');
+
+    const a2 = applyOneTimeAddOnPaymentReceived(a1, {
+      addOnId: 'extra_agents_5',
+      paymentId: 'pay_1',
+      extraAgents: 5,
+    });
+
+    expect(a2.extraAgents).toBe(5);
+    expect(a2.pendingOneTime?.length).toBe(1);
     expect(a2.pendingOneTime?.[0].status).toBe('received');
   });
 

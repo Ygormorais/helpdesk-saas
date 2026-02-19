@@ -35,7 +35,7 @@ export const ClientCarousel: React.FC = () => {
       setIndex((i) => (i + 1) % slides.length)
     }, 2800)
     return () => clearInterval(t)
-  }, [])
+  }, [slides.length])
 
   const safeIndex = slides.length > 0 ? index % slides.length : 0
   const current = useMemo(() => slides[safeIndex], [safeIndex])
@@ -69,7 +69,7 @@ export const ClientCarousel: React.FC = () => {
             <div
               key={safeIndex}
               className={`flex flex-wrap items-center justify-center gap-x-10 gap-y-6 py-2 ${
-                mounted ? 'animate-rise' : 'opacity-0 translate-y-2'
+                mounted ? 'opacity-100 translate-y-0 motion-safe:animate-rise' : 'opacity-0 translate-y-2'
               }`}
             >
               {current.items.map((c, i) => {

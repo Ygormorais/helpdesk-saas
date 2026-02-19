@@ -9,8 +9,10 @@ import { config } from '../config/index.js';
 import { timingSafeEqual } from 'crypto';
 import { emailTemplates, sendEmail } from '../services/emailService.js';
 import { z } from 'zod';
+import { isValidObjectId } from 'mongoose';
 
 import {
+  applyOneTimeAddOnPaymentReceived,
   ensureAddOns,
   mapAsaasSubscriptionStatus,
   setPendingOneTimeStatus,
@@ -401,6 +403,7 @@ export const handleWebhook = async (
     const eventId = req.body?.id ? String(req.body.id) : '';
     const extRef = String(payment?.externalReference || subscription?.externalReference || '');
     const tenantId = extRef ? extRef.split('-')[0] : '';
+    const tenant = tenantId && isValidObjectId(tenantId) ? tenantId : undefined;
     const resourceId = String(payment?.id || subscription?.id || '');
 
     if (config.asaasWebhookSecret) {
@@ -422,7 +425,7 @@ export const handleWebhook = async (
               $set: {
                 status: 'unauthorized',
                 event: event ? String(event) : undefined,
-                tenant: tenantId || undefined,
+                tenant,
                 resourceId: resourceId || undefined,
                 error: 'Nao autorizado',
                 processedAt: new Date(),
@@ -442,7 +445,7 @@ export const handleWebhook = async (
         const doc = await WebhookEvent.create({
           provider: 'asaas',
           eventId,
-          tenant: tenantId || undefined,
+          tenant,
           event: event ? String(event) : undefined,
           resourceId: resourceId || undefined,
           status: 'received',
@@ -458,7 +461,7 @@ export const handleWebhook = async (
               $set: {
                 status: 'duplicate',
                 event: event ? String(event) : undefined,
-                tenant: tenantId || undefined,
+                tenant,
                 resourceId: resourceId || undefined,
               },
             }
@@ -570,8 +573,8 @@ async function handlePaymentReceived(payment: any) {
   const tenantId = externalRef.split('-')[0];
   const plan = parsePlanFromExternalReference(externalRef);
   const addon = parseAddOnFromExternalReference(externalRef);
-  
-  if (!tenantId) return;
+
+  if (!tenantId || !isValidObjectId(tenantId)) return;
 
   const planLimit = await PlanLimit.findOne({ tenant: tenantId });
   if (!planLimit) return;
@@ -601,23 +604,18 @@ async function handlePaymentReceived(payment: any) {
 
   if (addon.kind === 'addon' && addon.addOnId) {
     const item = ADDON_CATALOG[addon.addOnId];
-    const current = (planLimit as any).addons || {};
-    (planLimit as any).addons = {
-      ...current,
-      extraAgents: Number(current.extraAgents || 0) + Number(item.extraAgents || 0),
-      extraStorage: Number(current.extraStorage || 0) + Number(item.extraStorage || 0),
-      aiCredits: Number(current.aiCredits || 0) + Number(item.aiCredits || 0),
-      recurring: current.recurring || [],
-    };
 
-    try {
-      const pid = String(payment?.id || '');
-      if (pid) {
-        (planLimit as any).addons = setPendingOneTimeStatus((planLimit as any).addons, pid, 'received');
-      }
-    } catch {
-      // ignore
-    }
+    const pid = String(payment?.id || '');
+    (planLimit as any).addons = applyOneTimeAddOnPaymentReceived((planLimit as any).addons, {
+      addOnId: item.id,
+      paymentId: pid,
+      invoiceUrl: payment?.invoiceUrl,
+      value: payment?.value,
+      createdAt: payment?.dateCreated ? new Date(String(payment.dateCreated)) : undefined,
+      extraAgents: item.extraAgents,
+      extraStorage: item.extraStorage,
+      aiCredits: item.aiCredits,
+    });
 
     await planLimit.save();
   }
@@ -681,7 +679,7 @@ async function handlePaymentOverdue(payment: any) {
   const tenantId = externalRef.split('-')[0];
   const plan = parsePlanFromExternalReference(externalRef);
   const addon = parseAddOnFromExternalReference(externalRef);
-  if (!tenantId) return;
+  if (!tenantId || !isValidObjectId(tenantId)) return;
 
   const planLimit = await PlanLimit.findOne({ tenant: tenantId });
   if (!planLimit) return;
@@ -738,7 +736,7 @@ async function handlePaymentCanceled(payment: any) {
   const externalRef = String(payment?.externalReference || '');
   const addon = parseAddOnFromExternalReference(externalRef);
   if (addon.kind !== 'addon') return;
-  if (!addon.tenantId) return;
+  if (!addon.tenantId || !isValidObjectId(addon.tenantId)) return;
 
   const planLimit = await PlanLimit.findOne({ tenant: addon.tenantId });
   if (!planLimit) return;
@@ -781,6 +779,7 @@ async function handleSubscriptionUpdated(subscription: any) {
   // Add-on subscription update
   if (parsedAddon.kind === 'addonsub' && parsedAddon.tenantId && parsedAddon.addOnId) {
     const tId = parsedAddon.tenantId;
+    if (!isValidObjectId(tId)) return;
     const pl = await PlanLimit.findOne({ tenant: tId });
     if (!pl) return;
 
@@ -827,6 +826,7 @@ async function handleSubscriptionCancelled(subscription: any) {
 
   // Add-on subscription cancel
   if (parsedAddon.kind === 'addonsub' && parsedAddon.tenantId) {
+    if (!isValidObjectId(parsedAddon.tenantId)) return;
     const pl = await PlanLimit.findOne({ tenant: parsedAddon.tenantId });
     if (!pl) return;
     const recurring = Array.isArray((pl as any)?.addons?.recurring) ? (pl as any).addons.recurring : [];

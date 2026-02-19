@@ -78,9 +78,13 @@ export default function LandingPage() {
             </div>
 
             {/* Mobile Menu Button */}
-            <button 
+            <button
+              type="button"
               className="md:hidden p-2"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -88,15 +92,15 @@ export default function LandingPage() {
 
           {/* Mobile Menu */}
             {mobileMenuOpen && (
-              <div className="md:hidden py-4 border-t">
+              <div id="mobile-menu" className="md:hidden py-4 border-t">
                 <div className="flex flex-col gap-4">
-                  <button onClick={() => scrollToSection('features')} className="text-left py-2 font-medium">
+                  <button type="button" onClick={() => scrollToSection('features')} className="text-left py-2 font-medium">
                     Funcionalidades
                   </button>
-                  <button onClick={() => scrollToSection('pricing')} className="text-left py-2 font-medium">
+                  <button type="button" onClick={() => scrollToSection('pricing')} className="text-left py-2 font-medium">
                     Preços
                   </button>
-                  <button onClick={() => scrollToSection('faq')} className="text-left py-2 font-medium">
+                  <button type="button" onClick={() => scrollToSection('faq')} className="text-left py-2 font-medium">
                     FAQ
                   </button>
                   <hr />
@@ -117,21 +121,21 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-background to-amber-50 opacity-80" />
         <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(70%_60%_at_50%_30%,black,transparent)]">
           <div className="absolute -top-24 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
-          <div className="absolute top-28 -left-24 h-[360px] w-[360px] rounded-full bg-sky-400/10 blur-3xl animate-float" />
-          <div className="absolute top-40 -right-20 h-[420px] w-[420px] rounded-full bg-amber-300/10 blur-3xl animate-float-slow" />
+          <div className="absolute top-28 -left-24 h-[360px] w-[360px] rounded-full bg-sky-400/10 blur-3xl motion-safe:animate-float" />
+          <div className="absolute top-40 -right-20 h-[420px] w-[420px] rounded-full bg-amber-300/10 blur-3xl motion-safe:animate-float-slow" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
-            <Badge variant="secondary" className={`mb-6 px-4 py-1.5 text-sm ${mounted ? 'animate-rise' : 'opacity-0 translate-y-2'}`}>
+            <Badge variant="secondary" className={`mb-6 px-4 py-1.5 text-sm ${mounted ? 'opacity-100 translate-y-0 motion-safe:animate-rise' : 'opacity-0 translate-y-2'}`}>
               <Sparkles className="w-4 h-4 mr-2" />
               14 dias grátis • Sem cartão de crédito
             </Badge>
             
-            <h1 className={`text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6 font-display ${mounted ? 'animate-rise' : 'opacity-0 translate-y-2'}`}>
+            <h1 className={`text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6 font-display ${mounted ? 'opacity-100 translate-y-0 motion-safe:animate-rise' : 'opacity-0 translate-y-2'}`}>
               O suporte que seus <span className="text-primary">clientes merecem</span>
             </h1>
             
-            <p className={`text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto ${mounted ? 'animate-rise [animation-delay:120ms]' : 'opacity-0 translate-y-2'}`}>
+            <p className={`text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto ${mounted ? 'opacity-100 translate-y-0 motion-safe:animate-rise motion-safe:[animation-delay:120ms]' : 'opacity-0 translate-y-2'}`}>
               DeskFlow é a plataforma completa de atendimento ao cliente. 
               Organize tickets, converse em tempo real e encante seus clientes.
             </p>
@@ -171,7 +175,7 @@ export default function LandingPage() {
       </section>
 
       {/* Demo Section */}
-      <section id="demo" className="py-16">
+      <section id="demo" className="py-16 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
             <div>
@@ -259,7 +263,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-muted/30">
+      <section id="features" className="py-20 bg-muted/30 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -344,7 +348,7 @@ export default function LandingPage() {
               <div key={index} className="bg-muted/30 p-8 rounded-2xl border">
                 <div className="flex gap-1 mb-4">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" aria-hidden="true" />
                   ))}
                 </div>
                 <p className="text-foreground/90 mb-6 italic">"{testimonial.quote}"</p>
@@ -359,7 +363,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-muted/30">
+      <section id="pricing" className="py-20 bg-muted/30 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -441,7 +445,7 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-20">
+      <section id="faq" className="py-20 scroll-mt-24">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Perguntas Frequentes</h2>
@@ -522,8 +526,8 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4">Produto</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><button onClick={() => scrollToSection('features')} className="hover:text-white">Funcionalidades</button></li>
-                <li><button onClick={() => scrollToSection('pricing')} className="hover:text-white">Preços</button></li>
+                <li><button type="button" onClick={() => scrollToSection('features')} className="hover:text-white">Funcionalidades</button></li>
+                <li><button type="button" onClick={() => scrollToSection('pricing')} className="hover:text-white">Preços</button></li>
                 <li><Link to="/login" className="hover:text-white">Login</Link></li>
               </ul>
             </div>

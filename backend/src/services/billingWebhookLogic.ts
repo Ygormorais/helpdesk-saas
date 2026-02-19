@@ -139,3 +139,46 @@ export function mapAsaasSubscriptionStatus(raw: any): RecurringAddOnStatus | und
   if (s === 'INACTIVE' || s === 'CANCELED' || s === 'CANCELLED') return 'canceled';
   return undefined;
 }
+
+export function applyOneTimeAddOnPaymentReceived(
+  addons: any,
+  args: {
+    addOnId: string;
+    paymentId: string;
+    invoiceUrl?: string;
+    value?: number;
+    createdAt?: Date;
+    extraAgents?: number;
+    extraStorage?: number;
+    aiCredits?: number;
+  }
+): PlanAddOns {
+  const pid = String(args.paymentId || '');
+  if (!pid) return ensureAddOns(addons);
+
+  const deltaAgents = Number(args.extraAgents || 0) || 0;
+  const deltaStorage = Number(args.extraStorage || 0) || 0;
+  const deltaAi = Number(args.aiCredits || 0) || 0;
+
+  let a = ensureAddOns(addons);
+  const existing = (a.pendingOneTime || []).find((p) => String(p.paymentId) === pid) as any;
+  const alreadyReceived = String(existing?.status || '').toLowerCase() === 'received';
+
+  // Keep the payment entry up to date, but only apply deltas once.
+  a = upsertPendingOneTime(a, {
+    addOnId: args.addOnId,
+    paymentId: pid,
+    invoiceUrl: args.invoiceUrl,
+    value: args.value,
+    createdAt: args.createdAt,
+  });
+
+  if (!alreadyReceived) {
+    a.extraAgents = Number(a.extraAgents || 0) + deltaAgents;
+    a.extraStorage = Number(a.extraStorage || 0) + deltaStorage;
+    a.aiCredits = Number(a.aiCredits || 0) + deltaAi;
+  }
+
+  a = setPendingOneTimeStatus(a, pid, 'received');
+  return a;
+}

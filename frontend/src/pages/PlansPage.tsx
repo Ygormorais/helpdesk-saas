@@ -247,24 +247,24 @@ export default function PlansPage() {
       const endpoint = addonMode === 'monthly' ? '/billing/addons/subscribe' : '/billing/addons/checkout';
       const res = await api.post(endpoint, { addOnId: selectedAddon, billingType: addonBillingType });
       const data = res.data;
-        if (data.checkoutUrl) {
-          window.open(data.checkoutUrl, '_blank');
-          setIsAddonCheckoutOpen(false);
-          toast({
-            title: 'Redirecionando...',
-            description: addonMode === 'monthly'
-              ? 'Complete o pagamento na nova aba. O add-on mensal sera ativado automaticamente.'
-              : 'Complete o pagamento na nova aba. O add-on sera aplicado automaticamente.',
-          });
-          // Refresh so pending payments show up.
-          fetchAddons();
-          return;
-        }
-      toast({ title: 'Checkout indisponivel', description: 'Nao foi possivel iniciar o checkout.', variant: 'destructive' });
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, '_blank');
+        setIsAddonCheckoutOpen(false);
+        toast({
+          title: 'Redirecionando...',
+          description: addonMode === 'monthly'
+            ? 'Complete o pagamento na nova aba. O add-on mensal será ativado automaticamente.'
+            : 'Complete o pagamento na nova aba. O add-on será aplicado automaticamente.',
+        });
+        // Refresh so pending payments show up.
+        fetchAddons();
+        return;
+      }
+      toast({ title: 'Checkout indisponível', description: 'Não foi possível iniciar o checkout.', variant: 'destructive' });
     } catch (error: any) {
       toast({
         title: 'Erro',
-        description: error?.response?.data?.message || 'Nao foi possivel iniciar o checkout do add-on',
+        description: error?.response?.data?.message || 'Não foi possível iniciar o checkout do add-on',
         variant: 'destructive',
       });
     } finally {
@@ -740,7 +740,7 @@ export default function PlansPage() {
                         {meta ? `R$ ${Number(meta.priceMonthly || 0).toFixed(2).replace('.', ',')}/mes` : 'Assinatura mensal'}
                       </p>
                       {r.currentPeriodEnd ? (
-                        <p className="text-xs text-muted-foreground">Ativo ate: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
+                        <p className="text-xs text-muted-foreground">Ativo até: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
                       ) : null}
                       {parts.length > 0 ? (
                         <p className="text-xs text-muted-foreground">{parts.join(' • ')}</p>
