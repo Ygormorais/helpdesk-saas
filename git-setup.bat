@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ================================================
-echo   🚀 HELPDEK SAAS - GIT SETUP
+echo   🚀 HELPDESK SAAS - GIT SETUP
 echo ================================================
 echo.
 
@@ -43,8 +43,8 @@ echo.
 echo 2. Execute os comandos abaixo:
 echo.
 echo    git remote add origin https://github.com/SEU-USERNAME/helpdesk-saas.git
-echo    git branch -M main
-echo    git push -u origin main
+echo    git branch -M master
+echo    git push -u origin master
 echo.
 echo 3. Acesse: https://github.com/SEU-USERNAME/helpdesk-saas
 echo.
