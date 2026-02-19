@@ -210,7 +210,8 @@ export const listAddOns = async (req: AuthRequest, res: Response): Promise<void>
       aiCredits: r.aiCredits,
       currentPeriodEnd: r.currentPeriodEnd,
     })),
-    canPurchase: !!(planLimit as any)?.subscription?.stripeCustomerId,
+    // We can create the Asaas customer on-demand during checkout.
+    canPurchase: true,
   });
 };
 
@@ -231,9 +232,21 @@ export const createAddOnCheckout = async (req: AuthRequest, res: Response): Prom
     throw new AppError('Add-on inválido', 400);
   }
 
-  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
-  if (!planLimit?.subscription?.stripeCustomerId) {
-    throw new AppError('Ative um plano pago antes de comprar add-ons.', 400);
+  let planLimit: any = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
+  if (!planLimit) {
+    await planService.initializeTenantPlan(user.tenant._id.toString());
+    planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
+  }
+  if (!planLimit) throw new AppError('Plano do tenant nao encontrado', 500);
+
+  if (!planLimit.subscription?.stripeCustomerId) {
+    const asaasCustomer = await asaasService.getOrCreateCustomer({
+      name: user.name,
+      email: user.email,
+      externalReference: user.tenant._id.toString(),
+    } as any);
+    planLimit.subscription.stripeCustomerId = asaasCustomer.id;
+    await planLimit.save();
   }
 
   const item = ADDON_CATALOG[addOnId];
@@ -243,8 +256,11 @@ export const createAddOnCheckout = async (req: AuthRequest, res: Response): Prom
   due.setDate(due.getDate() + 1);
   const dueDate = due.toISOString().split('T')[0];
 
+  const customerId = String(planLimit.subscription.stripeCustomerId || '');
+  if (!customerId) throw new AppError('Cliente de cobranca nao encontrado', 500);
+
   const payment = await asaasService.createPayment({
-    customer: planLimit.subscription.stripeCustomerId,
+    customer: customerId,
     billingType: parsed.data.billingType,
     value: item.priceOneTime,
     dueDate,
@@ -290,9 +306,21 @@ export const createAddOnSubscription = async (req: AuthRequest, res: Response): 
     throw new AppError('Add-on inválido', 400);
   }
 
-  const planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
-  if (!planLimit?.subscription?.stripeCustomerId) {
-    throw new AppError('Ative um plano pago antes de comprar add-ons.', 400);
+  let planLimit: any = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
+  if (!planLimit) {
+    await planService.initializeTenantPlan(user.tenant._id.toString());
+    planLimit = await PlanLimit.findOne({ tenant: user.tenant._id }).select('subscription addons');
+  }
+  if (!planLimit) throw new AppError('Plano do tenant nao encontrado', 500);
+
+  if (!planLimit.subscription?.stripeCustomerId) {
+    const asaasCustomer = await asaasService.getOrCreateCustomer({
+      name: user.name,
+      email: user.email,
+      externalReference: user.tenant._id.toString(),
+    } as any);
+    planLimit.subscription.stripeCustomerId = asaasCustomer.id;
+    await planLimit.save();
   }
 
   const item = ADDON_CATALOG[addOnId];
@@ -301,8 +329,11 @@ export const createAddOnSubscription = async (req: AuthRequest, res: Response): 
   const due = new Date();
   due.setDate(due.getDate() + 1);
 
+  const customerId = String(planLimit.subscription.stripeCustomerId || '');
+  if (!customerId) throw new AppError('Cliente de cobranca nao encontrado', 500);
+
   const subscriptionData: AsaasSubscription = {
-    customer: planLimit.subscription.stripeCustomerId,
+    customer: customerId,
     billingType: parsed.data.billingType as any,
     value: item.priceMonthly,
     nextDueDate: due.toISOString().split('T')[0],
