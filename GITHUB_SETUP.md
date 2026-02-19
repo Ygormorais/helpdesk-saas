@@ -84,9 +84,9 @@ git commit -m "feat: HelpDesk SaaS v1.0
 # Adicione o remote (substitua SEU-USERNAME)
 git remote add origin https://github.com/SEU-USERNAME/helpdesk-saas.git
 
-# Faça push para a branch main
-git branch -M main
-git push -u origin main
+# Faça push para a branch master (default deste repo)
+git branch -M master
+git push -u origin master
 ```
 
 ### Opção B: Usando SSH (mais seguro)
@@ -103,8 +103,8 @@ cat ~/.ssh/id_ed25519.pub
 git remote add origin git@github.com:SEU-USERNAME/helpdesk-saas.git
 
 # Faça push
-git branch -M main
-git push -u origin main
+git branch -M master
+git push -u origin master
 ```
 
 ---
@@ -142,7 +142,7 @@ git checkout -b feature/nova-feature
 git checkout nome-da-branch
 
 # Baixar mudanças do GitHub
-git pull origin main
+git pull origin master
 
 # Ver branches remotas
 git branch -a

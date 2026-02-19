@@ -113,8 +113,8 @@ curl https://seu-frontend.vercel.app
 # Backend logs
 railway logs
 
-# Frontend logs (via V)
-verercel CLIcel logs
+# Frontend logs
+vercel logs
 ```
 
 ## Variáveis de Ambiente

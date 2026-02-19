@@ -2,7 +2,7 @@
 
 ## Pré-requisitos
 
-1. **Node.js 18+** - [Download](https://nodejs.org)
+1. **Node.js 20+** - [Download](https://nodejs.org)
 2. **MongoDB** - Uma das opções:
    - Instalar localmente: [MongoDB Community](https://www.mongodb.com/try/download/community)
    - Usar MongoDB Atlas (gratuito): [Criar conta](https://www.mongodb.com/atlas)
