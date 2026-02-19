@@ -14,10 +14,10 @@ export default function BackendStatusBanner() {
   const redisBad = deps?.redis?.configured && deps?.redis && deps.redis.ok === false;
 
   const detail = mongoBad
-    ? 'MongoDB indisponivel'
+    ? 'MongoDB indisponível'
     : redisBad
-      ? 'Redis indisponivel'
-      : 'Backend indisponivel';
+      ? 'Redis indisponível'
+      : 'Backend indisponível';
 
   return (
     <div className="sticky top-0 z-50 border-b bg-amber-50">
@@ -25,7 +25,7 @@ export default function BackendStatusBanner() {
         <div className="flex items-center gap-2 min-w-0">
           <AlertTriangle className="h-4 w-4 text-amber-700" />
           <p className="text-sm text-amber-900 truncate">
-            Servico degradado: {detail}. Algumas acoes podem falhar.
+            Serviço degradado: {detail}. Algumas ações podem falhar.
           </p>
         </div>
         <a

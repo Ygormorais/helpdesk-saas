@@ -267,7 +267,7 @@ export default function MacrosPage() {
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-4 flex items-center justify-between gap-3">
             <p className="text-sm text-amber-900">
-              Voce atingiu o limite de macros do seu plano.
+              Você atingiu o limite de macros do seu plano.
             </p>
             <Link to="/plans">
               <Button variant="secondary">Ver planos</Button>

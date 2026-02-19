@@ -100,8 +100,8 @@ api.interceptors.response.use(
         if (now - last > 3000) {
           (window as any).__lastDbToastAt = now;
           toast({
-            title: 'Banco indisponivel',
-            description: 'O backend nao conseguiu conectar no MongoDB. Se voce usa Docker, suba o container do banco.',
+            title: 'Banco indisponível',
+            description: 'O backend não conseguiu conectar no MongoDB. Se você usa Docker, suba o container do banco.',
             variant: 'destructive',
           });
         }

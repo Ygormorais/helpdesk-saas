@@ -60,7 +60,7 @@ const getPriorityBadge = (priority: string) => {
   const labels: Record<string, string> = {
     urgent: 'Urgente',
     high: 'Alta',
-    medium: 'Media',
+    medium: 'Média',
     low: 'Baixa',
   };
   return (
@@ -273,8 +273,8 @@ export default function TicketDetailPage() {
     onError: (error: any) => {
       const msg = error?.response?.data?.message;
       const fallback = user?.role === 'client'
-        ? 'Esse ticket ainda nao tem um agente atribuido'
-        : 'Nao foi possivel abrir o chat';
+        ? 'Esse ticket ainda não tem um agente atribuído'
+        : 'Não foi possível abrir o chat';
       toast({
         title: 'Erro ao abrir chat',
         description: msg || fallback,
@@ -294,7 +294,7 @@ export default function TicketDetailPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold">Ticket</h1>
-            <p className="text-muted-foreground">ID invalido</p>
+            <p className="text-muted-foreground">ID inválido</p>
           </div>
         </div>
       </div>
@@ -329,7 +329,7 @@ export default function TicketDetailPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Ticket nao encontrado</h1>
+            <h1 className="text-2xl font-bold">Ticket não encontrado</h1>
             <p className="text-muted-foreground">{id}</p>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function TicketDetailPage() {
                 {clientSuggestedArticlesQuery.isLoading ? (
                   <p className="text-sm text-muted-foreground">Carregando...</p>
                 ) : (clientSuggestedArticlesQuery.data || []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhuma sugestao no momento</p>
+                  <p className="text-sm text-muted-foreground">Nenhuma sugestão no momento</p>
                 ) : (
                   (clientSuggestedArticlesQuery.data || []).map((a: any) => (
                     <Link
@@ -444,7 +444,7 @@ export default function TicketDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Este ticket esta {ticket.status === 'resolved' ? 'resolvido' : 'fechado'}. Para enviar uma nova mensagem, reabra o ticket.
+                  Este ticket está {ticket.status === 'resolved' ? 'resolvido' : 'fechado'}. Para enviar uma nova mensagem, reabra o ticket.
                 </p>
                 <div>
                   <Button
@@ -564,7 +564,7 @@ export default function TicketDetailPage() {
                     {suggestedArticlesQuery.isLoading ? (
                       <p className="text-sm text-muted-foreground mt-1">Carregando...</p>
                     ) : (suggestedArticlesQuery.data || []).length === 0 ? (
-                      <p className="text-sm text-muted-foreground mt-1">Nenhuma sugestao no momento</p>
+                      <p className="text-sm text-muted-foreground mt-1">Nenhuma sugestão no momento</p>
                     ) : (
                       <div className="mt-2 space-y-2">
                         {(suggestedArticlesQuery.data || [])
@@ -618,7 +618,7 @@ export default function TicketDetailPage() {
               <div>
                 <Label className="text-muted-foreground">OLA - ownership</Label>
                 <p className="font-medium">
-                  {ticket.ola?.ownedAt ? formatRemaining(ticket.ola?.ownDue) : 'Sem responsavel'}
+                  {ticket.ola?.ownedAt ? formatRemaining(ticket.ola?.ownDue) : 'Sem responsável'}
                 </p>
               </div>
               <div>
@@ -679,7 +679,7 @@ export default function TicketDetailPage() {
                   <User className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-medium">{ticket.assignedTo?.name || 'Nao atribuido'}</p>
+                  <p className="font-medium">{ticket.assignedTo?.name || 'Não atribuído'}</p>
                   <p className="text-sm text-muted-foreground">{ticket.assignedTo?.email || ''}</p>
                 </div>
               </div>

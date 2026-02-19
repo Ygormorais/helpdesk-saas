@@ -737,7 +737,7 @@ export default function PlansPage() {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {meta ? `R$ ${Number(meta.priceMonthly || 0).toFixed(2).replace('.', ',')}/mes` : 'Assinatura mensal'}
+                        {meta ? `R$ ${Number(meta.priceMonthly || 0).toFixed(2).replace('.', ',')}/mês` : 'Assinatura mensal'}
                       </p>
                       {r.currentPeriodEnd ? (
                         <p className="text-xs text-muted-foreground">Ativo até: {new Date(r.currentPeriodEnd).toLocaleDateString('pt-BR')}</p>
@@ -928,7 +928,7 @@ export default function PlansPage() {
               </div>
               {portalData.subscription?.nextDueDate ? (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Proximo vencimento</span>
+                  <span className="text-muted-foreground">Próximo vencimento</span>
                   <span className="font-medium">{String(portalData.subscription.nextDueDate)}</span>
                 </div>
               ) : null}

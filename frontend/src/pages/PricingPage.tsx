@@ -8,9 +8,9 @@ const plans = [
     id: 'free',
     name: 'Free',
     price: 'R$ 0',
-    description: 'Para comecar com o essencial.',
-    features: ['1 agente', 'Ate 50 tickets/mes', 'Chat em tickets', 'Satisfacao basica'],
-    cta: 'Comecar gratis',
+    description: 'Para começar com o essencial.',
+    features: ['1 agente', 'Até 50 tickets/mês', 'Chat em tickets', 'Satisfação básica'],
+    cta: 'Começar grátis',
     href: '/register?plan=free',
     icon: Sparkles,
   },
@@ -19,8 +19,8 @@ const plans = [
     name: 'Pro',
     price: 'R$ 29,90',
     description: 'Para equipes que precisam de visibilidade e escala.',
-    features: ['Ate 5 agentes', 'Tickets ilimitados', 'Relatorios avancados', 'Base de conhecimento', 'Controle de tempo'],
-    cta: 'Comecar trial',
+    features: ['Até 5 agentes', 'Tickets ilimitados', 'Relatórios avançados', 'Base de conhecimento', 'Controle de tempo'],
+    cta: 'Começar trial',
     href: '/register?plan=pro',
     highlight: true,
     icon: Zap,
@@ -29,9 +29,9 @@ const plans = [
     id: 'enterprise',
     name: 'Enterprise',
     price: 'R$ 99,90',
-    description: 'Para operacoes com compliance e integracoes.',
-    features: ['Agentes ilimitados', 'Webhooks', 'API', 'White label', 'Dominio personalizado'],
-    cta: 'Comecar trial',
+    description: 'Para operações com compliance e integrações.',
+    features: ['Agentes ilimitados', 'Webhooks', 'API', 'White-label', 'Domínio personalizado'],
+    cta: 'Começar trial',
     href: '/register?plan=enterprise',
     icon: Building2,
   },
@@ -43,8 +43,8 @@ export default function PricingPage() {
       <div className="mx-auto max-w-6xl px-4 py-16">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">Planos e precos</h1>
-            <p className="mt-3 text-gray-600">14 dias gratis nos planos pagos. Sem cartao para comecar.</p>
+            <h1 className="text-4xl font-bold tracking-tight">Planos e preços</h1>
+            <p className="mt-3 text-gray-600">14 dias grátis nos planos pagos. Sem cartão para começar.</p>
           </div>
           <Link to="/login">
             <Button variant="outline">Entrar</Button>

@@ -32,7 +32,7 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toast({ title: 'Notificacoes marcadas como lidas' });
+      toast({ title: 'Notificações marcadas como lidas' });
     },
   });
 
@@ -42,7 +42,7 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toast({ title: 'Notificacoes limpas' });
+      toast({ title: 'Notificações limpas' });
     },
   });
 
@@ -63,8 +63,8 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Notificacoes</h1>
-          <p className="text-muted-foreground">{unreadCount} nao lidas</p>
+          <h1 className="text-3xl font-bold">Notificações</h1>
+          <p className="text-muted-foreground">{unreadCount} não lidas</p>
         </div>
 
         <div className="flex gap-2">
@@ -75,7 +75,7 @@ export default function NotificationsPage() {
               setUnreadOnly((v) => !v);
             }}
           >
-            {unreadOnly ? 'Mostrando nao lidas' : 'Somente nao lidas'}
+            {unreadOnly ? 'Mostrando não lidas' : 'Somente não lidas'}
           </Button>
           <Button
             variant="outline"
@@ -105,12 +105,12 @@ export default function NotificationsPage() {
             <p className="text-sm text-muted-foreground">Carregando...</p>
           )}
           {listQuery.isError && (
-            <p className="text-sm text-destructive">Erro ao carregar notificacoes</p>
+            <p className="text-sm text-destructive">Erro ao carregar notificações</p>
           )}
           {!listQuery.isLoading && !listQuery.isError && notifications.length === 0 && (
             <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
               <Bell className="h-10 w-10 mb-2 opacity-50" />
-              <p className="text-sm">Nenhuma notificacao</p>
+              <p className="text-sm">Nenhuma notificação</p>
             </div>
           )}
 

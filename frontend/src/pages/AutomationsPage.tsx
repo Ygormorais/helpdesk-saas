@@ -154,12 +154,12 @@ export default function AutomationsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Automacoes</h1>
-          <p className="text-muted-foreground">Regras para automatizar triagem e atribuicao</p>
+          <h1 className="text-3xl font-bold">Automações</h1>
+          <p className="text-muted-foreground">Regras para automatizar triagem e atribuição</p>
         </div>
         <FeatureUnavailable
-          title="Automacoes bloqueadas"
-          description="Sua empresa precisa de um plano superior para usar regras de automacao."
+          title="Automações bloqueadas"
+          description="Sua empresa precisa de um plano superior para usar regras de automação."
         />
       </div>
     );
@@ -169,8 +169,8 @@ export default function AutomationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Automacoes</h1>
-          <p className="text-muted-foreground">Regras para automatizar triagem e atribuicao</p>
+          <h1 className="text-3xl font-bold">Automações</h1>
+          <p className="text-muted-foreground">Regras para automatizar triagem e atribuição</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -179,7 +179,7 @@ export default function AutomationsPage() {
                 if (limitReached) {
                   toast({
                     title: 'Limite de regras atingido',
-                    description: 'Faça upgrade para criar mais regras de automacao.',
+                    description: 'Faça upgrade para criar mais regras de automação.',
                     variant: 'destructive',
                   });
                   return;
@@ -336,7 +336,7 @@ export default function AutomationsPage() {
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-4 flex items-center justify-between gap-3">
             <p className="text-sm text-amber-900">
-              Voce atingiu o limite de regras de automacao do seu plano.
+              Você atingiu o limite de regras de automação do seu plano.
             </p>
             <Link to="/plans">
               <Button variant="secondary">Ver planos</Button>

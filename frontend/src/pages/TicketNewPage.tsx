@@ -23,8 +23,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 const schema = z.object({
-  title: z.string().min(5, 'Titulo deve ter no minimo 5 caracteres'),
-  description: z.string().min(10, 'Descricao deve ter no minimo 10 caracteres'),
+  title: z.string().min(5, 'Título deve ter no mínimo 5 caracteres'),
+  description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
   category: z.string().min(1, 'Selecione uma categoria'),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
 });
@@ -89,7 +89,7 @@ export default function TicketNewPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold">Novo Ticket</h1>
-          <p className="text-muted-foreground">Abra uma solicitacao para sua equipe</p>
+          <p className="text-muted-foreground">Abra uma solicitação para sua equipe</p>
         </div>
       </div>
 
@@ -103,7 +103,7 @@ export default function TicketNewPage() {
         <CardContent>
           {isCategoriesError && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive mb-4">
-              Nao foi possivel carregar as categorias.
+              Não foi possível carregar as categorias.
               <Button
                 type="button"
                 variant="outline"
@@ -126,19 +126,19 @@ export default function TicketNewPage() {
             onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}
           >
             <div className="space-y-2">
-              <Label htmlFor="title">Titulo</Label>
-              <Input id="title" placeholder="Ex: Nao consigo acessar minha conta" {...form.register('title')} />
+              <Label htmlFor="title">Título</Label>
+              <Input id="title" placeholder="Ex: Não consigo acessar minha conta" {...form.register('title')} />
               {form.formState.errors.title && (
                 <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Descricao</Label>
+              <Label htmlFor="description">Descrição</Label>
               <Textarea
                 id="description"
                 rows={6}
-                placeholder="Descreva o problema com o maximo de detalhes possivel"
+                placeholder="Descreva o problema com o máximo de detalhes possível"
                 {...form.register('description')}
               />
               {form.formState.errors.description && (

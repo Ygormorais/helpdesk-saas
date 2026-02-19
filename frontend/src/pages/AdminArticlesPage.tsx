@@ -136,7 +136,7 @@ export default function AdminArticlesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['articles', 'admin'] });
       queryClient.invalidateQueries({ queryKey: ['articles', 'public'] });
-      toast({ title: 'Artigo excluido' });
+      toast({ title: 'Artigo excluído' });
     },
     onError: (error: any) => {
       toast({
@@ -327,7 +327,7 @@ export default function AdminArticlesPage() {
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs text-muted-foreground">
                 {feedbackQuery.data?.stats
-                  ? `${feedbackQuery.data.stats.yes || 0} sim • ${feedbackQuery.data.stats.no || 0} nao • total ${feedbackQuery.data.stats.total || 0}`
+                  ? `${feedbackQuery.data.stats.yes || 0} sim • ${feedbackQuery.data.stats.no || 0} não • total ${feedbackQuery.data.stats.total || 0}`
                   : ''}
               </div>
               <div className="flex gap-2">
@@ -336,7 +336,7 @@ export default function AdminArticlesPage() {
                   variant={feedbackCommentOnly ? 'default' : 'outline'}
                   onClick={() => setFeedbackCommentOnly(true)}
                 >
-                  Com comentario
+                  Com comentário
                 </Button>
                 <Button
                   size="sm"
@@ -361,7 +361,7 @@ export default function AdminArticlesPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">
-                          {f.user?.name || 'Usuario'}
+                          {f.user?.name || 'Usuário'}
                           {f.user?.email ? <span className="text-xs text-muted-foreground"> {'<'}{f.user.email}{'>'}</span> : null}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -369,7 +369,7 @@ export default function AdminArticlesPage() {
                         </p>
                       </div>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${f.helpful ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {f.helpful ? 'Util' : 'Nao util'}
+                        {f.helpful ? 'Útil' : 'Não útil'}
                       </span>
                     </div>
                     {f.comment && <p className="text-sm whitespace-pre-wrap">{f.comment}</p>}

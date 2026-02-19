@@ -14,12 +14,12 @@ const actions = [
   { value: 'all', label: 'Todas as ações' },
   { value: 'ticket.created', label: 'Ticket criado' },
   { value: 'ticket.updated', label: 'Ticket atualizado' },
-  { value: 'ticket.assigned', label: 'Ticket atribuido' },
+  { value: 'ticket.assigned', label: 'Ticket atribuído' },
   { value: 'ticket.status_changed', label: 'Status alterado' },
   { value: 'ticket.resolved', label: 'Ticket resolvido' },
-  { value: 'comment.created', label: 'Comentario adicionado' },
-  { value: 'user.login', label: 'Login de usuario' },
-  { value: 'settings.updated', label: 'Configuracoes alteradas' },
+  { value: 'comment.created', label: 'Comentário adicionado' },
+  { value: 'user.login', label: 'Login de usuário' },
+  { value: 'settings.updated', label: 'Configurações alteradas' },
   { value: 'article.created', label: 'Artigo criado' },
   { value: 'article.updated', label: 'Artigo atualizado' },
   { value: 'article.deleted', label: 'Artigo removido' },
@@ -83,8 +83,8 @@ export default function AuditLogsPage() {
     } catch (e: any) {
       const status = e?.response?.status;
       const msg = status === 403
-        ? 'Export disponivel apenas em planos superiores. Faça upgrade para liberar.'
-        : 'Nao foi possivel exportar';
+        ? 'Export disponível apenas em planos superiores. Faça upgrade para liberar.'
+        : 'Não foi possível exportar';
       toast({ title: 'Falha ao exportar', description: msg, variant: 'destructive' });
     }
   };
@@ -94,11 +94,11 @@ export default function AuditLogsPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Audit Log</h1>
-          <p className="text-muted-foreground">Atividade e alteracoes no sistema</p>
+          <p className="text-muted-foreground">Atividade e alterações no sistema</p>
         </div>
         <FeatureUnavailable
           title="Audit log bloqueado"
-          description="Sua conta nao tem permissao para acessar auditoria."
+          description="Sua conta não tem permissão para acessar auditoria."
         />
       </div>
     );
@@ -110,7 +110,7 @@ export default function AuditLogsPage() {
         <div>
           <h1 className="text-3xl font-bold">Audit Log</h1>
           {planQuery.data?.retention?.auditDays ? (
-            <p className="text-sm text-muted-foreground">Retencao do seu plano: {planQuery.data.retention.auditDays} dias</p>
+            <p className="text-sm text-muted-foreground">Retenção do seu plano: {planQuery.data.retention.auditDays} dias</p>
           ) : null}
         </div>
         <Button variant="outline" onClick={exportCsv}>
@@ -128,7 +128,7 @@ export default function AuditLogsPage() {
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar por usuario ou recurso..."
+                placeholder="Buscar por usuário ou recurso..."
                 className="pl-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -136,7 +136,7 @@ export default function AuditLogsPage() {
             </div>
             <Select value={actionFilter} onValueChange={setActionFilter}>
               <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Acao" />
+                <SelectValue placeholder="Ação" />
               </SelectTrigger>
               <SelectContent>
                 {actions.map((action) => (
@@ -159,8 +159,8 @@ export default function AuditLogsPage() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left text-sm font-medium">Data/Hora</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Acao</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Usuario</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Ação</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Usuário</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Recurso</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Detalhes</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">IP</th>
@@ -178,7 +178,7 @@ export default function AuditLogsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{log.user?.name || 'Usuario'}</span>
+                      <span className="text-sm">{log.user?.name || 'Usuário'}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm font-medium">{log.resourceId || log.resource}</td>

@@ -354,7 +354,7 @@ export default function ReportsPage() {
          <CardHeader>
            <div className="flex items-center justify-between gap-3">
              <div className="space-y-1">
-               <CardTitle>Relatorios agendados (Email)</CardTitle>
+                <CardTitle>Relatórios agendados (Email)</CardTitle>
                {!schedulesForbidden && schedulesUsage ? (
                  <p className="text-xs text-muted-foreground">
                    {schedulesUsage.max === -1 ? 'Ilimitado' : `${schedulesUsage.current}/${schedulesUsage.max} usados`}
@@ -374,7 +374,7 @@ export default function ReportsPage() {
                    if (schedulesForbidden) {
                      toast({
                        title: 'Agendamento bloqueado',
-                       description: 'Disponivel apenas em planos superiores.',
+                        description: 'Disponível apenas em planos superiores.',
                        variant: 'destructive',
                      });
                      return;
@@ -382,7 +382,7 @@ export default function ReportsPage() {
                    if (schedulesLimitReached) {
                      toast({
                        title: 'Limite do plano atingido',
-                       description: 'Voce atingiu o limite de relatorios agendados do seu plano. Veja os planos para aumentar esse limite.',
+                        description: 'Você atingiu o limite de relatórios agendados do seu plano. Veja os planos para aumentar esse limite.',
                        variant: 'destructive',
                      });
                      return;
@@ -407,13 +407,13 @@ export default function ReportsPage() {
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Frequencia</Label>
+                      <Label>Frequência</Label>
                       <Select value={scheduleForm.frequency} onValueChange={(v) => setScheduleForm({ ...scheduleForm, frequency: v })}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="daily">Diario</SelectItem>
+                          <SelectItem value="daily">Diário</SelectItem>
                           <SelectItem value="weekly">Semanal</SelectItem>
                         </SelectContent>
                       </Select>
@@ -444,25 +444,25 @@ export default function ReportsPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="1">Segunda</SelectItem>
-                          <SelectItem value="2">Terca</SelectItem>
+                          <SelectItem value="2">Terça</SelectItem>
                           <SelectItem value="3">Quarta</SelectItem>
                           <SelectItem value="4">Quinta</SelectItem>
                           <SelectItem value="5">Sexta</SelectItem>
                           <SelectItem value="0">Domingo</SelectItem>
-                          <SelectItem value="6">Sabado</SelectItem>
+                          <SelectItem value="6">Sábado</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   ) : null}
 
                   <div className="space-y-2">
-                    <Label>Destinatarios (separar por virgula)</Label>
+                    <Label>Destinatários (separar por vírgula)</Label>
                     <Input
                       placeholder="financeiro@empresa.com, gestor@empresa.com"
                       value={scheduleForm.recipients}
                       onChange={(e) => setScheduleForm({ ...scheduleForm, recipients: e.target.value })}
                     />
-                    <p className="text-xs text-muted-foreground">O email contem um link para a pagina de relatorios com o filtro atual.</p>
+                    <p className="text-xs text-muted-foreground">O email contém um link para a página de relatórios com o filtro atual.</p>
                   </div>
                 </div>
                 <DialogFooter>
@@ -481,7 +481,7 @@ export default function ReportsPage() {
            {schedulesForbidden ? (
              <FeatureUnavailable
                title="Agendamento bloqueado"
-               description="Relatorios agendados por email estao disponiveis apenas em planos superiores."
+                description="Relatórios agendados por email estão disponíveis apenas em planos superiores."
              />
            ) : schedulesQuery.isLoading ? (
              <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -495,7 +495,7 @@ export default function ReportsPage() {
                  <div key={s._id} className="rounded-lg border p-3">
                    <p className="font-medium">{s.name}</p>
                    <p className="text-xs text-muted-foreground mt-1">
-                     Proximo envio: {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString('pt-BR') : '-'}
+                      Próximo envio: {s.nextRunAt ? new Date(s.nextRunAt).toLocaleString('pt-BR') : '-'}
                    </p>
                  </div>
                ))}

@@ -75,7 +75,7 @@ export default function KnowledgeBasePage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-4xl font-bold">Central de Ajuda</h1>
-          <p className="text-lg text-muted-foreground">Base de conhecimento indisponivel no seu plano.</p>
+          <p className="text-lg text-muted-foreground">Base de conhecimento indisponível no seu plano.</p>
         </div>
         <FeatureUnavailable
           title="Base de conhecimento bloqueada"
@@ -106,8 +106,8 @@ export default function KnowledgeBasePage() {
         </div>
         {isAiSearch ? (
           <div className="mt-2 text-center text-xs text-muted-foreground">
-            {searchMode === 'ai' ? 'Busca com IA (semantica).' : null}
-            {searchMode === 'fallback' ? 'IA indisponivel no momento; usando busca basica.' : null}
+            {searchMode === 'ai' ? 'Busca com IA (semântica).' : null}
+            {searchMode === 'fallback' ? 'IA indisponível no momento; usando busca básica.' : null}
             {!searchMode ? 'Buscando...' : null}
           </div>
         ) : (

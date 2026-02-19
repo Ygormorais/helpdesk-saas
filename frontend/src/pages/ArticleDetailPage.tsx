@@ -64,14 +64,14 @@ export default function ArticleDetailPage() {
       await navigator.clipboard.writeText(window.location.href);
       toast({ title: 'Link copiado' });
     } catch {
-      toast({ title: 'Nao foi possivel copiar o link', variant: 'destructive' });
+      toast({ title: 'Não foi possível copiar o link', variant: 'destructive' });
     }
   };
 
   if (!slug) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
-        <p className="text-muted-foreground">Slug invalido</p>
+        <p className="text-muted-foreground">Slug inválido</p>
       </div>
     );
   }
