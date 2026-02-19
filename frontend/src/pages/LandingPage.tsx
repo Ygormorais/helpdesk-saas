@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Check, ArrowRight, Zap, Shield, Users, Clock, BarChart3, MessageSquare, 
-  Star, Menu, X, ChevronDown, Play, Sparkles, HeadphonesIcon, FileText,
-  TrendingUp, Lock, Globe, Smartphone, CreditCard
+  Check, ArrowRight, Shield, Clock, BarChart3, MessageSquare,
+  Star, Menu, X, Play, Sparkles, HeadphonesIcon, FileText,
+  Lock, Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +12,10 @@ import ClientCarousel from '@/components/sections/ClientCarousel';
 export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
@@ -27,11 +29,20 @@ export default function LandingPage() {
     setMobileMenuOpen(false);
   };
 
+  const heroKpis = useMemo(
+    () => [
+      { value: '500+', label: 'Empresas' },
+      { value: '99,9%', label: 'Uptime' },
+      { value: '4,9/5', label: 'Avaliacoes' },
+    ],
+    []
+  );
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-transparent'
+        isScrolled ? 'bg-background/90 backdrop-blur-md shadow-sm border-b' : 'bg-transparent'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -45,13 +56,13 @@ export default function LandingPage() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <button onClick={() => scrollToSection('features')} className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              <button onClick={() => scrollToSection('features')} className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 Funcionalidades
               </button>
-              <Link to="/pricing" className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 Preços
               </Link>
-              <button onClick={() => scrollToSection('faq')} className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              <button onClick={() => scrollToSection('faq')} className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 FAQ
               </button>
             </div>
@@ -103,20 +114,24 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 opacity-70" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-background to-amber-50 opacity-80" />
+        <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(70%_60%_at_50%_30%,black,transparent)]">
+          <div className="absolute -top-24 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute top-28 -left-24 h-[360px] w-[360px] rounded-full bg-sky-400/10 blur-3xl animate-float" />
+          <div className="absolute top-40 -right-20 h-[420px] w-[420px] rounded-full bg-amber-300/10 blur-3xl animate-float-slow" />
+        </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
-            <Badge variant="secondary" className="mb-6 px-4 py-1.5 text-sm">
+            <Badge variant="secondary" className={`mb-6 px-4 py-1.5 text-sm ${mounted ? 'animate-rise' : 'opacity-0 translate-y-2'}`}>
               <Sparkles className="w-4 h-4 mr-2" />
               14 dias grátis • Sem cartão de crédito
             </Badge>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6">
-              O suporte que seus{' '}
-              <span className="text-primary">clientes merecem</span>
+            <h1 className={`text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6 font-display ${mounted ? 'animate-rise' : 'opacity-0 translate-y-2'}`}>
+              O suporte que seus <span className="text-primary">clientes merecem</span>
             </h1>
             
-            <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            <p className={`text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto ${mounted ? 'animate-rise [animation-delay:120ms]' : 'opacity-0 translate-y-2'}`}>
               DeskFlow é a plataforma completa de atendimento ao cliente. 
               Organize tickets, converse em tempo real e encante seus clientes.
             </p>
@@ -128,7 +143,12 @@ export default function LandingPage() {
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 py-6 text-lg">
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full sm:w-auto px-8 py-6 text-lg"
+                onClick={() => scrollToSection('demo')}
+              >
                 <Play className="mr-2 w-5 h-5" />
                 Ver Demo
               </Button>
@@ -139,17 +159,99 @@ export default function LandingPage() {
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto pt-8 border-t">
-              <div>
-                <div className="text-3xl font-bold text-primary">500+</div>
-                <div className="text-sm text-gray-600">Empresas</div>
+              {heroKpis.map((k) => (
+                <div key={k.label}>
+                  <div className="text-3xl font-bold text-primary">{k.value}</div>
+                  <div className="text-sm text-muted-foreground">{k.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Demo Section */}
+      <section id="demo" className="py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <div>
+              <h2 className="text-3xl sm:text-4xl font-bold font-display mb-4">Uma caixa de entrada. Varios canais.</h2>
+              <p className="text-muted-foreground text-lg mb-6">
+                Centralize tickets, chat e base de conhecimento. Com macros e automacoes, o time resolve mais rapido - sem perder contexto.
+              </p>
+              <div className="grid gap-3">
+                {[
+                  { icon: Lock, title: 'Dados isolados por empresa', desc: 'Multi-tenant com seguranca e auditoria.' },
+                  { icon: Clock, title: 'SLA e prazos visiveis', desc: 'Priorize o que vence primeiro.' },
+                  { icon: BarChart3, title: 'Relatorios que viram decisao', desc: 'CSAT, SLA e produtividade em um lugar.' },
+                ].map((item) => (
+                  <div key={item.title} className="flex gap-3 rounded-xl border bg-card p-4">
+                    <div className="mt-0.5 h-10 w-10 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <item.icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{item.title}</p>
+                      <p className="text-sm text-muted-foreground">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div>
-                <div className="text-3xl font-bold text-primary">99.9%</div>
-                <div className="text-sm text-gray-600">Uptime</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-primary">4.9/5</div>
-                <div className="text-sm text-gray-600">Avaliação</div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute -inset-6 bg-gradient-to-br from-primary/10 via-sky-300/10 to-amber-200/10 blur-2xl rounded-3xl" />
+              <div className="relative rounded-3xl border bg-card shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3 border-b bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Caixa de entrada</p>
+                </div>
+                <div className="grid grid-cols-5 min-h-[340px]">
+                  <div className="col-span-2 border-r bg-muted/10 p-4 space-y-3">
+                    {[
+                      { t: 'PIX: comprovante', s: 'Cliente', b: true },
+                      { t: 'Erro no login', s: 'Site', b: false },
+                      { t: 'Troca de plano', s: 'Financeiro', b: false },
+                      { t: 'Integracao API', s: 'Dev', b: false },
+                    ].map((r, i) => (
+                      <div key={i} className={`rounded-xl border p-3 ${r.b ? 'bg-background' : 'bg-card'}`}>
+                        <p className="text-sm font-medium truncate">{r.t}</p>
+                        <p className="text-xs text-muted-foreground truncate">{r.s} • ha {i + 1}h</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="col-span-3 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold">PIX: comprovante</p>
+                        <p className="text-xs text-muted-foreground">Ticket #1042 • Prioridade alta</p>
+                      </div>
+                      <Badge variant="secondary">SLA: 1h</Badge>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl bg-muted/30 p-4">
+                        <p className="text-sm">
+                          Ola! Paguei via PIX mas o acesso ao Pro ainda nao liberou. Pode verificar?
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">Cliente • 09:12</p>
+                      </div>
+                      <div className="rounded-2xl bg-primary/10 p-4 border border-primary/15">
+                        <p className="text-sm">
+                          Claro! Ja estou validando o pagamento. Enquanto isso, pode me enviar o ID da cobranca?
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">Agente • 09:14</p>
+                      </div>
+                      <div className="pt-2">
+                        <div className="rounded-xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+                          Responder... (ex.: /macro, /sla)
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -157,13 +259,13 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-gray-50">
+      <section id="features" className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Tudo que você precisa em um só lugar
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Ferramentas poderosas para gerenciar seu atendimento de forma eficiente
             </p>
           </div>
@@ -201,12 +303,12 @@ export default function LandingPage() {
                 description: 'Cada empresa tem seus dados isolados e seguros.',
               },
             ].map((feature, index) => (
-              <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border hover:shadow-md transition-shadow">
+              <div key={index} className="bg-card p-6 rounded-2xl shadow-sm border hover:shadow-md transition-shadow">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
                   <feature.icon className="w-6 h-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <p className="text-muted-foreground">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -217,7 +319,8 @@ export default function LandingPage() {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Loved by teams everywhere</h2>
+            <h2 className="text-3xl font-bold font-display mb-4">Times que atendem melhor, crescem melhor</h2>
+            <p className="text-muted-foreground">Resultados reais de quem vive suporte todo dia.</p>
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
@@ -238,16 +341,16 @@ export default function LandingPage() {
                 role: "Diretora de Operações, BrasilDigital",
               },
             ].map((testimonial, index) => (
-              <div key={index} className="bg-gray-50 p-8 rounded-2xl">
+              <div key={index} className="bg-muted/30 p-8 rounded-2xl border">
                 <div className="flex gap-1 mb-4">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   ))}
                 </div>
-                <p className="text-gray-700 mb-6 italic">"{testimonial.quote}"</p>
+                <p className="text-foreground/90 mb-6 italic">"{testimonial.quote}"</p>
                 <div>
                   <div className="font-semibold">{testimonial.author}</div>
-                  <div className="text-sm text-gray-600">{testimonial.role}</div>
+                  <div className="text-sm text-muted-foreground">{testimonial.role}</div>
                 </div>
               </div>
             ))}
@@ -256,13 +359,13 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-gray-50">
+      <section id="pricing" className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Preços simples e transparentes
             </h2>
-            <p className="text-lg text-gray-600">
+            <p className="text-lg text-muted-foreground">
               Comece grátis e evolua conforme sua empresa cresce
             </p>
           </div>
@@ -294,7 +397,7 @@ export default function LandingPage() {
                 popular: false,
               },
             ].map((plan, index) => (
-              <div key={index} className={`relative bg-white rounded-2xl p-8 ${
+              <div key={index} className={`relative bg-card rounded-2xl p-8 ${
                 plan.popular ? 'ring-2 ring-primary shadow-xl' : 'border shadow-sm'
               }`}>
                 {plan.popular && (
@@ -306,8 +409,8 @@ export default function LandingPage() {
                 <div className="text-center mb-6">
                   <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
                   <div className="text-4xl font-bold mb-2">{plan.price}</div>
-                  <div className="text-sm text-gray-600">/mês</div>
-                  <p className="text-sm text-gray-600 mt-2">{plan.description}</p>
+                  <div className="text-sm text-muted-foreground">/mês</div>
+                  <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
                 </div>
 
                 <ul className="space-y-3 mb-8">
@@ -331,7 +434,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <p className="text-center text-sm text-gray-600 mt-8">
+          <p className="text-center text-sm text-muted-foreground mt-8">
             Todos os planos incluem SSL, backups diários e suporte por email.
           </p>
         </div>
@@ -342,7 +445,7 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Perguntas Frequentes</h2>
-            <p className="text-gray-600">Tudo que você precisa saber sobre o DeskFlow</p>
+            <p className="text-muted-foreground">Tudo que você precisa saber sobre o DeskFlow</p>
           </div>
 
           <div className="space-y-4">
@@ -368,9 +471,9 @@ export default function LandingPage() {
                 answer: 'Absolutamente! Usamos criptografia SSL, backups diários e cada cliente tem seus dados isolados (multi-tenancy).',
               },
             ].map((faq, index) => (
-              <div key={index} className="border rounded-lg p-6">
+              <div key={index} className="border rounded-lg p-6 bg-card">
                 <h3 className="font-semibold text-lg mb-2">{faq.question}</h3>
-                <p className="text-gray-600">{faq.answer}</p>
+                <p className="text-muted-foreground">{faq.answer}</p>
               </div>
             ))}
           </div>

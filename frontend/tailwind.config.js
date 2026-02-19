@@ -7,6 +7,38 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          '"Space Grotesk"',
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif',
+          '"Apple Color Emoji"',
+          '"Segoe UI Emoji"',
+          '"Segoe UI Symbol"',
+        ],
+        display: [
+          '"Fraunces"',
+          'ui-serif',
+          'Georgia',
+          'serif',
+        ],
+      },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translate3d(0, 0, 0)' },
+          '50%': { transform: 'translate3d(0, -10px, 0)' },
+        },
+        rise: {
+          '0%': { opacity: '0', transform: 'translate3d(0, 10px, 0)' },
+          '100%': { opacity: '1', transform: 'translate3d(0, 0, 0)' },
+        },
+      },
+      animation: {
+        float: 'float 10s ease-in-out infinite',
+        'float-slow': 'float 14s ease-in-out infinite',
+        rise: 'rise 650ms ease-out both',
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
