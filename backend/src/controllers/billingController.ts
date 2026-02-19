@@ -454,20 +454,34 @@ export const handleWebhook = async (
         webhookEventDocId = doc._id;
       } catch (e: any) {
         if (e?.code === 11000) {
-          // Duplicate event (at-least-once delivery)
+          // Duplicate event (at-least-once delivery). Re-process only if not yet processed.
+          const existing = await WebhookEvent.findOne({ provider: 'asaas', eventId })
+            .select('_id status')
+            .lean();
+
+          if (!existing) {
+            res.status(200).json({ received: true, duplicate: true });
+            return;
+          }
+
+          if (existing.status === 'processed' || existing.status === 'unauthorized') {
+            res.status(200).json({ received: true, duplicate: true });
+            return;
+          }
+
+          webhookEventDocId = existing._id;
           await WebhookEvent.updateOne(
             { provider: 'asaas', eventId },
             {
               $set: {
-                status: 'duplicate',
+                status: 'received',
                 event: event ? String(event) : undefined,
                 tenant,
                 resourceId: resourceId || undefined,
               },
+              $unset: { error: 1, processedAt: 1 },
             }
           ).catch(() => undefined);
-          res.status(200).json({ received: true, duplicate: true });
-          return;
         }
         throw e;
       }
@@ -621,22 +635,29 @@ async function handlePaymentReceived(payment: any) {
   }
 
   if (addon.kind === 'addonsub' && addon.addOnId) {
-    (planLimit as any).addons = (planLimit as any).addons || {};
-    (planLimit as any).addons.recurring = Array.isArray((planLimit as any).addons.recurring) ? (planLimit as any).addons.recurring : [];
-
     const subId = String(payment?.subscription || '');
-    const entry = subId
-      ? (planLimit as any).addons.recurring.find((r: any) => String(r.subscriptionId) === subId)
-      : null;
-
-    if (entry) {
-      entry.status = 'active';
+    if (!subId) {
+      // Best-effort: without subscriptionId we can't track recurring add-ons.
+    } else {
+      const item = ADDON_CATALOG[addon.addOnId];
+      let currentPeriodEnd: Date | undefined = undefined;
       try {
         const sub = await asaasService.getSubscription(String(subId));
-        if (sub?.nextDueDate) entry.currentPeriodEnd = new Date(String(sub.nextDueDate));
+        if (sub?.nextDueDate) currentPeriodEnd = new Date(String(sub.nextDueDate));
       } catch {
         // ignore
       }
+
+      (planLimit as any).addons = upsertRecurringAddOn((planLimit as any).addons, {
+        addOnId: item.id,
+        subscriptionId: String(subId),
+        status: 'active',
+        extraAgents: item.extraAgents,
+        extraStorage: item.extraStorage,
+        aiCredits: item.aiCredits,
+        currentPeriodEnd,
+      });
+
       await planLimit.save();
     }
   }
@@ -699,17 +720,23 @@ async function handlePaymentOverdue(payment: any) {
     }
   }
 
-  // Recurring add-on payment overdue (keep entry as past_due)
-  if (addon.kind === 'addonsub') {
+  // Recurring add-on payment overdue
+  if (addon.kind === 'addonsub' && addon.addOnId) {
     const subId = String(payment?.subscription || '');
-    if (subId) {
-      (planLimit as any).addons = ensureAddOns((planLimit as any).addons);
-      const recurring = Array.isArray((planLimit as any).addons.recurring) ? (planLimit as any).addons.recurring : [];
-      const entry = recurring.find((r: any) => String(r.subscriptionId) === subId);
-      if (entry) {
-        entry.status = 'past_due';
-        await planLimit.save();
-      }
+    if (!subId) {
+      // Best-effort: without subscriptionId we can't track recurring add-ons.
+    } else {
+      const item = ADDON_CATALOG[addon.addOnId];
+      (planLimit as any).addons = upsertRecurringAddOn((planLimit as any).addons, {
+        addOnId: item.id,
+        subscriptionId: String(subId),
+        status: 'past_due',
+        extraAgents: item.extraAgents,
+        extraStorage: item.extraStorage,
+        aiCredits: item.aiCredits,
+      });
+
+      await planLimit.save();
     }
   }
 
