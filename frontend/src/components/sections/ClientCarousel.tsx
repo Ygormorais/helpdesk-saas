@@ -27,46 +27,92 @@ export const ClientCarousel: React.FC = () => {
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (slides.length <= 1) return
     const t = setInterval(() => {
       setIndex((i) => (i + 1) % slides.length)
-    }, 2500)
+    }, 2800)
     return () => clearInterval(t)
   }, [])
 
-  const current = useMemo(() => slides[index], [index])
+  const safeIndex = slides.length > 0 ? index % slides.length : 0
+  const current = useMemo(() => slides[safeIndex], [safeIndex])
 
   if (!current || slides.length === 0) {
     return null
   }
 
   return (
-    <section className="py-12 bg-gradient-to-b from-white/60 to-white/40">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-6">
-        <h3 className={`text-2xl font-semibold ${mounted ? 'opacity-100' : 'opacity-0'} transition-opacity duration-700`}>Clientes que merecem</h3>
-        <p className={`text-sm text-gray-600 ${mounted ? 'opacity-100' : 'opacity-0'} transition-opacity duration-700`}>O reconhecimento que mantém sua base de clientes satisfeita</p>
-      </div>
+    <section aria-label="Clientes" className="mt-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="rounded-3xl border bg-background/70 backdrop-blur-sm shadow-sm">
+          <div className="px-6 py-5 text-center">
+            <h3
+              className={`text-xl sm:text-2xl font-semibold font-display ${
+                mounted ? 'opacity-100' : 'opacity-0'
+              } transition-opacity duration-700`}
+            >
+              Clientes que confiam
+            </h3>
+            <p
+              className={`text-sm text-muted-foreground ${
+                mounted ? 'opacity-100' : 'opacity-0'
+              } transition-opacity duration-700`}
+            >
+              Marcas que usam o DeskFlow para atender melhor.
+            </p>
+          </div>
 
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="flex justify-center items-center space-x-8 overflow-hidden py-6">
-          {current.items.map((c, i) => {
-            const logoPath = c.logo ? logos[c.logo] : null
-            return (
-              <div key={i} className="flex flex-col items-center">
-                {logoPath ? (
-                  <img src={logoPath} alt={c.name} className="w-20 h-20 object-contain" />
-                ) : (
-                  <div className="w-20 h-20 rounded-full shadow-md" style={{ background: c.color }} />
-                )}
-                <span className="mt-2 text-sm font-semibold text-gray-700">{c.name}</span>
-              </div>
-            )
-          })}
+          <div className="px-6 pb-6">
+            <div
+              key={safeIndex}
+              className={`flex flex-wrap items-center justify-center gap-x-10 gap-y-6 py-2 ${
+                mounted ? 'animate-rise' : 'opacity-0 translate-y-2'
+              }`}
+            >
+              {current.items.map((c, i) => {
+                const logoPath = c.logo ? logos[c.logo] : null
+                return (
+                  <div key={i} className="flex flex-col items-center">
+                    {logoPath ? (
+                      <img
+                        src={logoPath}
+                        alt={c.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-12 w-auto max-w-[120px] object-contain opacity-90"
+                      />
+                    ) : (
+                      <div
+                        className="h-12 w-12 rounded-2xl shadow-sm border"
+                        style={{ background: c.color }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className="mt-2 text-sm font-semibold text-foreground/80">{c.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-5 flex justify-center gap-2" aria-label="Slides">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setIndex(i)}
+                  aria-label={`Ir para slide ${i + 1}`}
+                  aria-current={i === safeIndex}
+                  className={`h-2.5 w-6 rounded-full transition-colors ${
+                    i === safeIndex ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="flex justify-center mt-2 space-x-2">
-        {slides.map((_, i) => (
-          <span key={i} className={`h-2 w-4 rounded-full ${i === index ? 'bg-blue-600' : 'bg-gray-300'}`} />
-        ))}
       </div>
     </section>
   )

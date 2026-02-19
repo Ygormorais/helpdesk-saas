@@ -33,7 +33,7 @@ export default function LandingPage() {
     () => [
       { value: '500+', label: 'Empresas' },
       { value: '99,9%', label: 'Uptime' },
-      { value: '4,9/5', label: 'Avaliacoes' },
+      { value: '4,9/5', label: 'Avaliações' },
     ],
     []
   );
@@ -59,9 +59,9 @@ export default function LandingPage() {
               <button onClick={() => scrollToSection('features')} className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 Funcionalidades
               </button>
-              <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+              <button onClick={() => scrollToSection('pricing')} className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 Preços
-              </Link>
+              </button>
               <button onClick={() => scrollToSection('faq')} className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 FAQ
               </button>
@@ -87,19 +87,19 @@ export default function LandingPage() {
           </div>
 
           {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div className="md:hidden py-4 border-t">
-              <div className="flex flex-col gap-4">
-                <button onClick={() => scrollToSection('features')} className="text-left py-2 font-medium">
-                  Funcionalidades
-                </button>
-                 <Link to="/pricing" className="text-left py-2 font-medium" onClick={() => setMobileMenuOpen(false)}>
-                   Preços
-                 </Link>
-                <button onClick={() => scrollToSection('faq')} className="text-left py-2 font-medium">
-                  FAQ
-                </button>
-                <hr />
+            {mobileMenuOpen && (
+              <div className="md:hidden py-4 border-t">
+                <div className="flex flex-col gap-4">
+                  <button onClick={() => scrollToSection('features')} className="text-left py-2 font-medium">
+                    Funcionalidades
+                  </button>
+                  <button onClick={() => scrollToSection('pricing')} className="text-left py-2 font-medium">
+                    Preços
+                  </button>
+                  <button onClick={() => scrollToSection('faq')} className="text-left py-2 font-medium">
+                    FAQ
+                  </button>
+                  <hr />
                 <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="ghost" className="w-full">Entrar</Button>
                 </Link>
@@ -175,15 +175,15 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
             <div>
-              <h2 className="text-3xl sm:text-4xl font-bold font-display mb-4">Uma caixa de entrada. Varios canais.</h2>
+              <h2 className="text-3xl sm:text-4xl font-bold font-display mb-4">Uma caixa de entrada. Vários canais.</h2>
               <p className="text-muted-foreground text-lg mb-6">
-                Centralize tickets, chat e base de conhecimento. Com macros e automacoes, o time resolve mais rapido - sem perder contexto.
+                Centralize tickets, chat e base de conhecimento. Com macros e automações, o time resolve mais rápido - sem perder contexto.
               </p>
               <div className="grid gap-3">
                 {[
-                  { icon: Lock, title: 'Dados isolados por empresa', desc: 'Multi-tenant com seguranca e auditoria.' },
-                  { icon: Clock, title: 'SLA e prazos visiveis', desc: 'Priorize o que vence primeiro.' },
-                  { icon: BarChart3, title: 'Relatorios que viram decisao', desc: 'CSAT, SLA e produtividade em um lugar.' },
+                  { icon: Lock, title: 'Dados isolados por empresa', desc: 'Multi-tenant com segurança e auditoria.' },
+                  { icon: Clock, title: 'SLA e prazos visíveis', desc: 'Priorize o que vence primeiro.' },
+                  { icon: BarChart3, title: 'Relatórios que viram decisão', desc: 'CSAT, SLA e produtividade em um lugar.' },
                 ].map((item) => (
                   <div key={item.title} className="flex gap-3 rounded-xl border bg-card p-4">
                     <div className="mt-0.5 h-10 w-10 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -215,11 +215,11 @@ export default function LandingPage() {
                       { t: 'PIX: comprovante', s: 'Cliente', b: true },
                       { t: 'Erro no login', s: 'Site', b: false },
                       { t: 'Troca de plano', s: 'Financeiro', b: false },
-                      { t: 'Integracao API', s: 'Dev', b: false },
+                      { t: 'Integração API', s: 'Dev', b: false },
                     ].map((r, i) => (
                       <div key={i} className={`rounded-xl border p-3 ${r.b ? 'bg-background' : 'bg-card'}`}>
                         <p className="text-sm font-medium truncate">{r.t}</p>
-                        <p className="text-xs text-muted-foreground truncate">{r.s} • ha {i + 1}h</p>
+                        <p className="text-xs text-muted-foreground truncate">{r.s} • há {i + 1}h</p>
                       </div>
                     ))}
                   </div>
@@ -234,13 +234,13 @@ export default function LandingPage() {
                     <div className="mt-4 space-y-3">
                       <div className="rounded-2xl bg-muted/30 p-4">
                         <p className="text-sm">
-                          Ola! Paguei via PIX mas o acesso ao Pro ainda nao liberou. Pode verificar?
+                          Olá! Paguei via PIX mas o acesso ao Pro ainda não liberou. Pode verificar?
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">Cliente • 09:12</p>
                       </div>
                       <div className="rounded-2xl bg-primary/10 p-4 border border-primary/15">
                         <p className="text-sm">
-                          Claro! Ja estou validando o pagamento. Enquanto isso, pode me enviar o ID da cobranca?
+                          Claro! Já estou validando o pagamento. Enquanto isso, pode me enviar o ID da cobrança?
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">Agente • 09:14</p>
                       </div>
