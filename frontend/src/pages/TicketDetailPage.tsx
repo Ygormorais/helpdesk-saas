@@ -109,6 +109,10 @@ export default function TicketDetailPage() {
   const isStaff = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'agent';
   const isClient = user?.role === 'client';
 
+  const isClosedLike = ticket?.status === 'resolved' || ticket?.status === 'closed';
+  const assignedToId = (ticket?.assignedTo?._id || ticket?.assignedTo?.id) as string | undefined;
+  const canAssignToMe = !!id && !!user && isStaff && !isClosedLike && (!assignedToId || assignedToId !== user.id);
+
   const macrosQuery = useQuery({
     queryKey: ['macros', 'active'],
     enabled: !!id && isStaff,
@@ -379,6 +383,41 @@ export default function TicketDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {canAssignToMe ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => updateTicketMutation.mutate({ assignedTo: user!.id })}
+              disabled={updateTicketMutation.isPending}
+              title="Atribuir a mim"
+            >
+              Atribuir a mim
+            </Button>
+          ) : null}
+
+          {isStaff && !isClosedLike ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => updateTicketMutation.mutate({ status: 'resolved' })}
+                disabled={updateTicketMutation.isPending}
+                title="Marcar como resolvido"
+              >
+                Resolver
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => updateTicketMutation.mutate({ status: 'closed' })}
+                disabled={updateTicketMutation.isPending}
+                title="Fechar ticket"
+              >
+                Fechar
+              </Button>
+            </>
+          ) : null}
+
           <Button
             type="button"
             variant="outline"
