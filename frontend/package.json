@@ -11,6 +11,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "audit": "npm audit",
+    "audit:prod": "npm audit --omit=dev",
     "test": "vitest run --environment node",
     "test:watch": "vitest --environment node"
   },

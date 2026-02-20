@@ -56,6 +56,13 @@ Sistema SaaS de Help Desk multi-tenancy para gestão de atendimento ao cliente, 
 - GitHub Actions
 - Railway / Render / Vercel
 
+## 🔒 Security / npm audit
+
+- Para checar dependencias de producao (ignorando toolchain de dev como ESLint), use:
+  - `cd backend && npm run audit:prod`
+  - `cd frontend && npm run audit:prod`
+- `npm audit` no frontend pode reportar vulnerabilidades em dependencias de desenvolvimento (ESLint/@eslint/*) sem fix semver-safe ate a toolchain suportar ESLint 10.
+
 ## 📦 Instalação
 
 ### Pré-requisitos
