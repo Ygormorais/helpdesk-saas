@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Plus, Search } from 'lucide-react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -90,6 +90,52 @@ export default function TicketsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const clearFilters = () => {
+    setSearch('');
+    setDebouncedSearch('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setCategoryFilter('all');
+    setMineOnly(false);
+    setPage(1);
+  };
+
+  useEffect(() => {
+    const isActive =
+      !!debouncedSearch.trim() ||
+      statusFilter !== 'all' ||
+      priorityFilter !== 'all' ||
+      categoryFilter !== 'all' ||
+      mineOnly;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = (t?.tagName || '').toLowerCase();
+      const isTypingTarget =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        (t as any)?.isContentEditable;
+
+      if (isTypingTarget) return;
+      if (e.key === 'Escape') {
+        if (isActive) {
+          clearFilters();
+        }
+        return;
+      }
+      if (e.key === '/') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [debouncedSearch, statusFilter, priorityFilter, categoryFilter, mineOnly]);
+
   useEffect(() => {
     const id = window.setTimeout(() => {
       setDebouncedSearch(search);
@@ -105,7 +151,7 @@ export default function TicketsPage() {
   useEffect(() => {
     // Keep selection scoped to current filters/page
     setSelectedIds([]);
-  }, [debouncedSearch, statusFilter, priorityFilter, mineOnly, page]);
+  }, [debouncedSearch, statusFilter, priorityFilter, categoryFilter, mineOnly, page, limit]);
 
   useEffect(() => {
     // Support back/forward navigation by reading URL state
@@ -326,6 +372,7 @@ export default function TicketsPage() {
                 className="pl-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                ref={searchRef}
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -401,15 +448,7 @@ export default function TicketsPage() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  setSearch('');
-                  setDebouncedSearch('');
-                  setStatusFilter('all');
-                  setPriorityFilter('all');
-                  setCategoryFilter('all');
-                  setMineOnly(false);
-                  setPage(1);
-                }}
+                onClick={clearFilters}
               >
                 Limpar
               </Button>
