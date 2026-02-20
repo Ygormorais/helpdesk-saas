@@ -4,7 +4,6 @@
   "labels": ["dependencies"],
   "dependencyDashboard": false,
   "timezone": "America/Sao_Paulo",
-  "repositories": ["Ygormorais/helpdesk-saas"],
   "baseBranches": ["master"],
   "prConcurrentLimit": 1,
   "prHourlyLimit": 1,
