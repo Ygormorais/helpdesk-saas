@@ -68,11 +68,42 @@ export default function ChatPage() {
   }, [searchParams]);
 
   const [inputValue, setInputValue] = useState('');
+  const messageInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [unseenCount, setUnseenCount] = useState(0);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = (t?.tagName || '').toLowerCase();
+      const isTypingTarget =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        (t as any)?.isContentEditable;
+
+      if (isTypingTarget) return;
+
+      if (e.key === '/') {
+        if (!currentChat) return;
+        e.preventDefault();
+        messageInputRef.current?.focus();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        if (!inputValue.trim()) return;
+        setInputValue('');
+        stopTyping();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [currentChat, inputValue, stopTyping]);
 
   useEffect(() => {
     const desiredScope = chatIdParam ? 'all' : (tab === 'internal' ? 'internal' : 'ticket');
@@ -713,6 +744,7 @@ export default function ChatPage() {
                 <div className="flex gap-2">
                   <Input
                     placeholder="Digite sua mensagem..."
+                    ref={messageInputRef}
                     value={inputValue}
                     onChange={(e) => {
                       setInputValue(e.target.value);
