@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, BookOpen, Eye, ThumbsUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -20,6 +20,40 @@ export default function KnowledgeBasePage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const clearFilters = () => {
+    setSearch('');
+    setDebouncedSearch('');
+    setSelectedCategory('all');
+  };
+
+  useEffect(() => {
+    const isActive = !!debouncedSearch.trim() || selectedCategory !== 'all';
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = (t?.tagName || '').toLowerCase();
+      const isTypingTarget =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        (t as any)?.isContentEditable;
+
+      if (isTypingTarget) return;
+      if (e.key === 'Escape') {
+        if (isActive) clearFilters();
+        return;
+      }
+      if (e.key === '/') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [debouncedSearch, selectedCategory]);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search), 350);
@@ -100,6 +134,7 @@ export default function KnowledgeBasePage() {
           <Input
             placeholder="Buscar artigos..."
             className="pl-12 py-6 text-lg"
+            ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
