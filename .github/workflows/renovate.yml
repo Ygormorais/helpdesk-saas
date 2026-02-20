@@ -21,6 +21,8 @@ jobs:
         env:
           RENOVATE_AUTODISCOVER: 'true'
           RENOVATE_AUTODISCOVER_FILTER: 'Ygormorais/helpdesk-saas'
+          RENOVATE_PLATFORM: 'github'
+          RENOVATE_ENDPOINT: 'https://api.github.com/'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           configurationFile: renovate.json
