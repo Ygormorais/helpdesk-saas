@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Bell, Check, Trash2 } from 'lucide-react';
+import { Bell, Check, Trash2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
@@ -57,17 +57,28 @@ export default function NotificationsPage() {
 
   const notifications = (listQuery.data?.notifications || []) as NotificationDto[];
   const pagination = listQuery.data?.pagination as undefined | { page: number; pages: number; total: number };
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadTotal = typeof listQuery.data?.unreadTotal === 'number'
+    ? Number(listQuery.data?.unreadTotal)
+    : notifications.filter((n) => !n.read).length;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Notificações</h1>
-          <p className="text-muted-foreground">{unreadCount} não lidas</p>
+          <p className="text-muted-foreground">{unreadTotal} não lidas</p>
         </div>
 
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => listQuery.refetch()}
+            disabled={listQuery.isFetching}
+            title="Atualizar"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Atualizar
+          </Button>
           <Button
             variant={unreadOnly ? 'default' : 'outline'}
             onClick={() => {
@@ -80,7 +91,7 @@ export default function NotificationsPage() {
           <Button
             variant="outline"
             onClick={() => markAllMutation.mutate()}
-            disabled={markAllMutation.isPending || notifications.length === 0}
+            disabled={markAllMutation.isPending || unreadTotal === 0}
           >
             <Check className="mr-2 h-4 w-4" />
             Marcar todas
@@ -88,7 +99,7 @@ export default function NotificationsPage() {
           <Button
             variant="outline"
             onClick={() => clearMutation.mutate()}
-            disabled={clearMutation.isPending || notifications.length === 0}
+            disabled={clearMutation.isPending || unreadTotal === 0}
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Limpar

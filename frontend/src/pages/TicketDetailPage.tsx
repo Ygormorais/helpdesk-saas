@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MessageCircle, User, Send } from 'lucide-react';
+import { ArrowLeft, Clock, MessageCircle, User, Send, Copy } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,6 +79,15 @@ export default function TicketDetailPage() {
   const [newComment, setNewComment] = useState('');
   const [, setTick] = useState(0);
   const [didAutoTake, setDidAutoTake] = useState(false);
+
+  const copyToClipboard = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast({ title: 'Copiado', description: value });
+    } catch {
+      toast({ title: 'Nao foi possivel copiar', description: value, variant: 'destructive' });
+    }
+  };
 
   useEffect(() => {
     const t = window.setInterval(() => setTick((v) => v + 1), 60000);
@@ -237,6 +246,25 @@ export default function TicketDetailPage() {
     },
   });
 
+  const updateTicketMutation = useMutation({
+    mutationFn: async (updates: Record<string, unknown>) => {
+      if (!id) return;
+      await ticketsApi.update(id, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast({ title: 'Ticket atualizado' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao atualizar ticket',
+        description: error?.response?.data?.message || 'Tente novamente',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleSend = () => {
     const content = newComment.trim();
     if (!content || !id) return;
@@ -349,15 +377,28 @@ export default function TicketDetailPage() {
           <h1 className="text-2xl font-bold truncate">{ticket.title}</h1>
           <p className="text-muted-foreground">{ticket.ticketNumber}</p>
         </div>
-        {(ticket.status === 'resolved' || ticket.status === 'closed') && (
+
+        <div className="flex items-center gap-2">
           <Button
+            type="button"
             variant="outline"
-            onClick={() => reopenMutation.mutate()}
-            disabled={reopenMutation.isPending}
+            onClick={() => copyToClipboard(String(ticket.ticketNumber || id))}
+            title="Copiar numero do ticket"
           >
-            {reopenMutation.isPending ? 'Reabrindo...' : 'Reabrir'}
+            <Copy className="mr-2 h-4 w-4" />
+            Copiar
           </Button>
-        )}
+
+          {(ticket.status === 'resolved' || ticket.status === 'closed') ? (
+            <Button
+              variant="outline"
+              onClick={() => reopenMutation.mutate()}
+              disabled={reopenMutation.isPending}
+            >
+              {reopenMutation.isPending ? 'Reabrindo...' : 'Reabrir'}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -639,11 +680,52 @@ export default function TicketDetailPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-muted-foreground">Status</Label>
-                <div className="pt-1">{getStatusBadge(ticket.status)}</div>
+                <div className="pt-1">
+                  {isStaff ? (
+                    <Select
+                      value={String(ticket.status)}
+                      onValueChange={(v) => updateTicketMutation.mutate({ status: v })}
+                      disabled={updateTicketMutation.isPending}
+                    >
+                      <SelectTrigger aria-label="Alterar status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="open">Aberto</SelectItem>
+                        <SelectItem value="in_progress">Em Andamento</SelectItem>
+                        <SelectItem value="waiting_customer">Aguardando Cliente</SelectItem>
+                        <SelectItem value="resolved">Resolvido</SelectItem>
+                        <SelectItem value="closed">Fechado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    getStatusBadge(ticket.status)
+                  )}
+                </div>
               </div>
               <div>
                 <Label className="text-muted-foreground">Prioridade</Label>
-                <div className="pt-1">{getPriorityBadge(ticket.priority)}</div>
+                <div className="pt-1">
+                  {isStaff ? (
+                    <Select
+                      value={String(ticket.priority)}
+                      onValueChange={(v) => updateTicketMutation.mutate({ priority: v })}
+                      disabled={updateTicketMutation.isPending}
+                    >
+                      <SelectTrigger aria-label="Alterar prioridade">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
+                        <SelectItem value="medium">Média</SelectItem>
+                        <SelectItem value="low">Baixa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    getPriorityBadge(ticket.priority)
+                  )}
+                </div>
               </div>
               <div>
                 <Label className="text-muted-foreground">Categoria</Label>

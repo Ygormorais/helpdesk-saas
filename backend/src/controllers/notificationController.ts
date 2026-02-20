@@ -27,13 +27,19 @@ export const listNotifications = async (req: AuthRequest, res: Response): Promis
 
   const skip = (page - 1) * limit;
 
-  const [items, total] = await Promise.all([
+  const unreadQuery: any = {
+    tenant: user.tenant._id,
+    readBy: { $ne: user._id },
+  };
+
+  const [items, total, unreadTotal] = await Promise.all([
     Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .select('type title message data ticket chat createdBy readBy createdAt'),
     Notification.countDocuments(query),
+    Notification.countDocuments(unreadQuery),
   ]);
 
   const notifications = items.map((n) => ({
@@ -51,6 +57,7 @@ export const listNotifications = async (req: AuthRequest, res: Response): Promis
 
   res.json({
     notifications,
+    unreadTotal,
     pagination: {
       page,
       limit,
