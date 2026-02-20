@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Save, Mail, Clock, Bell, Shield, Globe } from 'lucide-react';
+import { Save, Mail, Clock, Bell, Shield, Globe, Server, Copy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useBackendHealth } from '@/hooks/useBackendHealth';
+import { api } from '@/config/api';
+import { toast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -22,6 +25,18 @@ export default function SettingsPage() {
     slackNotifications: false,
     autoAssign: true,
   });
+
+  const health = useBackendHealth();
+  const apiBaseUrl = String(api.defaults.baseURL || '').trim();
+
+  const copy = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast({ title: 'Copiado', description: value });
+    } catch {
+      toast({ title: 'Nao foi possivel copiar', description: 'Copie manualmente: ' + value, variant: 'destructive' });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -53,6 +68,10 @@ export default function SettingsPage() {
           <TabsTrigger value="security">
             <Shield className="mr-2 h-4 w-4" />
             Segurança
+          </TabsTrigger>
+          <TabsTrigger value="diagnostics">
+            <Server className="mr-2 h-4 w-4" />
+            Diagnóstico
           </TabsTrigger>
         </TabsList>
 
@@ -218,6 +237,93 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="diagnostics">
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ambiente</CardTitle>
+                <CardDescription>Valores uteis para debugar integracoes e rede</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">API baseURL</p>
+                    <p className="text-sm text-muted-foreground break-all">{apiBaseUrl || '(vazio)'}</p>
+                  </div>
+                  <Button variant="outline" onClick={() => copy(apiBaseUrl || '')} disabled={!apiBaseUrl}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copiar
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">VITE_API_URL</p>
+                    <p className="text-sm break-all">{String(import.meta.env.VITE_API_URL || '') || '-'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">VITE_BACKEND_URL</p>
+                    <p className="text-sm break-all">{String((import.meta.env as any).VITE_BACKEND_URL || '') || '-'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">VITE_SOCKET_URL</p>
+                    <p className="text-sm break-all">{String(import.meta.env.VITE_SOCKET_URL || '') || '-'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Backend</CardTitle>
+                <CardDescription>Status do /health e dependencias (Mongo/Redis)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm">
+                    Status:{' '}
+                    <span className="font-medium">
+                      {health.isLoading ? 'carregando...' : health.data?.data?.status || (health.isError ? 'erro' : '-')}
+                    </span>
+                  </p>
+                  <Button variant="outline" onClick={() => health.refetch()}>
+                    Atualizar
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">ready</p>
+                    <p className="text-sm font-medium">{String(health.data?.data?.ready ?? '-')}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">mongo</p>
+                    <p className="text-sm font-medium">
+                      {health.data?.data?.deps?.mongo
+                        ? (health.data.data.deps.mongo.connected && health.data.data.deps.mongo.ping ? 'ok' : 'problema')
+                        : '-'}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">redis</p>
+                    <p className="text-sm font-medium">
+                      {health.data?.data?.deps?.redis
+                        ? (health.data.data.deps.redis.configured ? (health.data.data.deps.redis.ok === false ? 'problema' : 'ok') : 'nao configurado')
+                        : '-'}
+                    </p>
+                  </div>
+                </div>
+
+                {health.isError ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nao foi possivel consultar o health. Verifique se o backend esta rodando e o `VITE_API_URL` esta correto.
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

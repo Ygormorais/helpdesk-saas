@@ -1,5 +1,6 @@
 import { AlertTriangle, Server } from 'lucide-react';
 import { useBackendHealth } from '@/hooks/useBackendHealth';
+import { api } from '@/config/api';
 
 export default function BackendStatusBanner() {
   const q = useBackendHealth();
@@ -19,6 +20,15 @@ export default function BackendStatusBanner() {
       ? 'Redis indisponível'
       : 'Backend indisponível';
 
+  const base = String(api.defaults.baseURL || '').trim().replace(/\/+$/, '');
+  const healthUrl = (() => {
+    if (/^https?:\/\//i.test(base)) {
+      return `${base.replace(/\/api$/i, '')}/health`;
+    }
+    // Same-origin deployments usually expose /health at the server root.
+    return `${window.location.origin}/health`;
+  })();
+
   return (
     <div className="sticky top-0 z-50 border-b bg-amber-50">
       <div className="mx-auto max-w-7xl px-4 py-2 flex items-center justify-between gap-3">
@@ -29,7 +39,7 @@ export default function BackendStatusBanner() {
           </p>
         </div>
         <a
-          href="/health"
+          href={healthUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 text-sm text-amber-900 hover:underline shrink-0"

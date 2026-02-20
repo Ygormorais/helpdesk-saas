@@ -11,7 +11,7 @@ REM Verificar Node.js
 node --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ Node.js não encontrado!
-    echo Por favor, instale o Node.js 18+ em https://nodejs.org
+    echo Por favor, instale o Node.js 20+ em https://nodejs.org
     pause
     exit /b 1
 )
@@ -41,7 +41,7 @@ if not exist backend\.env (
     (
         echo PORT=3000
         echo NODE_ENV=development
-        echo MONGODB_URI=mongodb://localhost:27017/deskflow
+        echo MONGODB_URI=mongodb://localhost:27017/helpdesk
         echo JWT_SECRET=chave-secreta-para-desenvolvimento
         echo JWT_EXPIRES_IN=7d
         echo FRONTEND_URL=http://localhost:5173

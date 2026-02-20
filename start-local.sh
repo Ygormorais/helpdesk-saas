@@ -20,7 +20,7 @@ if [ ! -f "backend/.env" ]; then
     cat > backend/.env << EOF
 PORT=3000
 NODE_ENV=development
-MONGODB_URI=mongodb://localhost:27017/deskflow
+MONGODB_URI=mongodb://localhost:27017/helpdesk
 JWT_SECRET=chave-secreta-dev
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=http://localhost:5173

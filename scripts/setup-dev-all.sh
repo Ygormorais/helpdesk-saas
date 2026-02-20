@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[setup-all] Starting docker-compose..."
-docker-compose up -d
+DC="docker-compose"
+if docker compose version >/dev/null 2>&1; then
+  DC="docker compose"
+fi
+
+echo "[setup-all] Starting services..."
+$DC up -d
 
 echo "[setup-all] Waiting for MongoDB to be ready..."
 MAX=60
@@ -30,13 +35,5 @@ docker exec -i helpdesk-frontend npm test --silent || true
 
 echo "[setup-all] Building frontend..."
 docker exec -i helpdesk-frontend npm run build
-
-echo "[setup-all] Attempting to create PR (if gh is installed) ..."
-if command -v gh >/dev/null 2>&1; then
-  gh pr create --title "feat: Reports enhancements, tests, and CI scaffolding" --body-file PR_BODY.md --head feat/github-push --base main
-  echo "[setup-all] PR created via gh (if allowance)."
-else
-  echo "[setup-all] gh not found. Create PR manually or via UI."
-fi
 
 echo "[setup-all] Done. Access: http://localhost:5173/login"

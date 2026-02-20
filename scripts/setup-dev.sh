@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[setup] Starting docker-compose services..."
-docker-compose up -d
+DC="docker-compose"
+if docker compose version >/dev/null 2>&1; then
+  DC="docker compose"
+fi
+
+echo "[setup] Starting services..."
+$DC up -d
 
 echo "[setup] Waiting for MongoDB to be ready..."
 MAX=60
