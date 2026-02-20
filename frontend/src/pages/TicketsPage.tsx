@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ticketsApi } from '@/api/tickets';
+import { categoriesApi } from '@/api/categories';
 import { chatApi } from '@/api/chat';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +73,7 @@ export default function TicketsPage() {
   const initialSearch = searchParams.get('q') || '';
   const initialStatus = searchParams.get('status') || 'all';
   const initialPriority = searchParams.get('priority') || 'all';
+  const initialCategory = searchParams.get('category') || 'all';
   const initialMine = searchParams.get('mine') === '1';
   const initialPage = Math.max(1, Number(searchParams.get('page') || 1) || 1);
 
@@ -79,6 +81,7 @@ export default function TicketsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [priorityFilter, setPriorityFilter] = useState(initialPriority);
+  const [categoryFilter, setCategoryFilter] = useState(initialCategory);
   const [mineOnly, setMineOnly] = useState(initialMine);
   const [page, setPage] = useState(initialPage);
   const [limit, setLimit] = useState(20);
@@ -97,7 +100,7 @@ export default function TicketsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, priorityFilter]);
+  }, [statusFilter, priorityFilter, categoryFilter]);
 
   useEffect(() => {
     // Keep selection scoped to current filters/page
@@ -109,6 +112,7 @@ export default function TicketsPage() {
     const q = searchParams.get('q') || '';
     const status = searchParams.get('status') || 'all';
     const priority = searchParams.get('priority') || 'all';
+    const category = searchParams.get('category') || 'all';
     const mine = searchParams.get('mine') === '1';
     const nextPage = Math.max(1, Number(searchParams.get('page') || 1) || 1);
 
@@ -118,9 +122,10 @@ export default function TicketsPage() {
     }
     if (status !== statusFilter) setStatusFilter(status);
     if (priority !== priorityFilter) setPriorityFilter(priority);
+    if (category !== categoryFilter) setCategoryFilter(category);
     if (mine !== mineOnly) setMineOnly(mine);
     if (nextPage !== page) setPage(nextPage);
-  }, [debouncedSearch, mineOnly, page, priorityFilter, searchParams, statusFilter]);
+  }, [debouncedSearch, mineOnly, page, priorityFilter, searchParams, statusFilter, categoryFilter]);
 
   useEffect(() => {
     // keep URL in sync (shareable state)
@@ -128,13 +133,23 @@ export default function TicketsPage() {
     if (debouncedSearch.trim()) next.set('q', debouncedSearch.trim());
     if (statusFilter !== 'all') next.set('status', statusFilter);
     if (priorityFilter !== 'all') next.set('priority', priorityFilter);
+    if (categoryFilter !== 'all') next.set('category', categoryFilter);
     if (mineOnly) next.set('mine', '1');
     if (page > 1) next.set('page', String(page));
     setSearchParams(next, { replace: true });
-  }, [debouncedSearch, mineOnly, page, priorityFilter, setSearchParams, statusFilter]);
+  }, [debouncedSearch, mineOnly, page, priorityFilter, categoryFilter, setSearchParams, statusFilter]);
+
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await categoriesApi.list();
+      return res.data.categories as Array<any>;
+    },
+    staleTime: 60_000,
+  });
 
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ['tickets', { page, limit, search: debouncedSearch, statusFilter, priorityFilter, mineOnly }],
+    queryKey: ['tickets', { page, limit, search: debouncedSearch, statusFilter, priorityFilter, categoryFilter, mineOnly }],
     queryFn: async () => {
       const res = await ticketsApi.list({
         page,
@@ -142,6 +157,7 @@ export default function TicketsPage() {
         search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
         assignedTo: mineOnly && user?.id ? user.id : undefined,
       });
       return res.data as {
@@ -160,7 +176,7 @@ export default function TicketsPage() {
   const allSelectedOnPage = tickets.length > 0 && tickets.every((t) => selectedSet.has(String(t._id)));
 
   const hasActiveFilters =
-    !!debouncedSearch.trim() || statusFilter !== 'all' || priorityFilter !== 'all' || mineOnly;
+    !!debouncedSearch.trim() || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all' || mineOnly;
 
   const canExport = user?.role !== 'client';
   const canUseMineFilter = user?.role !== 'client';
@@ -205,6 +221,7 @@ export default function TicketsPage() {
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter !== 'all') params.status = statusFilter;
       if (priorityFilter !== 'all') params.priority = priorityFilter;
+      if (categoryFilter !== 'all') params.category = categoryFilter;
       if (mineOnly && user?.id) params.assignedTo = user.id;
 
       const res = await api.get('/tickets/export/csv', { params, responseType: 'blob' });
@@ -336,6 +353,20 @@ export default function TicketsPage() {
               </SelectContent>
             </Select>
 
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[220px]" aria-label="Filtrar por categoria">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Categorias</SelectItem>
+                {(categoriesQuery.data || []).map((c: any) => (
+                  <SelectItem key={String(c._id)} value={String(c._id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {canUseMineFilter ? (
               <Button
                 type="button"
@@ -375,6 +406,7 @@ export default function TicketsPage() {
                   setDebouncedSearch('');
                   setStatusFilter('all');
                   setPriorityFilter('all');
+                  setCategoryFilter('all');
                   setMineOnly(false);
                   setPage(1);
                 }}
