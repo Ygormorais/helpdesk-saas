@@ -50,6 +50,7 @@ export default function ChatPage() {
 
   const [dmOpen, setDmOpen] = useState(false);
   const [dmSearch, setDmSearch] = useState('');
+  const dmSearchRef = useRef<HTMLInputElement | null>(null);
   const [staff, setStaff] = useState<UserListItem[]>([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [startingDmId, setStartingDmId] = useState<string | null>(null);
@@ -295,6 +296,12 @@ export default function ChatPage() {
 
   const typingActive = !!isTyping;
 
+  useEffect(() => {
+    if (!dmOpen) return;
+    const t = window.setTimeout(() => dmSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [dmOpen]);
+
   return (
     <div className="flex h-[calc(100vh-140px)] gap-4">
       <Card className="w-80 flex flex-col">
@@ -329,6 +336,7 @@ export default function ChatPage() {
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
+                            ref={dmSearchRef}
                             value={dmSearch}
                             onChange={(e) => setDmSearch(e.target.value)}
                             placeholder="Buscar por nome ou email"
