@@ -1,0 +1,84 @@
+name: Job Platform Deploy (AWS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'staging or prod'
+        required: true
+        default: 'staging'
+      image_tag:
+        description: 'Docker tag (e.g. sha)'
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Terraform apply (infra)
+        working-directory: job-platform/infra/environments/${{ inputs.environment }}
+        env:
+          TF_IN_AUTOMATION: 'true'
+        run: |
+          terraform init
+          terraform apply -auto-approve \
+            -var="api_image_tag=${{ inputs.image_tag }}" \
+            -var="worker_image_tag=${{ inputs.image_tag }}"
+
+      - name: Read Terraform outputs
+        id: tf
+        working-directory: job-platform/infra/environments/${{ inputs.environment }}
+        run: |
+          echo "ecr_api=$(terraform output -raw ecr_api)" >> $GITHUB_OUTPUT
+          echo "ecr_worker=$(terraform output -raw ecr_worker)" >> $GITHUB_OUTPUT
+          echo "cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
+          echo "api_service=$(terraform output -raw ecs_api_service_name)" >> $GITHUB_OUTPUT
+          echo "worker_service=$(terraform output -raw ecs_worker_service_name)" >> $GITHUB_OUTPUT
+
+      - name: Build & push API image
+        working-directory: job-platform
+        env:
+          TAG: ${{ inputs.image_tag }}
+        run: |
+          docker build -f packages/api/Dockerfile -t "${{ steps.tf.outputs.ecr_api }}:$TAG" .
+          docker push "${{ steps.tf.outputs.ecr_api }}:$TAG"
+
+      - name: Build & push Worker image
+        working-directory: job-platform
+        env:
+          TAG: ${{ inputs.image_tag }}
+        run: |
+          docker build -f packages/worker/Dockerfile -t "${{ steps.tf.outputs.ecr_worker }}:$TAG" .
+          docker push "${{ steps.tf.outputs.ecr_worker }}:$TAG"
+
+      - name: Force new deployment (ECS)
+        run: |
+          aws ecs update-service \
+            --cluster "${{ steps.tf.outputs.cluster }}" \
+            --service "${{ steps.tf.outputs.api_service }}" \
+            --force-new-deployment
+          aws ecs update-service \
+            --cluster "${{ steps.tf.outputs.cluster }}" \
+            --service "${{ steps.tf.outputs.worker_service }}" \
+            --force-new-deployment

@@ -1,0 +1,36 @@
+name: Job Platform CI
+
+on:
+  push:
+    paths:
+      - 'job-platform/**'
+      - '.github/workflows/job-platform-ci.yml'
+  pull_request:
+    paths:
+      - 'job-platform/**'
+      - '.github/workflows/job-platform-ci.yml'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: job-platform/package-lock.json
+
+      - name: Install
+        working-directory: job-platform
+        run: npm ci
+
+      - name: Build
+        working-directory: job-platform
+        run: npm run build
+
+      - name: Test
+        working-directory: job-platform
+        run: npm test
