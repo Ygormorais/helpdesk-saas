@@ -108,14 +108,14 @@ resource "aws_lb_listener" "http" {
 }
 
 resource "aws_iam_role" "task_exec" {
-  name               = "${var.name}-task-exec"
+  name = "${var.name}-task-exec"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "ecs-tasks.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -127,27 +127,27 @@ resource "aws_iam_role_policy_attachment" "task_exec" {
 }
 
 resource "aws_iam_role" "task" {
-  name               = "${var.name}-task"
+  name = "${var.name}-task"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "ecs-tasks.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
 }
 
 resource "aws_iam_policy" "secrets" {
-  name   = "${var.name}-secrets"
+  name = "${var.name}-secrets"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
         Resource = [var.app_secret_arn]
       }
     ]
@@ -160,7 +160,7 @@ resource "aws_iam_role_policy_attachment" "secrets_exec" {
 }
 
 resource "aws_iam_policy" "s3" {
-  name   = "${var.name}-s3"
+  name = "${var.name}-s3"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -173,8 +173,8 @@ resource "aws_iam_policy" "s3" {
         Resource = ["arn:aws:s3:::${var.s3_bucket_name}/*"]
       },
       {
-        Effect = "Allow"
-        Action = ["s3:ListBucket"]
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
         Resource = ["arn:aws:s3:::${var.s3_bucket_name}"]
       }
     ]
@@ -221,20 +221,20 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name             = "api"
-      image            = var.api_image
-      essential        = true
-      portMappings     = [
+      name      = "api"
+      image     = var.api_image
+      essential = true
+      portMappings = [
         { containerPort = var.api_port, hostPort = var.api_port, protocol = "tcp" }
       ]
-      environment      = concat(local.common_env, [
+      environment = concat(local.common_env, [
         { name = "API_PORT", value = tostring(var.api_port) },
         { name = "OUTBOX_POLL_MS", value = "1000" }
       ])
-      secrets          = local.common_secrets
+      secrets = local.common_secrets
       logConfiguration = {
         logDriver = "awslogs"
-        options   = {
+        options = {
           awslogs-group         = aws_cloudwatch_log_group.api.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
@@ -255,14 +255,14 @@ resource "aws_ecs_task_definition" "worker" {
 
   container_definitions = jsonencode([
     {
-      name             = "worker"
-      image            = var.worker_image
-      essential        = true
-      environment      = local.common_env
-      secrets          = local.common_secrets
+      name        = "worker"
+      image       = var.worker_image
+      essential   = true
+      environment = local.common_env
+      secrets     = local.common_secrets
       logConfiguration = {
         logDriver = "awslogs"
-        options   = {
+        options = {
           awslogs-group         = aws_cloudwatch_log_group.worker.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
