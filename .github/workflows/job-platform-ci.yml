@@ -3,16 +3,29 @@ name: Job Platform CI
 on:
   push:
     paths:
-      - 'job-platform/**'
+      - 'job-platform/package.json'
+      - 'job-platform/package-lock.json'
+      - 'job-platform/tsconfig*.json'
+      - 'job-platform/.nvmrc'
+      - 'job-platform/.npmrc'
+      - 'job-platform/packages/**'
       - '.github/workflows/job-platform-ci.yml'
   pull_request:
     paths:
-      - 'job-platform/**'
+      - 'job-platform/package.json'
+      - 'job-platform/package-lock.json'
+      - 'job-platform/tsconfig*.json'
+      - 'job-platform/.nvmrc'
+      - 'job-platform/.npmrc'
+      - 'job-platform/packages/**'
       - '.github/workflows/job-platform-ci.yml'
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: job-platform
     steps:
       - uses: actions/checkout@v4
 
@@ -24,13 +37,10 @@ jobs:
           cache-dependency-path: job-platform/package-lock.json
 
       - name: Install
-        working-directory: job-platform
         run: npm ci
 
       - name: Build
-        working-directory: job-platform
         run: npm run build
 
       - name: Test
-        working-directory: job-platform
         run: npm test
