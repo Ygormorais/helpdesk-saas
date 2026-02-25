@@ -108,7 +108,7 @@ resource "aws_lb_listener" "http" {
 }
 
 resource "aws_iam_role" "task_exec" {
-  name = "${var.name}-task-exec"
+  name               = "${var.name}-task-exec"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -123,11 +123,11 @@ resource "aws_iam_role" "task_exec" {
 
 resource "aws_iam_role_policy_attachment" "task_exec" {
   role       = aws_iam_role.task_exec.name
-  policy_arn  = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 resource "aws_iam_role" "task" {
-  name = "${var.name}-task"
+  name               = "${var.name}-task"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -141,7 +141,7 @@ resource "aws_iam_role" "task" {
 }
 
 resource "aws_iam_policy" "secrets" {
-  name = "${var.name}-secrets"
+  name   = "${var.name}-secrets"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -155,12 +155,12 @@ resource "aws_iam_policy" "secrets" {
 }
 
 resource "aws_iam_role_policy_attachment" "secrets_exec" {
-  role      = aws_iam_role.task_exec.name
+  role       = aws_iam_role.task_exec.name
   policy_arn = aws_iam_policy.secrets.arn
 }
 
 resource "aws_iam_policy" "s3" {
-  name = "${var.name}-s3"
+  name   = "${var.name}-s3"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -183,7 +183,7 @@ resource "aws_iam_policy" "s3" {
 
 resource "aws_iam_role_policy_attachment" "s3_task" {
   role       = aws_iam_role.task.name
-  policy_arn  = aws_iam_policy.s3.arn
+  policy_arn = aws_iam_policy.s3.arn
 }
 
 locals {
@@ -221,20 +221,20 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name      = "api"
-      image     = var.api_image
-      essential = true
-      portMappings = [
+      name             = "api"
+      image            = var.api_image
+      essential        = true
+      portMappings     = [
         { containerPort = var.api_port, hostPort = var.api_port, protocol = "tcp" }
       ]
-      environment = concat(local.common_env, [
+      environment      = concat(local.common_env, [
         { name = "API_PORT", value = tostring(var.api_port) },
         { name = "OUTBOX_POLL_MS", value = "1000" }
       ])
-      secrets = local.common_secrets
+      secrets          = local.common_secrets
       logConfiguration = {
         logDriver = "awslogs"
-        options = {
+        options   = {
           awslogs-group         = aws_cloudwatch_log_group.api.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
@@ -255,14 +255,14 @@ resource "aws_ecs_task_definition" "worker" {
 
   container_definitions = jsonencode([
     {
-      name      = "worker"
-      image     = var.worker_image
-      essential = true
-      environment = local.common_env
-      secrets = local.common_secrets
+      name             = "worker"
+      image            = var.worker_image
+      essential        = true
+      environment      = local.common_env
+      secrets          = local.common_secrets
       logConfiguration = {
         logDriver = "awslogs"
-        options = {
+        options   = {
           awslogs-group         = aws_cloudwatch_log_group.worker.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
@@ -273,11 +273,11 @@ resource "aws_ecs_task_definition" "worker" {
 }
 
 resource "aws_ecs_service" "api" {
-  name            = "api"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.api.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                  = "api"
+  cluster               = aws_ecs_cluster.this.id
+  task_definition       = aws_ecs_task_definition.api.arn
+  desired_count         = 1
+  launch_type           = "FARGATE"
   wait_for_steady_state = false
 
   network_configuration {
@@ -296,11 +296,11 @@ resource "aws_ecs_service" "api" {
 }
 
 resource "aws_ecs_service" "worker" {
-  name            = "worker"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.worker.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                  = "worker"
+  cluster               = aws_ecs_cluster.this.id
+  task_definition       = aws_ecs_task_definition.worker.arn
+  desired_count         = 1
+  launch_type           = "FARGATE"
   wait_for_steady_state = false
 
   network_configuration {

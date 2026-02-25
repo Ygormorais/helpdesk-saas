@@ -25,7 +25,7 @@ resource "aws_secretsmanager_secret" "db" {
 }
 
 resource "aws_secretsmanager_secret_version" "db" {
-  secret_id = aws_secretsmanager_secret.db.id
+  secret_id     = aws_secretsmanager_secret.db.id
   secret_string = jsonencode({
     username = "jp"
     password = random_password.db.result
@@ -35,10 +35,10 @@ resource "aws_secretsmanager_secret_version" "db" {
 resource "aws_db_instance" "this" {
   identifier = var.name
 
-  engine               = "postgres"
-  engine_version       = "16"
-  instance_class       = "db.t3.micro"
-  allocated_storage    = 20
+  engine                = "postgres"
+  engine_version        = "16"
+  instance_class        = "db.t3.micro"
+  allocated_storage     = 20
   max_allocated_storage = 50
 
   db_subnet_group_name   = aws_db_subnet_group.this.name
@@ -69,7 +69,7 @@ resource "aws_secretsmanager_secret" "redis" {
 }
 
 resource "aws_secretsmanager_secret_version" "redis" {
-  secret_id = aws_secretsmanager_secret.redis.id
+  secret_id     = aws_secretsmanager_secret.redis.id
   secret_string = jsonencode({
     auth_token = random_password.redis.result
   })
@@ -99,7 +99,7 @@ resource "aws_secretsmanager_secret" "app" {
 }
 
 resource "aws_secretsmanager_secret_version" "app" {
-  secret_id = aws_secretsmanager_secret.app.id
+  secret_id     = aws_secretsmanager_secret.app.id
   secret_string = jsonencode({
     DATABASE_URL = "postgresql://jp:${random_password.db.result}@${aws_db_instance.this.address}:5432/jp?schema=public"
     REDIS_URL    = "rediss://:${random_password.redis.result}@${aws_elasticache_replication_group.this.primary_endpoint_address}:6379"
