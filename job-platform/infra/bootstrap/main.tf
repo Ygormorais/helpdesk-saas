@@ -49,9 +49,10 @@ resource "aws_dynamodb_table" "lock" {
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  // GitHub's OIDC root CA thumbprint (subject to change). If this fails, update the thumbprint.
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  # GitHub's OIDC root CA thumbprint (subject to change).
+  # If this fails, update the thumbprint.
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
@@ -84,9 +85,9 @@ resource "aws_iam_role" "github_actions" {
   assume_role_policy = data.aws_iam_policy_document.assume.json
 }
 
-// Portfolio scaffold: broad permissions for Terraform-managed infra.
-// Tighten this in a real project.
+# Portfolio scaffold: broad permissions for Terraform-managed infra.
+# Tighten this in a real project.
 resource "aws_iam_role_policy_attachment" "admin" {
   role       = aws_iam_role.github_actions.name
-  policy_arn  = "arn:aws:iam::aws:policy/AdministratorAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }

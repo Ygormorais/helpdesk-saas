@@ -1,0 +1,56 @@
+name: Job Platform Infra CI
+
+on:
+  push:
+    paths:
+      - 'job-platform/infra/**'
+      - '.github/workflows/job-platform-infra-ci.yml'
+  pull_request:
+    paths:
+      - 'job-platform/infra/**'
+      - '.github/workflows/job-platform-infra-ci.yml'
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Terraform fmt (check)
+        working-directory: job-platform/infra
+        run: terraform fmt -check -recursive
+
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - job-platform/infra/bootstrap
+          - job-platform/infra/environments/staging
+          - job-platform/infra/environments/prod
+          - job-platform/infra/modules/network
+          - job-platform/infra/modules/ecr
+          - job-platform/infra/modules/data
+          - job-platform/infra/modules/ecs
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Terraform init (no backend)
+        working-directory: ${{ matrix.dir }}
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: ${{ matrix.dir }}
+        run: terraform validate

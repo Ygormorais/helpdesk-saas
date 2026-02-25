@@ -35,10 +35,10 @@ resource "aws_secretsmanager_secret_version" "db" {
 resource "aws_db_instance" "this" {
   identifier = var.name
 
-  engine               = "postgres"
-  engine_version       = "16"
-  instance_class       = "db.t3.micro"
-  allocated_storage    = 20
+  engine                = "postgres"
+  engine_version        = "16"
+  instance_class        = "db.t3.micro"
+  allocated_storage     = 20
   max_allocated_storage = 50
 
   db_subnet_group_name   = aws_db_subnet_group.this.name

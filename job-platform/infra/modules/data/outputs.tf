@@ -19,12 +19,12 @@ output "app_secret_arn" {
 }
 
 output "database_url" {
-  value = "postgresql://jp:${random_password.db.result}@${aws_db_instance.this.address}:5432/jp?schema=public"
+  value     = "postgresql://jp:${random_password.db.result}@${aws_db_instance.this.address}:5432/jp?schema=public"
   sensitive = true
 }
 
 output "redis_url" {
-  value = "rediss://:${random_password.redis.result}@${aws_elasticache_replication_group.this.primary_endpoint_address}:6379"
+  value     = "rediss://:${random_password.redis.result}@${aws_elasticache_replication_group.this.primary_endpoint_address}:6379"
   sensitive = true
 }
 
