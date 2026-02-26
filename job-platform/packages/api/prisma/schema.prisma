@@ -12,6 +12,7 @@ enum JobStatus {
   processing
   succeeded
   failed
+  cancelled
 }
 
 enum OutboxStatus {
@@ -32,6 +33,8 @@ model Job {
   result         Json?
   artifactBucket String?
   artifactKey    String?
+  cancelRequested Boolean  @default(false)
+  cancelledAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }

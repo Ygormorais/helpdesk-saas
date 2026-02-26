@@ -8,12 +8,34 @@ import { putTextObject } from "./s3.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 
 await maybeStartOtel(process.env.OTEL_SERVICE_NAME || "jp-worker");
 
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
 const cfg = getQueueConfig();
 const dlq = makeDlqQueue();
+
+const tracer = trace.getTracer("jp-worker");
+
+async function withSpan<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  return tracer.startActiveSpan(name, async (span) => {
+    try {
+      const out = await fn();
+      span.setStatus({ code: SpanStatusCode.OK });
+      return out;
+    } catch (err: any) {
+      span.recordException(err);
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: String(err?.message || err)
+      });
+      throw err;
+    } finally {
+      span.end();
+    }
+  });
+}
 
 const reportGeneratePayloadSchema = z
   .object({
@@ -95,6 +117,18 @@ const worker = new Worker(
     const persisted = await prisma.job.findUnique({ where: { id: jobId } });
     if (!persisted) throw new Error("job not found");
 
+    if (persisted.cancelRequested || persisted.status === "cancelled") {
+      await prisma.job.update({
+        where: { id: jobId },
+        data: {
+          status: "cancelled",
+          cancelledAt: new Date()
+        }
+      });
+      log.warn({ jobId, name: job.name }, "cancelled before processing");
+      return;
+    }
+
     if (persisted.status === "succeeded") {
       log.info({ jobId, name: job.name }, "already succeeded; skipping");
       return;
@@ -115,16 +149,31 @@ const worker = new Worker(
     let artifactBucket: string | null = null;
     let artifactKey: string | null = null;
 
-    if (job.name === "report.generate") {
-      const payload = reportGeneratePayloadSchema.parse(persisted.payload ?? {});
-      const out = await handleReportGenerate(jobId, payload);
-      result = out.result;
-      artifactBucket = out.artifactBucket;
-      artifactKey = out.artifactKey;
-    } else {
-      // fallback: simulate some work
-      await sleep(300);
-      result = { ok: true };
+    await withSpan("job.process", async () => {
+      if (job.name === "report.generate") {
+        const payload = reportGeneratePayloadSchema.parse(persisted.payload ?? {});
+        const out = await handleReportGenerate(jobId, payload);
+        result = out.result;
+        artifactBucket = out.artifactBucket;
+        artifactKey = out.artifactKey;
+      } else {
+        // fallback: simulate some work
+        await sleep(300);
+        result = { ok: true };
+      }
+    });
+
+    const latest = await prisma.job.findUnique({ where: { id: jobId } });
+    if (latest?.cancelRequested) {
+      await prisma.job.update({
+        where: { id: jobId },
+        data: {
+          status: "cancelled",
+          cancelledAt: new Date()
+        }
+      });
+      log.warn({ jobId, name: job.name }, "cancelled during processing");
+      return;
     }
 
     await prisma.job.update({
