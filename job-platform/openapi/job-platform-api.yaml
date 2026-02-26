@@ -50,6 +50,7 @@ components:
           $ref: '#/components/schemas/JobType'
         payload:
           type: object
+          additionalProperties: true
         status:
           $ref: '#/components/schemas/JobStatus'
         attempts:
@@ -63,6 +64,7 @@ components:
         result:
           type: object
           nullable: true
+          additionalProperties: true
         artifactBucket:
           type: string
           nullable: true
@@ -92,6 +94,7 @@ components:
         payload:
           description: Job-specific payload
           type: object
+          additionalProperties: true
 
     ListJobsResponse:
       type: object
@@ -174,6 +177,7 @@ components:
           type: string
         data:
           type: object
+          additionalProperties: true
         timestamp:
           type: number
         processedOn:

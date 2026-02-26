@@ -176,12 +176,16 @@ export interface components {
             /** Format: uuid */
             id: string;
             type: components["schemas"]["JobType"];
-            payload: Record<string, never>;
+            payload: {
+                [key: string]: unknown;
+            };
             status: components["schemas"]["JobStatus"];
             attempts: number;
             idempotencyKey: string | null;
             lastError: string | null;
-            result: Record<string, never> | null;
+            result: {
+                [key: string]: unknown;
+            } | null;
             artifactBucket: string | null;
             artifactKey: string | null;
             cancelRequested: boolean;
@@ -195,7 +199,9 @@ export interface components {
         CreateJobRequest: {
             type: components["schemas"]["JobType"];
             /** @description Job-specific payload */
-            payload?: Record<string, never>;
+            payload?: {
+                [key: string]: unknown;
+            };
         };
         ListJobsResponse: {
             items: components["schemas"]["Job"][];
@@ -231,7 +237,9 @@ export interface components {
         DlqJob: {
             id: string | null;
             name: string;
-            data: Record<string, never>;
+            data: {
+                [key: string]: unknown;
+            };
             timestamp: number;
             processedOn: number | null;
             finishedOn: number | null;
