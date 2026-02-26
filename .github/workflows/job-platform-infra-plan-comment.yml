@@ -9,7 +9,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  id-token: write
 
 jobs:
   plan:
@@ -23,12 +22,6 @@ jobs:
         with:
           terraform_version: 1.8.5
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-
       - name: Terraform fmt (check)
         working-directory: job-platform/infra
         run: terraform fmt -check -recursive
@@ -38,11 +31,29 @@ jobs:
         working-directory: job-platform/infra/environments/staging
         env:
           TF_IN_AUTOMATION: 'true'
+          AWS_REGION: 'us-east-1'
+          AWS_EC2_METADATA_DISABLED: 'true'
         run: |
           terraform init -backend=false
+
+          set +e
           terraform plan -no-color -out=tfplan \
             -var="api_image_tag=pr-${{ github.sha }}" \
-            -var="worker_image_tag=pr-${{ github.sha }}"
+            -var="worker_image_tag=pr-${{ github.sha }}" > plan.txt 2>&1
+          code=$?
+          set -e
+
+          if [ "$code" -ne 0 ]; then
+            {
+              echo "plan_failed: true"
+              echo "exit_code: $code"
+              echo
+              echo "output (last 80 lines):"
+              tail -n 80 plan.txt || true
+            } > plan-summary.txt
+            exit 0
+          fi
+
           terraform show -json tfplan > plan.json
           node - <<'NODE'
           const fs = require('fs');
@@ -79,11 +90,29 @@ jobs:
         working-directory: job-platform/infra/environments/prod
         env:
           TF_IN_AUTOMATION: 'true'
+          AWS_REGION: 'us-east-1'
+          AWS_EC2_METADATA_DISABLED: 'true'
         run: |
           terraform init -backend=false
+
+          set +e
           terraform plan -no-color -out=tfplan \
             -var="api_image_tag=pr-${{ github.sha }}" \
-            -var="worker_image_tag=pr-${{ github.sha }}"
+            -var="worker_image_tag=pr-${{ github.sha }}" > plan.txt 2>&1
+          code=$?
+          set -e
+
+          if [ "$code" -ne 0 ]; then
+            {
+              echo "plan_failed: true"
+              echo "exit_code: $code"
+              echo
+              echo "output (last 80 lines):"
+              tail -n 80 plan.txt || true
+            } > plan-summary.txt
+            exit 0
+          fi
+
           terraform show -json tfplan > plan.json
           node - <<'NODE'
           const fs = require('fs');
