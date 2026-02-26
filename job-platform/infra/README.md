@@ -11,6 +11,10 @@ Componentes:
 - ECR (repos api/worker)
 - S3 (artefatos/export)
 
+Endpoints (API):
+- `GET /health` -> ok basico
+- `GET /ready` -> checa DB + Redis (usado pelo ALB healthcheck)
+
 ## Estrutura
 
 - `infra/environments/staging`
