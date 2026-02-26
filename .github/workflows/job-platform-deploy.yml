@@ -37,7 +37,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Terraform plan (infra)
@@ -71,8 +71,20 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          if [[ -z "${{ inputs.image_tag }}" ]]; then
+            echo "image_tag is required" >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.image_tag }}" =~ [[:space:]] ]]; then
+            echo "image_tag must not contain spaces" >&2
+            exit 1
+          fi
 
       - name: Login to ECR
         id: login-ecr
