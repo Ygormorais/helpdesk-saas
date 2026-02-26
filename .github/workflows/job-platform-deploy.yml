@@ -13,7 +13,7 @@ on:
           - prod
       image_tag:
         description: 'Docker tag (e.g. sha)'
-        required: true
+        required: false
 
 permissions:
   id-token: write
@@ -45,16 +45,21 @@ jobs:
         env:
           TF_IN_AUTOMATION: 'true'
         run: |
-          terraform init
-          terraform plan -no-color -out=tfplan \
-            -var="api_image_tag=${{ inputs.image_tag }}" \
-            -var="worker_image_tag=${{ inputs.image_tag }}"
+          if [[ -z "${{ vars.TFSTATE_BUCKET }}" || -z "${{ vars.TFLOCK_TABLE }}" ]]; then
+            echo "Missing environment vars TFSTATE_BUCKET/TFLOCK_TABLE" >&2
+            exit 1
+          fi
 
-      - name: Upload Terraform plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-${{ inputs.environment }}
-          path: job-platform/infra/environments/${{ inputs.environment }}/tfplan
+          TAG="${{ inputs.image_tag || github.sha }}"
+
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TFSTATE_BUCKET }}" \
+            -backend-config="key=job-platform/${{ inputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION || secrets.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ vars.TFLOCK_TABLE }}"
+          terraform plan -no-color \
+            -var="api_image_tag=$TAG" \
+            -var="worker_image_tag=$TAG"
 
   apply:
     runs-on: ubuntu-latest
@@ -77,58 +82,112 @@ jobs:
       - name: Validate inputs
         shell: bash
         run: |
-          if [[ -z "${{ inputs.image_tag }}" ]]; then
-            echo "image_tag is required" >&2
+          if [[ -z "${{ vars.TFSTATE_BUCKET }}" || -z "${{ vars.TFLOCK_TABLE }}" ]]; then
+            echo "Missing environment vars TFSTATE_BUCKET/TFLOCK_TABLE" >&2
             exit 1
           fi
-          if [[ "${{ inputs.image_tag }}" =~ [[:space:]] ]]; then
+
+          TAG="${{ inputs.image_tag || github.sha }}"
+          if [[ "$TAG" =~ [[:space:]] ]]; then
             echo "image_tag must not contain spaces" >&2
             exit 1
           fi
 
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
       - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Download Terraform plan
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-${{ inputs.environment }}
-          path: job-platform/infra/environments/${{ inputs.environment }}
 
       - name: Terraform apply (infra)
         working-directory: job-platform/infra/environments/${{ inputs.environment }}
         env:
           TF_IN_AUTOMATION: 'true'
         run: |
-          terraform init
-          terraform apply -auto-approve tfplan
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TFSTATE_BUCKET }}" \
+            -backend-config="key=job-platform/${{ inputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION || secrets.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ vars.TFLOCK_TABLE }}"
+
+          # Ensure ECR exists before pushing images
+          terraform apply -auto-approve -target=module.ecr
+
+      - name: Read ECR outputs
+        id: ecr
+        working-directory: job-platform/infra/environments/${{ inputs.environment }}
+        run: |
+          echo "api=$(terraform output -raw ecr_api)" >> $GITHUB_OUTPUT
+          echo "worker=$(terraform output -raw ecr_worker)" >> $GITHUB_OUTPUT
+
+      - name: Build & push images
+        working-directory: job-platform
+        env:
+          API_REPO: ${{ steps.ecr.outputs.api }}
+          WORKER_REPO: ${{ steps.ecr.outputs.worker }}
+        run: |
+          docker build -f packages/api/Dockerfile -t "$API_REPO:$TAG" .
+          docker push "$API_REPO:$TAG"
+
+          docker build -f packages/worker/Dockerfile -t "$WORKER_REPO:$TAG" .
+          docker push "$WORKER_REPO:$TAG"
+
+      - name: Terraform apply (services)
+        working-directory: job-platform/infra/environments/${{ inputs.environment }}
+        env:
+          TF_IN_AUTOMATION: 'true'
+        run: |
+          terraform apply -auto-approve \
+            -var="api_image_tag=$TAG" \
+            -var="worker_image_tag=$TAG"
 
       - name: Read Terraform outputs
         id: tf
         working-directory: job-platform/infra/environments/${{ inputs.environment }}
         run: |
-          echo "ecr_api=$(terraform output -raw ecr_api)" >> $GITHUB_OUTPUT
-          echo "ecr_worker=$(terraform output -raw ecr_worker)" >> $GITHUB_OUTPUT
           echo "cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
           echo "api_service=$(terraform output -raw ecs_api_service_name)" >> $GITHUB_OUTPUT
           echo "worker_service=$(terraform output -raw ecs_worker_service_name)" >> $GITHUB_OUTPUT
+          echo "api_task_definition_arn=$(terraform output -raw api_task_definition_arn)" >> $GITHUB_OUTPUT
+          echo "tasks_security_group_id=$(terraform output -raw tasks_security_group_id)" >> $GITHUB_OUTPUT
+          echo "private_subnet_ids=$(terraform output -json private_subnet_ids)" >> $GITHUB_OUTPUT
 
-      - name: Build & push API image
-        working-directory: job-platform
+      - name: Run Prisma migrations (ECS one-off)
         env:
-          TAG: ${{ inputs.image_tag }}
+          SUBNETS: ${{ steps.tf.outputs.private_subnet_ids }}
+          SG: ${{ steps.tf.outputs.tasks_security_group_id }}
+          TASK_DEF: ${{ steps.tf.outputs.api_task_definition_arn }}
         run: |
-          docker build -f packages/api/Dockerfile -t "${{ steps.tf.outputs.ecr_api }}:$TAG" .
-          docker push "${{ steps.tf.outputs.ecr_api }}:$TAG"
+          NETCFG=$(jq -nc --argjson subnets "$SUBNETS" --arg sg "$SG" '{awsvpcConfiguration:{subnets:$subnets,securityGroups:[$sg],assignPublicIp:"DISABLED"}}')
 
-      - name: Build & push Worker image
-        working-directory: job-platform
-        env:
-          TAG: ${{ inputs.image_tag }}
-        run: |
-          docker build -f packages/worker/Dockerfile -t "${{ steps.tf.outputs.ecr_worker }}:$TAG" .
-          docker push "${{ steps.tf.outputs.ecr_worker }}:$TAG"
+          OUT=$(aws ecs run-task \
+            --cluster "${{ steps.tf.outputs.cluster }}" \
+            --task-definition "$TASK_DEF" \
+            --launch-type FARGATE \
+            --network-configuration "$NETCFG" \
+            --overrides '{"containerOverrides":[{"name":"api","command":["sh","-lc","./node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma"]}]}' \
+            --output json)
+
+          TASK_ARN=$(echo "$OUT" | jq -r '.tasks[0].taskArn')
+          if [[ -z "$TASK_ARN" || "$TASK_ARN" == "null" ]]; then
+            echo "Failed to start migration task" >&2
+            echo "$OUT" >&2
+            exit 1
+          fi
+
+          aws ecs wait tasks-stopped --cluster "${{ steps.tf.outputs.cluster }}" --tasks "$TASK_ARN"
+
+          DESC=$(aws ecs describe-tasks --cluster "${{ steps.tf.outputs.cluster }}" --tasks "$TASK_ARN" --output json)
+          EXIT=$(echo "$DESC" | jq -r '.tasks[0].containers[] | select(.name=="api") | .exitCode')
+          REASON=$(echo "$DESC" | jq -r '.tasks[0].containers[] | select(.name=="api") | .reason // empty')
+          if [[ "$EXIT" != "0" ]]; then
+            echo "Migration task failed (exitCode=$EXIT)" >&2
+            if [[ -n "$REASON" ]]; then
+              echo "reason: $REASON" >&2
+            fi
+            echo "$DESC" >&2
+            exit 1
+          fi
 
       - name: Force new deployment (ECS)
         run: |
