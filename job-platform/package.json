@@ -10,10 +10,13 @@
   ],
   "scripts": {
     "dev": "npm run build -w @jp/shared && concurrently -n api,worker -c blue,green \"npm run dev -w @jp/api\" \"npm run dev -w @jp/worker\"",
+    "dashboard:dev": "npm -w @jp/dashboard run dev",
+    "dashboard:build": "npm -w @jp/dashboard run build",
+    "dashboard:preview": "npm -w @jp/dashboard run preview",
     "lint": "npm run typecheck",
     "gen:client": "openapi-typescript openapi/job-platform-api.yaml -o packages/client/src/schema.ts",
-    "build": "npm run build -w @jp/shared && npm run gen:client && npm run build -w @jp/client && npm run build -w @jp/api && npm run build -w @jp/worker",
-    "typecheck": "npm run build -w @jp/shared && npm run gen:client && npm run typecheck -w @jp/shared && npm run typecheck -w @jp/client && npm run typecheck -w @jp/api && npm run typecheck -w @jp/worker",
+    "build": "npm run build -w @jp/shared && npm run gen:client && npm run build -w @jp/client && npm run build -w @jp/api && npm run build -w @jp/worker && npm run build -w @jp/dashboard",
+    "typecheck": "npm run build -w @jp/shared && npm run gen:client && npm run build -w @jp/client && npm run typecheck -w @jp/shared && npm run typecheck -w @jp/client && npm run typecheck -w @jp/api && npm run typecheck -w @jp/worker && npm run typecheck -w @jp/dashboard",
     "test": "npm --workspaces run test",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down -v"

@@ -37,12 +37,31 @@ npm -w @jp/api run prisma:migrate
 npm run dev
 ```
 
+## Dashboard (portfolio)
+
+Um dashboard web simples para operar a fila, criar jobs e baixar artifacts.
+
+```bash
+cd job-platform
+npm install
+npm run dashboard:dev
+```
+
+Abra `http://localhost:4070`.
+
 ## Endpoints
 
 - `GET /health`
 - `POST /jobs` (header opcional: `Idempotency-Key`)
 - `GET /jobs/:id`
 - `GET /jobs/:id/artifact` (presigned URL se S3)
+- `POST /jobs/:id/cancel`
+- `POST /jobs/:id/retry`
+- `GET /queue`
+- `GET /dlq/jobs`
+- `GET /metrics` (se `METRICS_ENABLED=1`)
+
+Auth (opcional): defina `API_KEY` e envie `Authorization: Bearer <key>` ou `x-api-key: <key>`.
 
 ## Jobs (exemplos)
 
