@@ -25,6 +25,24 @@ jobs:
         working-directory: job-platform/infra
         run: terraform fmt -check -recursive
 
+  tflint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.54.0
+
+      - name: TFLint init
+        working-directory: job-platform/infra
+        run: tflint --init
+
+      - name: TFLint
+        working-directory: job-platform/infra
+        run: tflint -f compact
+
   validate:
     runs-on: ubuntu-latest
     strategy:

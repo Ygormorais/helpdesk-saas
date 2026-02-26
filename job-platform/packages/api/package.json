@@ -22,6 +22,7 @@
     "@prisma/client": "^6.15.0",
     "@aws-sdk/client-s3": "^3.995.0",
     "@aws-sdk/s3-request-presigner": "^3.995.0",
+    "@fastify/rate-limit": "^10.3.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.66.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.205.0",
