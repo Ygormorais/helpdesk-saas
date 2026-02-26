@@ -1,0 +1,391 @@
+openapi: 3.0.3
+info:
+  title: Job Platform API
+  version: 0.1.0
+servers:
+  - url: http://localhost:4010
+
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-api-key
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    JobStatus:
+      type: string
+      enum: [queued, processing, succeeded, failed, cancelled]
+
+    JobType:
+      type: string
+      enum: [report.generate]
+
+    Job:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - payload
+        - status
+        - attempts
+        - idempotencyKey
+        - lastError
+        - result
+        - artifactBucket
+        - artifactKey
+        - cancelRequested
+        - cancelledAt
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/JobType'
+        payload:
+          type: object
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        attempts:
+          type: integer
+        idempotencyKey:
+          type: string
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+        result:
+          type: object
+          nullable: true
+        artifactBucket:
+          type: string
+          nullable: true
+        artifactKey:
+          type: string
+          nullable: true
+        cancelRequested:
+          type: boolean
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateJobRequest:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          $ref: '#/components/schemas/JobType'
+        payload:
+          description: Job-specific payload
+          type: object
+
+    ListJobsResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+        nextCursor:
+          type: string
+          format: uuid
+          nullable: true
+
+    ArtifactResponseS3:
+      type: object
+      additionalProperties: false
+      required: [type, bucket, key, url]
+      properties:
+        type:
+          type: string
+          enum: [s3]
+        bucket:
+          type: string
+        key:
+          type: string
+        url:
+          type: string
+          format: uri
+
+    ArtifactResponseLocal:
+      type: object
+      additionalProperties: false
+      required: [type, path]
+      properties:
+        type:
+          type: string
+          enum: [local]
+        path:
+          type: string
+
+    QueueCounts:
+      type: object
+      additionalProperties: true
+
+    QueueStatsResponse:
+      type: object
+      additionalProperties: false
+      required: [queue, dlq]
+      properties:
+        queue:
+          type: object
+          additionalProperties: false
+          required: [name, counts]
+          properties:
+            name:
+              type: string
+            counts:
+              $ref: '#/components/schemas/QueueCounts'
+        dlq:
+          type: object
+          additionalProperties: false
+          required: [name, counts]
+          properties:
+            name:
+              type: string
+            counts:
+              $ref: '#/components/schemas/QueueCounts'
+
+    DlqJob:
+      type: object
+      additionalProperties: false
+      required: [id, name, data, timestamp, processedOn, finishedOn, attemptsMade, failedReason]
+      properties:
+        id:
+          type: string
+          nullable: true
+        name:
+          type: string
+        data:
+          type: object
+        timestamp:
+          type: number
+        processedOn:
+          type: number
+          nullable: true
+        finishedOn:
+          type: number
+          nullable: true
+        attemptsMade:
+          type: number
+        failedReason:
+          type: string
+          nullable: true
+
+    DlqJobsResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DlqJob'
+
+security:
+  - ApiKeyHeader: []
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: ok
+
+  /ready:
+    get:
+      operationId: ready
+      security: []
+      responses:
+        '200':
+          description: ok
+        '503':
+          description: dependency unavailable
+
+  /metrics:
+    get:
+      operationId: metrics
+      security: []
+      responses:
+        '200':
+          description: Prometheus metrics
+
+  /jobs:
+    get:
+      operationId: listJobs
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50 }
+        - in: query
+          name: cursor
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/JobStatus' }
+        - in: query
+          name: type
+          schema: { $ref: '#/components/schemas/JobType' }
+      responses:
+        '200':
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListJobsResponse'
+        '401':
+          description: Unauthorized
+
+    post:
+      operationId: createJob
+      parameters:
+        - in: header
+          name: idempotency-key
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '200':
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          description: Unauthorized
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          description: Not found
+
+  /jobs/{id}/artifact:
+    get:
+      operationId: getJobArtifact
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Artifact
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ArtifactResponseS3'
+                  - $ref: '#/components/schemas/ArtifactResponseLocal'
+        '404':
+          description: Not found
+
+  /jobs/{id}/cancel:
+    post:
+      operationId: cancelJob
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          description: Not found
+        '409':
+          description: Cannot cancel
+
+  /jobs/{id}/retry:
+    post:
+      operationId: retryJob
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          description: Not found
+        '409':
+          description: Cannot retry
+
+  /queue:
+    get:
+      operationId: getQueueStats
+      responses:
+        '200':
+          description: Queue stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStatsResponse'
+
+  /dlq/jobs:
+    get:
+      operationId: listDlqJobs
+      parameters:
+        - in: query
+          name: start
+          schema: { type: integer, minimum: 0 }
+        - in: query
+          name: end
+          schema: { type: integer, minimum: 0, maximum: 200 }
+      responses:
+        '200':
+          description: DLQ jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DlqJobsResponse'
