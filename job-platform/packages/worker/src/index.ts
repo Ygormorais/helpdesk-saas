@@ -2,17 +2,25 @@ import "dotenv/config";
 import { maybeStartOtel } from "./otel.js";
 import { Worker } from "bullmq";
 import pino from "pino";
-import { getQueueConfig, makeDlqQueue } from "@jp/shared";
+import { getQueueConfig, JOB_TYPES, makeDlqQueue } from "@jp/shared";
 import { prisma } from "./prisma.js";
 import { putTextObject } from "./s3.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { z } from "zod";
 
 await maybeStartOtel(process.env.OTEL_SERVICE_NAME || "jp-worker");
 
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
 const cfg = getQueueConfig();
 const dlq = makeDlqQueue();
+
+const reportGeneratePayloadSchema = z
+  .object({
+    rows: z.coerce.number().int().min(1).max(50_000).optional().default(50),
+    value: z.string().max(2_000).optional().default("demo")
+  })
+  .strict();
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,8 +83,22 @@ async function handleReportGenerate(jobId: string, payload: any) {
 const worker = new Worker(
   cfg.name,
   async (job) => {
-    const jobId = (job.data as any)?.jobId as string | undefined;
-    if (!jobId) throw new Error("missing jobId");
+    const jobId = z
+      .string()
+      .uuid()
+      .parse((job.data as any)?.jobId ?? "", { path: ["jobId"] });
+
+    if (!(JOB_TYPES as readonly string[]).includes(job.name)) {
+      throw new Error(`unknown job type: ${job.name}`);
+    }
+
+    const persisted = await prisma.job.findUnique({ where: { id: jobId } });
+    if (!persisted) throw new Error("job not found");
+
+    if (persisted.status === "succeeded") {
+      log.info({ jobId, name: job.name }, "already succeeded; skipping");
+      return;
+    }
 
     await prisma.job.update({
       where: { id: jobId },
@@ -94,8 +116,8 @@ const worker = new Worker(
     let artifactKey: string | null = null;
 
     if (job.name === "report.generate") {
-      const persisted = await prisma.job.findUnique({ where: { id: jobId } });
-      const out = await handleReportGenerate(jobId, persisted?.payload);
+      const payload = reportGeneratePayloadSchema.parse(persisted.payload ?? {});
+      const out = await handleReportGenerate(jobId, payload);
       result = out.result;
       artifactBucket = out.artifactBucket;
       artifactKey = out.artifactKey;
@@ -118,7 +140,8 @@ const worker = new Worker(
     log.info({ jobId }, "succeeded");
   },
   {
-    connection: { url: cfg.connection.url }
+    connection: { url: cfg.connection.url },
+    concurrency: Number(process.env.WORKER_CONCURRENCY || 5)
   }
 );
 
