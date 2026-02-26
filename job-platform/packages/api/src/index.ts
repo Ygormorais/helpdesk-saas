@@ -18,6 +18,23 @@ const app = Fastify({
 
 app.get("/health", async () => ({ ok: true }));
 
+app.get("/ready", async (_req, reply) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (err) {
+    return reply.code(503).send({ ok: false, dependency: "db" });
+  }
+
+  try {
+    await queue.waitUntilReady();
+    await queue.getJobCounts();
+  } catch (err) {
+    return reply.code(503).send({ ok: false, dependency: "redis" });
+  }
+
+  return reply.code(200).send({ ok: true });
+});
+
 const createJobSchema = z.object({
   type: z.string().min(1),
   payload: z.any().optional().default({})
