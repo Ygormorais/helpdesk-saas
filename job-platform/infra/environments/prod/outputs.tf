@@ -33,3 +33,15 @@ output "redis_secret_arn" {
 output "app_secret_arn" {
   value = module.data.app_secret_arn
 }
+
+output "tasks_security_group_id" {
+  value = module.ecs.tasks_security_group_id
+}
+
+output "private_subnet_ids" {
+  value = module.network.private_subnet_ids
+}
+
+output "api_task_definition_arn" {
+  value = module.ecs.api_task_definition_arn
+}

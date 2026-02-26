@@ -36,5 +36,23 @@ Use `job-platform/infra/bootstrap` para criar:
 - tabela DynamoDB de lock
 - role IAM para GitHub Actions (OIDC)
 
-Obs: este scaffold nao configura backend remoto (S3/DynamoDB) por padrao.
-Quando for usar de verdade, adicione um backend remoto por ambiente.
+Este repo ja inclui `backend "s3" {}` em:
+- `job-platform/infra/environments/staging/backend.tf`
+- `job-platform/infra/environments/prod/backend.tf`
+
+Voce precisa fornecer os valores via `terraform init -backend-config=...`.
+
+### Deploy via GitHub Actions
+
+O workflow `.github/workflows/job-platform-deploy.yml` espera estas vars por environment:
+- `AWS_REGION`
+- `TFSTATE_BUCKET`
+- `TFLOCK_TABLE`
+
+E este secret por environment:
+- `AWS_ROLE_TO_ASSUME`
+
+Os outputs do bootstrap ajudam:
+- `tfstate_bucket`
+- `tflock_table`
+- `github_actions_role_arn` (valor recomendado para `AWS_ROLE_TO_ASSUME`)

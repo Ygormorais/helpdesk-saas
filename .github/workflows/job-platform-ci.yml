@@ -50,3 +50,80 @@ jobs:
 
       - name: Test
         run: npm test
+
+  deps-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: job-platform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: job-platform/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Start Postgres + Redis
+        run: docker compose up -d
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U jp -d jp >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become ready" >&2
+          docker compose logs postgres || true
+          exit 1
+
+      - name: Wait for Redis
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T redis redis-cli ping >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Redis did not become ready" >&2
+          docker compose logs redis || true
+          exit 1
+
+      - name: Prisma generate + migrate (local)
+        env:
+          DATABASE_URL: postgresql://jp:jp@localhost:5433/jp?schema=public
+        run: |
+          npm run prisma:generate -w @jp/api
+          npm run prisma:migrate:deploy -w @jp/api
+
+      - name: Dependency connectivity check
+        env:
+          DATABASE_URL: postgresql://jp:jp@localhost:5433/jp?schema=public
+          REDIS_URL: redis://localhost:6380
+        run: |
+          node --input-type=module - <<'NODE'
+          import { PrismaClient } from "@prisma/client";
+          import { Queue } from "bullmq";
+
+          const prisma = new PrismaClient();
+          await prisma.$queryRaw`SELECT 1`;
+          await prisma.$disconnect();
+
+          const q = new Queue("jobs", { connection: { url: process.env.REDIS_URL } });
+          await q.waitUntilReady();
+          await q.getJobCounts();
+          await q.close();
+
+          console.log("ok");
+          NODE
+
+      - name: Stop services
+        if: ${{ always() }}
+        run: docker compose down -v
