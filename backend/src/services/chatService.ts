@@ -152,10 +152,11 @@ class ChatService {
 
       this.io?.to(`chat:${data.chatId}`).emit('new-message', message);
 
-      socket.to(`tenant:${user.tenantId}`).emit('notification', {
-        type: 'new-message',
+      // Notify tenant-level listeners (chat lists, unread badges, etc.)
+      this.io?.to(`tenant:${user.tenantId}`).emit('chat:message', {
         chatId: data.chatId,
-        message,
+        messageId: message._id,
+        senderId: user.userId,
       });
 
        // Persist notification (best-effort)
