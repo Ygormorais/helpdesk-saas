@@ -4,6 +4,9 @@ import {
   listNotifications,
   markNotificationRead,
   markAllRead,
+  archiveNotifications,
+  unarchiveNotifications,
+  unarchiveAllNotifications,
   clearMyNotifications,
 } from '../controllers/notificationController.js';
 
@@ -36,11 +39,86 @@ router.use(authenticate);
  *         schema:
  *           type: boolean
  *         description: Quando true, retorna apenas nao lidas.
+ *       - in: query
+ *         name: archivedOnly
+ *         schema:
+ *           type: boolean
+ *         description: Quando true, retorna apenas arquivadas pelo usuario atual.
  *     responses:
  *       200:
  *         description: Lista paginada de notificacoes
  */
 router.get('/', listNotifications);
+
+/**
+ * @swagger
+ * /notifications/archive:
+ *   post:
+ *     summary: Arquivar notificacoes (por usuario)
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 500
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.post('/archive', archiveNotifications);
+
+/**
+ * @swagger
+ * /notifications/unarchive:
+ *   post:
+ *     summary: Desarquivar notificacoes (por usuario)
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 500
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.post('/unarchive', unarchiveNotifications);
+
+/**
+ * @swagger
+ * /notifications/unarchive-all:
+ *   post:
+ *     summary: Desarquivar todas as notificacoes do usuario
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.post('/unarchive-all', unarchiveAllNotifications);
 
 /**
  * @swagger
