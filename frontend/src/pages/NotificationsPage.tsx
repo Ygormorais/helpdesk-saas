@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Bell, Check, Trash2, RefreshCw } from 'lucide-react';
+import { Bell, Check, Trash2, RefreshCw, Archive } from 'lucide-react';
 import { useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
@@ -81,6 +81,32 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const archiveOneMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await notificationsApi.archive([id]);
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast({
+        title: 'Notificacao arquivada',
+        duration: 6000,
+        action: (
+          <ToastAction
+            altText="Desfazer"
+            onClick={() => {
+              notificationsApi
+                .unarchive([id])
+                .then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+                .catch(() => undefined);
+            }}
+          >
+            Desfazer
+          </ToastAction>
+        ),
+      });
     },
   });
 
@@ -228,9 +254,26 @@ export default function NotificationsPage() {
                     >
                       Restaurar
                     </Button>
-                  ) : !n.read ? (
-                    <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                  ) : null}
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          archiveOneMutation.mutate(n.id);
+                        }}
+                        title="Arquivar"
+                        aria-label="Arquivar"
+                      >
+                        <Archive className="h-4 w-4" />
+                      </Button>
+
+                      {!n.read ? <span className="mt-1 h-2 w-2 rounded-full bg-primary" /> : null}
+                    </div>
+                  )}
                 </div>
               </Link>
             );
