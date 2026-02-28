@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bell, Check, Trash2, RefreshCw, Archive, X, CheckCircle } from 'lucide-react';
+import { Bell, Check, Trash2, RefreshCw, Archive, X, CheckCircle, Circle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
@@ -205,6 +205,15 @@ export default function NotificationsPage() {
   const markOneMutation = useMutation({
     mutationFn: async (id: string) => {
       await notificationsApi.markRead(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const markUnreadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await notificationsApi.markUnread(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -418,7 +427,22 @@ export default function NotificationsPage() {
                         >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
-                      ) : null}
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            markUnreadMutation.mutate(n.id);
+                          }}
+                          title="Marcar como nao lida"
+                          aria-label="Marcar como nao lida"
+                        >
+                          <Circle className="h-4 w-4" />
+                        </Button>
+                      )}
 
                       <Button
                         type="button"

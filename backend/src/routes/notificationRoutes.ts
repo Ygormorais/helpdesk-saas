@@ -3,6 +3,7 @@ import { authenticate } from '../middlewares/auth.js';
 import {
   listNotifications,
   markNotificationRead,
+  markNotificationUnread,
   markAllRead,
   archiveNotifications,
   unarchiveNotifications,
@@ -149,6 +150,26 @@ router.post('/unarchive-all', unarchiveAllNotifications);
  *         description: OK
  */
 router.post('/:id/read', markNotificationRead);
+
+/**
+ * @swagger
+ * /notifications/{id}/unread:
+ *   post:
+ *     summary: Marcar notificacao como nao lida
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.post('/:id/unread', markNotificationUnread);
 
 /**
  * @swagger
