@@ -40,6 +40,16 @@ router.use(authenticate);
  *           type: boolean
  *         description: Quando true, retorna apenas nao lidas.
  *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Busca por texto em titulo/mensagem.
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         description: Filtra por tipo (ou lista separada por virgula).
+ *       - in: query
  *         name: archivedOnly
  *         schema:
  *           type: boolean
