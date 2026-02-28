@@ -99,7 +99,7 @@ export default function NotificationsPage() {
           <Button
             variant="outline"
             onClick={() => clearMutation.mutate()}
-            disabled={clearMutation.isPending || unreadTotal === 0}
+            disabled={clearMutation.isPending || notifications.length === 0}
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Limpar

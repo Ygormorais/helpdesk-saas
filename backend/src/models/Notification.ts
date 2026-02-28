@@ -19,6 +19,7 @@ export interface INotification extends Document {
   chat?: mongoose.Types.ObjectId;
   createdBy?: mongoose.Types.ObjectId;
   readBy: mongoose.Types.ObjectId[];
+  archivedBy: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +71,12 @@ const notificationSchema = new Schema<INotification>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       default: [],
+    }],
+    archivedBy: [{
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: [],
+      index: true,
     }],
   },
   {
