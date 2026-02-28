@@ -296,6 +296,14 @@ export default function ChatPage() {
 
   const typingActive = !!isTyping;
 
+  const typingLabel = useMemo(() => {
+    if (!isTyping || !currentChat) return null;
+    const c: any = currentChat;
+    const p = (c.participants || []).find((x: any) => String(x?._id) === String(isTyping.userId));
+    const name = String(p?.name || '').trim() || 'Alguem';
+    return `${name} digitando...`;
+  }, [currentChat, isTyping]);
+
   useEffect(() => {
     if (!dmOpen) return;
     const t = window.setTimeout(() => dmSearchRef.current?.focus(), 0);
@@ -713,7 +721,7 @@ export default function ChatPage() {
                     <div className="flex justify-start">
                       <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-2">
                         {tab === 'internal' ? (
-                          <div className="text-xs text-muted-foreground">Digitando...</div>
+                          <div className="text-xs text-muted-foreground">{typingLabel || 'Digitando...'}</div>
                         ) : (
                           <div className="flex gap-1">
                             <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
