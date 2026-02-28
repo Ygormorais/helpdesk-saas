@@ -51,6 +51,48 @@ router.get('/', getTickets);
 
 router.get('/export/csv', authorize('admin', 'manager', 'agent'), exportTicketsCsv);
 
+/**
+ * @swagger
+ * /tickets/bulk:
+ *   post:
+ *     summary: Atualizar tickets em massa
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids, updates]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 200
+ *                 items:
+ *                   type: string
+ *               updates:
+ *                 type: object
+ *                 description: Pelo menos um campo deve ser enviado.
+ *                 properties:
+ *                   status:
+ *                     type: string
+ *                     enum: [open, in_progress, waiting_customer, resolved, closed]
+ *                   priority:
+ *                     type: string
+ *                     enum: [low, medium, high, urgent]
+ *                   assignedTo:
+ *                     type: string
+ *                     nullable: true
+ *                     description: ID do agente (ou null para desatribuir)
+ *     responses:
+ *       200:
+ *         description: Resultado do bulk update
+ *       400:
+ *         description: Erro de validacao
+ */
 router.post('/bulk', authorize('admin', 'manager', 'agent'), bulkUpdateTickets);
 
 /**
