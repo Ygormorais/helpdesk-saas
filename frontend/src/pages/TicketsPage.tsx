@@ -248,6 +248,10 @@ export default function TicketsPage() {
       const res = await categoriesApi.list();
       return res.data.categories as Array<any>;
     },
+    select: (data) => {
+      const anyData: any = data as any;
+      return Array.isArray(anyData) ? anyData : (anyData?.categories || []);
+    },
     staleTime: 60_000,
   });
 

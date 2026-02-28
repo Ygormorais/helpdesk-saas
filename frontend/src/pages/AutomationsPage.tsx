@@ -46,6 +46,10 @@ export default function AutomationsPage() {
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async () => (await categoriesApi.list()).data.categories,
+    select: (data) => {
+      const anyData: any = data as any;
+      return Array.isArray(anyData) ? anyData : (anyData?.categories || []);
+    },
     staleTime: 60_000,
   });
 

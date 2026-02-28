@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
+type TicketCategory = { _id: string; name: string };
+
 const schema = z.object({
   title: z.string().min(5, 'Título deve ter no mínimo 5 caracteres'),
   description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
@@ -43,11 +45,15 @@ export default function TicketNewPage() {
     queryKey: ['categories'],
     queryFn: async () => {
       const res = await categoriesApi.list();
-      return res.data.categories as Array<{ _id: string; name: string }>;
+      return res.data.categories as TicketCategory[];
+    },
+    select: (data) => {
+      const anyData: any = data as any;
+      return (Array.isArray(anyData) ? anyData : (anyData?.categories || [])) as TicketCategory[];
     },
   });
 
-  const safeCategories = categories || [];
+  const safeCategories: TicketCategory[] = categories || [];
   const canSubmit = safeCategories.length > 0;
 
   const form = useForm<FormValues>({
