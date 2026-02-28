@@ -700,7 +700,7 @@ export default function ChatPage() {
                             <span className={`text-xs ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                               {formatTime(m.createdAt)}
                             </span>
-                            {tab === 'tickets' && isOwn && Array.isArray(m.readBy) && m.readBy.length > 1 ? (
+                            {isOwn && Array.isArray(m.readBy) && m.readBy.length > 1 ? (
                               <span className="text-xs text-primary-foreground/70">✓✓</span>
                             ) : null}
                           </div>
