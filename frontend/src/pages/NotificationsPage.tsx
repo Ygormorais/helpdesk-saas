@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
@@ -16,12 +17,13 @@ export default function NotificationsPage() {
 
   const [page, setPage] = useState(1);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [archivedOnly, setArchivedOnly] = useState(false);
   const limit = 50;
 
   const listQuery = useQuery({
-    queryKey: ['notifications', { page, limit, unreadOnly }],
+    queryKey: ['notifications', { page, limit, unreadOnly, archivedOnly }],
     queryFn: async () => {
-      const res = await notificationsApi.list({ page, limit, unreadOnly });
+      const res = await notificationsApi.list({ page, limit, unreadOnly: archivedOnly ? false : unreadOnly, archivedOnly });
       return res.data;
     },
   });
@@ -42,7 +44,43 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toast({ title: 'Notificações limpas' });
+      toast({
+        title: 'Notificacoes arquivadas',
+        description: 'Voce pode desfazer agora.',
+        duration: 6000,
+        action: (
+          <ToastAction
+            altText="Desfazer"
+            onClick={() => {
+              notificationsApi
+                .unarchiveAll()
+                .then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+                .catch(() => undefined);
+            }}
+          >
+            Desfazer
+          </ToastAction>
+        ),
+      });
+    },
+  });
+
+  const unarchiveAllMutation = useMutation({
+    mutationFn: async () => {
+      await notificationsApi.unarchiveAll();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast({ title: 'Notificacoes restauradas' });
+    },
+  });
+
+  const unarchiveOneMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await notificationsApi.unarchive([id]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 
@@ -57,9 +95,11 @@ export default function NotificationsPage() {
 
   const notifications = (listQuery.data?.notifications || []) as NotificationDto[];
   const pagination = listQuery.data?.pagination as undefined | { page: number; pages: number; total: number };
-  const unreadTotal = typeof listQuery.data?.unreadTotal === 'number'
-    ? Number(listQuery.data?.unreadTotal)
-    : notifications.filter((n) => !n.read).length;
+  const unreadTotal = archivedOnly
+    ? 0
+    : (typeof listQuery.data?.unreadTotal === 'number'
+      ? Number(listQuery.data?.unreadTotal)
+      : notifications.filter((n) => !n.read).length);
 
   return (
     <div className="space-y-6">
@@ -80,26 +120,51 @@ export default function NotificationsPage() {
             Atualizar
           </Button>
           <Button
-            variant={unreadOnly ? 'default' : 'outline'}
+            variant={archivedOnly ? 'outline' : (unreadOnly ? 'default' : 'outline')}
             onClick={() => {
               setPage(1);
+              if (archivedOnly) return;
               setUnreadOnly((v) => !v);
             }}
+            disabled={archivedOnly}
           >
             {unreadOnly ? 'Mostrando não lidas' : 'Somente não lidas'}
           </Button>
+
+          <Button
+            variant={archivedOnly ? 'default' : 'outline'}
+            onClick={() => {
+              setPage(1);
+              setUnreadOnly(false);
+              setArchivedOnly((v) => !v);
+            }}
+          >
+            {archivedOnly ? 'Arquivadas' : 'Ver arquivadas'}
+          </Button>
+
           <Button
             variant="outline"
             onClick={() => markAllMutation.mutate()}
-            disabled={markAllMutation.isPending || unreadTotal === 0}
+            disabled={archivedOnly || markAllMutation.isPending || unreadTotal === 0}
           >
             <Check className="mr-2 h-4 w-4" />
             Marcar todas
           </Button>
+
+          {archivedOnly ? (
+            <Button
+              variant="outline"
+              onClick={() => unarchiveAllMutation.mutate()}
+              disabled={unarchiveAllMutation.isPending || notifications.length === 0}
+            >
+              Restaurar tudo
+            </Button>
+          ) : null}
+
           <Button
             variant="outline"
             onClick={() => clearMutation.mutate()}
-            disabled={clearMutation.isPending || notifications.length === 0}
+            disabled={archivedOnly || clearMutation.isPending || notifications.length === 0}
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Limpar
@@ -109,7 +174,7 @@ export default function NotificationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recentes</CardTitle>
+          <CardTitle>{archivedOnly ? 'Arquivadas' : 'Recentes'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {listQuery.isLoading && (
@@ -136,7 +201,7 @@ export default function NotificationsPage() {
                 key={n.id}
                 to={link}
                 onClick={() => {
-                  if (!n.read) markOneMutation.mutate(n.id);
+                  if (!archivedOnly && !n.read) markOneMutation.mutate(n.id);
                 }}
                 className={`block rounded-lg border p-3 hover:bg-muted/40 transition-colors ${
                   !n.read ? 'bg-muted/20' : ''
@@ -150,9 +215,22 @@ export default function NotificationsPage() {
                       {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true, locale: ptBR })}
                     </p>
                   </div>
-                  {!n.read && (
+                  {archivedOnly ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        unarchiveOneMutation.mutate(n.id);
+                      }}
+                    >
+                      Restaurar
+                    </Button>
+                  ) : !n.read ? (
                     <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                  )}
+                  ) : null}
                 </div>
               </Link>
             );

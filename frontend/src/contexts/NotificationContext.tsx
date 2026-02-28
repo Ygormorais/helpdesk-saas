@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Bell, Ticket, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
 import { getSocketUrl } from '@/config/socket';
+import { ToastAction } from '@/components/ui/toast';
 
 export interface Notification {
   id: string;
@@ -66,6 +67,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     });
   }, [toast]);
 
+  const reloadNotifications = useCallback(async () => {
+    const res = await notificationsApi.list({ page: 1, limit: 50 });
+    const list = res.data.notifications;
+    setNotifications(
+      list.map((n: NotificationDto) => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        ticketId: n.ticketId,
+        chatId: n.chatId,
+        userId: n.createdBy,
+        createdAt: new Date(n.createdAt),
+        read: n.read,
+      }))
+    );
+  }, []);
+
   // Load persisted notifications
   useEffect(() => {
     if (!isAuthenticated) {
@@ -75,26 +94,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     (async () => {
       try {
-        const res = await notificationsApi.list({ page: 1, limit: 50 });
-        const list = res.data.notifications;
-        setNotifications(
-          list.map((n: NotificationDto) => ({
-            id: n.id,
-            type: n.type,
-            title: n.title,
-            message: n.message,
-            ticketId: n.ticketId,
-            chatId: n.chatId,
-            userId: n.createdBy,
-            createdAt: new Date(n.createdAt),
-            read: n.read,
-          }))
-        );
+        await reloadNotifications();
       } catch {
         // ignore
       }
     })();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, reloadNotifications]);
 
   // Conectar ao socket quando autenticado
   useEffect(() => {
@@ -166,9 +171,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const clearNotifications = useCallback(() => {
+    if (notifications.length === 0) return;
+
     setNotifications([]);
     notificationsApi.clearMine().catch(() => undefined);
-  }, []);
+
+    toast({
+      title: 'Notificacoes arquivadas',
+      description: 'Voce pode desfazer agora.',
+      duration: 6000,
+      action: (
+        <ToastAction
+          altText="Desfazer"
+          onClick={() => {
+            notificationsApi
+              .unarchiveAll()
+              .then(() => reloadNotifications())
+              .catch(() => undefined);
+          }}
+        >
+          Desfazer
+        </ToastAction>
+      ),
+    });
+  }, [notifications.length, reloadNotifications, toast]);
 
   return (
     <NotificationContext.Provider
