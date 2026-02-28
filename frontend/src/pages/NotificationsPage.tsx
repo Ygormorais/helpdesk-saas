@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bell, Check, Trash2, RefreshCw, Archive } from 'lucide-react';
+import { Bell, Check, Trash2, RefreshCw, Archive, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
@@ -80,6 +80,16 @@ export default function NotificationsPage() {
     ],
     []
   );
+
+  const effectiveTypeOptions = useMemo(() => {
+    if (typeFilter === 'all') return typeOptions;
+    if (typeOptions.some((o) => o.value === typeFilter)) return typeOptions;
+    return [...typeOptions, { value: typeFilter, label: typeFilter }];
+  }, [typeFilter, typeOptions]);
+
+  const hasAnyFilter = useMemo(() => {
+    return page > 1 || unreadOnly || archivedOnly || q.trim().length > 0 || (typeFilter && typeFilter !== 'all');
+  }, [archivedOnly, page, q, typeFilter, unreadOnly]);
 
   const listQuery = useQuery({
     queryKey: ['notifications', { page, limit, unreadOnly, archivedOnly, q: debouncedQ, typeFilter }],
@@ -276,36 +286,55 @@ export default function NotificationsPage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <CardTitle>{archivedOnly ? 'Arquivadas' : 'Recentes'}</CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Input
-                value={q}
-                onChange={(e) => {
+          <div className="flex items-center gap-2 flex-wrap">
+            <Input
+              value={q}
+              onChange={(e) => {
+                setPage(1);
+                setQ(e.target.value);
+              }}
+              placeholder="Buscar..."
+              className="h-9 w-[220px]"
+            />
+            <Select
+              value={typeFilter}
+              onValueChange={(v) => {
+                setPage(1);
+                setTypeFilter(v);
+              }}
+            >
+              <SelectTrigger className="h-9 w-[200px]" aria-label="Filtrar por tipo">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {effectiveTypeOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {hasAnyFilter ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9"
+                onClick={() => {
                   setPage(1);
-                  setQ(e.target.value);
+                  setUnreadOnly(false);
+                  setArchivedOnly(false);
+                  setQ('');
+                  setTypeFilter('all');
                 }}
-                placeholder="Buscar..."
-                className="h-9 w-[220px]"
-              />
-              <Select
-                value={typeFilter}
-                onValueChange={(v) => {
-                  setPage(1);
-                  setTypeFilter(v);
-                }}
+                title="Limpar filtros"
               >
-                <SelectTrigger className="h-9 w-[200px]" aria-label="Filtrar por tipo">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeOptions.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <X className="mr-2 h-4 w-4" />
+                Limpar
+              </Button>
+            ) : null}
           </div>
+        </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {listQuery.isLoading && (
