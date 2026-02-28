@@ -3,6 +3,10 @@ import { Notification } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { z } from 'zod';
 
+function escapeRegexLiteral(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -43,9 +47,10 @@ export const listNotifications = async (req: AuthRequest, res: Response): Promis
   }
 
   if (q) {
+    const safe = escapeRegexLiteral(q);
     query.$or = [
-      { title: { $regex: q, $options: 'i' } },
-      { message: { $regex: q, $options: 'i' } },
+      { title: { $regex: safe, $options: 'i' } },
+      { message: { $regex: safe, $options: 'i' } },
     ];
   }
 
