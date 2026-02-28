@@ -219,7 +219,7 @@ export const markAllRead = async (req: AuthRequest, res: Response): Promise<void
   const user = req.user!;
 
   await Notification.updateMany(
-    { tenant: user.tenant._id, readBy: { $ne: user._id } },
+    { tenant: user.tenant._id, readBy: { $ne: user._id }, archivedBy: { $ne: user._id } },
     { $addToSet: { readBy: user._id } }
   );
 
