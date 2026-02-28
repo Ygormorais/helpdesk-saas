@@ -406,6 +406,10 @@ export default function TicketsPage() {
     }
   };
 
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -664,6 +668,7 @@ export default function TicketsPage() {
                   <input
                     type="checkbox"
                     checked={allSelectedOnPage}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       if (e.target.checked) setSelectedIds(tickets.map((t) => String(t._id)));
                       else setSelectedIds([]);
@@ -720,14 +725,22 @@ export default function TicketsPage() {
                 </tr>
               )}
               {!isLoading && !isError && tickets.map((ticket) => (
-                <tr key={ticket._id} className="border-b last:border-0 hover:bg-muted/50">
+                <tr
+                  key={ticket._id}
+                  className="border-b last:border-0 hover:bg-muted/50"
+                  onClick={(e) => {
+                    const t = e.target as HTMLElement | null;
+                    if (t?.closest('a,button,input,select,textarea,[role="button"]')) return;
+                    toggleSelected(String(ticket._id));
+                  }}
+                >
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={selectedSet.has(String(ticket._id))}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={() => {
-                        const id = String(ticket._id);
-                        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+                        toggleSelected(String(ticket._id));
                       }}
                       aria-label={`Selecionar ticket ${ticket.ticketNumber}`}
                     />
