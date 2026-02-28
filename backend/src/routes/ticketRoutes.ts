@@ -4,6 +4,7 @@ import {
   getTickets,
   getTicketById,
   updateTicket,
+  bulkUpdateTickets,
   reopenTicket,
   addComment,
   exportTicketsCsv,
@@ -49,6 +50,8 @@ router.use(authenticate);
 router.get('/', getTickets);
 
 router.get('/export/csv', authorize('admin', 'manager', 'agent'), exportTicketsCsv);
+
+router.post('/bulk', authorize('admin', 'manager', 'agent'), bulkUpdateTickets);
 
 /**
  * @swagger

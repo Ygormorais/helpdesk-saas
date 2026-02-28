@@ -10,8 +10,8 @@ export type UserListItem = {
 };
 
 export const usersApi = {
-  listStaff: () =>
+  listStaff: (opts?: { excludeSelf?: boolean }) =>
     api.get<{ users: UserListItem[] }>('/users', {
-      params: { staffOnly: true, excludeSelf: true },
+      params: { staffOnly: true, excludeSelf: opts?.excludeSelf ?? false },
     }),
 };
