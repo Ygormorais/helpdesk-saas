@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Bell, Check, Trash2, RefreshCw, Archive, X, CheckCircle, Circle } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ export default function NotificationsPage() {
   const [q, setQ] = useState(() => searchParams.get('q') || '');
   const [debouncedQ, setDebouncedQ] = useState(() => (searchParams.get('q') || '').trim());
   const [typeFilter, setTypeFilter] = useState(() => initialType);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const limit = 50;
 
   useEffect(() => {
@@ -220,8 +221,72 @@ export default function NotificationsPage() {
     },
   });
 
+  const bulkMarkReadMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await notificationsApi.markManyRead(ids);
+    },
+    onSuccess: () => {
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast({ title: 'Notificacoes marcadas como lidas' });
+    },
+  });
+
+  const bulkMarkUnreadMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await notificationsApi.markManyUnread(ids);
+    },
+    onSuccess: () => {
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast({ title: 'Notificacoes marcadas como nao lidas' });
+    },
+  });
+
+  const bulkArchiveMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await notificationsApi.archive(ids);
+    },
+    onSuccess: () => {
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast({ title: 'Notificacoes arquivadas' });
+    },
+  });
+
+  const bulkUnarchiveMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await notificationsApi.unarchive(ids);
+    },
+    onSuccess: () => {
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast({ title: 'Notificacoes restauradas' });
+    },
+  });
+
   const notifications = (listQuery.data?.notifications || []) as NotificationDto[];
   const pagination = listQuery.data?.pagination as undefined | { page: number; pages: number; total: number };
+  const pageIds = useMemo(() => notifications.map((n) => n.id), [notifications]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const allOnPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedSet.has(id));
+  const someOnPageSelected = pageIds.some((id) => selectedSet.has(id));
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const bulkBusy =
+    bulkMarkReadMutation.isPending ||
+    bulkMarkUnreadMutation.isPending ||
+    bulkArchiveMutation.isPending ||
+    bulkUnarchiveMutation.isPending;
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    selectAllRef.current.indeterminate = someOnPageSelected && !allOnPageSelected;
+  }, [allOnPageSelected, someOnPageSelected]);
+
+  useEffect(() => {
+    // Avoid applying bulk actions across different result sets.
+    setSelectedIds([]);
+  }, [archivedOnly, debouncedQ, page, typeFilter, unreadOnly]);
   const unreadTotal = archivedOnly
     ? 0
     : (typeof listQuery.data?.unreadTotal === 'number'
@@ -299,20 +364,87 @@ export default function NotificationsPage() {
         </div>
       </div>
 
+      {selectedIds.length > 0 ? (
+        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2 flex-wrap">
+          <div className="text-sm">{selectedIds.length} selecionada(s)</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!archivedOnly ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => bulkMarkReadMutation.mutate(selectedIds)}
+                  disabled={bulkBusy}
+                >
+                  Marcar lidas
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => bulkMarkUnreadMutation.mutate(selectedIds)}
+                  disabled={bulkBusy}
+                >
+                  Marcar nao lidas
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => bulkArchiveMutation.mutate(selectedIds)}
+                  disabled={bulkBusy}
+                >
+                  Arquivar
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => bulkUnarchiveMutation.mutate(selectedIds)}
+                disabled={bulkBusy}
+              >
+                Restaurar
+              </Button>
+            )}
+            <Button type="button" variant="ghost" onClick={() => setSelectedIds([])} disabled={bulkBusy}>
+              Limpar selecao
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <CardTitle>{archivedOnly ? 'Arquivadas' : 'Recentes'}</CardTitle>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Input
-              value={q}
-              onChange={(e) => {
-                setPage(1);
-                setQ(e.target.value);
-              }}
-              placeholder="Buscar..."
-              className="h-9 w-[220px]"
-            />
+            <div className="flex items-center gap-2 flex-wrap">
+              {notifications.length > 0 ? (
+                <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={allOnPageSelected}
+                    onChange={() => {
+                      if (allOnPageSelected) {
+                        setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+                      } else {
+                        setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+                      }
+                    }}
+                    aria-label="Selecionar pagina"
+                  />
+                  Selecionar pagina
+                </label>
+              ) : null}
+              <Input
+                value={q}
+                onChange={(e) => {
+                  setPage(1);
+                  setQ(e.target.value);
+                }}
+                placeholder="Buscar..."
+                className="h-9 w-[220px]"
+              />
             <Select
               value={typeFilter}
               onValueChange={(v) => {
@@ -332,7 +464,7 @@ export default function NotificationsPage() {
               </SelectContent>
             </Select>
 
-            {hasAnyFilter ? (
+              {hasAnyFilter ? (
               <Button
                 type="button"
                 variant="outline"
@@ -350,7 +482,7 @@ export default function NotificationsPage() {
                 Limpar
               </Button>
             ) : null}
-          </div>
+            </div>
         </div>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -382,20 +514,39 @@ export default function NotificationsPage() {
                 }}
                 className={`block rounded-lg border p-3 hover:bg-muted/40 transition-colors ${
                   !n.read ? 'bg-muted/20' : ''
+                } ${selectedSet.has(n.id) ? 'ring-1 ring-primary/20' : ''
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm truncate">{n.title}</p>
-                      <span className="shrink-0 rounded-full border bg-muted/30 px-2 py-0.5 text-[10px] text-muted-foreground">
-                        {typeLabelByValue.get(String(n.type)) || String(n.type)}
-                      </span>
+                  <div className="flex items-start gap-3 min-w-0">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={selectedSet.has(n.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(n.id)) next.delete(n.id);
+                          else next.add(n.id);
+                          return Array.from(next);
+                        });
+                      }}
+                      aria-label="Selecionar notificacao"
+                    />
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{n.title}</p>
+                        <span className="shrink-0 rounded-full border bg-muted/30 px-2 py-0.5 text-[10px] text-muted-foreground">
+                          {typeLabelByValue.get(String(n.type)) || String(n.type)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true, locale: ptBR })}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true, locale: ptBR })}
-                    </p>
                   </div>
                   {archivedOnly ? (
                     <Button

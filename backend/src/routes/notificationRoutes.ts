@@ -4,6 +4,8 @@ import {
   listNotifications,
   markNotificationRead,
   markNotificationUnread,
+  markNotificationsRead,
+  markNotificationsUnread,
   markAllRead,
   archiveNotifications,
   unarchiveNotifications,
@@ -170,6 +172,62 @@ router.post('/:id/read', markNotificationRead);
  *         description: OK
  */
 router.post('/:id/unread', markNotificationUnread);
+
+/**
+ * @swagger
+ * /notifications/read:
+ *   post:
+ *     summary: Marcar notificacoes como lidas (bulk)
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 500
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.post('/read', markNotificationsRead);
+
+/**
+ * @swagger
+ * /notifications/unread:
+ *   post:
+ *     summary: Marcar notificacoes como nao lidas (bulk)
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 500
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.post('/unread', markNotificationsUnread);
 
 /**
  * @swagger

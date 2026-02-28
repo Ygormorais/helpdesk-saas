@@ -179,6 +179,42 @@ export const markNotificationUnread = async (req: AuthRequest, res: Response): P
   res.json({ success: true });
 };
 
+export const markNotificationsRead = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const parsed = idsBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
+    return;
+  }
+
+  const { ids } = parsed.data;
+
+  const result = await Notification.updateMany(
+    { _id: { $in: ids }, tenant: user.tenant._id },
+    { $addToSet: { readBy: user._id } }
+  );
+
+  res.json({ success: true, modifiedCount: result.modifiedCount || 0 });
+};
+
+export const markNotificationsUnread = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const parsed = idsBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
+    return;
+  }
+
+  const { ids } = parsed.data;
+
+  const result = await Notification.updateMany(
+    { _id: { $in: ids }, tenant: user.tenant._id },
+    { $pull: { readBy: user._id } }
+  );
+
+  res.json({ success: true, modifiedCount: result.modifiedCount || 0 });
+};
+
 export const markAllRead = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
 
