@@ -174,26 +174,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (notifications.length === 0) return;
 
     setNotifications([]);
-    notificationsApi.clearMine().catch(() => undefined);
+    notificationsApi
+      .clearMine()
+      .then((res) => {
+        const archivedIds = Array.isArray(res.data?.archivedIds) ? res.data.archivedIds : [];
+        const truncated = !!res.data?.truncated;
 
-    toast({
-      title: 'Notificacoes arquivadas',
-      description: 'Voce pode desfazer agora.',
-      duration: 6000,
-      action: (
-        <ToastAction
-          altText="Desfazer"
-          onClick={() => {
-            notificationsApi
-              .unarchiveAll()
-              .then(() => reloadNotifications())
-              .catch(() => undefined);
-          }}
-        >
-          Desfazer
-        </ToastAction>
-      ),
-    });
+        toast({
+          title: 'Notificacoes arquivadas',
+          description: 'Voce pode desfazer agora.',
+          duration: 6000,
+          action: (
+            <ToastAction
+              altText="Desfazer"
+              onClick={() => {
+                const p = truncated || archivedIds.length === 0
+                  ? notificationsApi.unarchiveAll()
+                  : notificationsApi.unarchive(archivedIds);
+
+                p.then(() => reloadNotifications()).catch(() => undefined);
+              }}
+            >
+              Desfazer
+            </ToastAction>
+          ),
+        });
+      })
+      .catch(() => undefined);
   }, [notifications.length, reloadNotifications, toast]);
 
   return (

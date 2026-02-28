@@ -40,10 +40,14 @@ export default function NotificationsPage() {
 
   const clearMutation = useMutation({
     mutationFn: async () => {
-      await notificationsApi.clearMine();
+      const res = await notificationsApi.clearMine();
+      return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+
+      const archivedIds = Array.isArray(data?.archivedIds) ? data.archivedIds : [];
+      const truncated = !!data?.truncated;
       toast({
         title: 'Notificacoes arquivadas',
         description: 'Voce pode desfazer agora.',
@@ -52,9 +56,11 @@ export default function NotificationsPage() {
           <ToastAction
             altText="Desfazer"
             onClick={() => {
-              notificationsApi
-                .unarchiveAll()
-                .then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+              const p = truncated || archivedIds.length === 0
+                ? notificationsApi.unarchiveAll()
+                : notificationsApi.unarchive(archivedIds);
+
+              p.then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
                 .catch(() => undefined);
             }}
           >

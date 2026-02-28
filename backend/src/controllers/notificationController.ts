@@ -157,10 +157,26 @@ export const clearMyNotifications = async (req: AuthRequest, res: Response): Pro
   const user = req.user!;
 
   // Clearing hides notifications only for the current user (per-user archive).
-  await Notification.updateMany(
-    { tenant: user.tenant._id, archivedBy: { $ne: user._id } },
+  const q = { tenant: user.tenant._id, archivedBy: { $ne: user._id } };
+
+  // Return up to 500 ids so the client can offer a scoped undo.
+  const ids = await Notification.find(q)
+    .sort({ createdAt: -1 })
+    .limit(501)
+    .select('_id');
+
+  const truncated = ids.length > 500;
+  const archivedIds = (truncated ? ids.slice(0, 500) : ids).map((d) => d._id);
+
+  const result = await Notification.updateMany(
+    q,
     { $addToSet: { archivedBy: user._id, readBy: user._id } }
   );
 
-  res.json({ success: true });
+  res.json({
+    success: true,
+    modifiedCount: result.modifiedCount || 0,
+    archivedIds,
+    truncated,
+  });
 };

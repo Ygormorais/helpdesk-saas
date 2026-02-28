@@ -165,7 +165,7 @@ router.post('/read-all', markAllRead);
  *     description: Arquiva as notificacoes apenas para o usuario atual (nao remove globalmente).
  *     responses:
  *       200:
- *         description: OK
+ *         description: OK (retorna ids arquivados para desfazer)
  */
 router.delete('/', clearMyNotifications);
 
