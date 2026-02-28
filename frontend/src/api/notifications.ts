@@ -18,7 +18,10 @@ export const notificationsApi = {
     api.get<{ notifications: NotificationDto[]; pagination: any; unreadTotal?: number }>('/notifications', { params }),
   markRead: (id: string) => api.post(`/notifications/${id}/read`),
   markAllRead: () => api.post('/notifications/read-all'),
-  clearMine: () => api.delete('/notifications'),
+  clearMine: () =>
+    api.delete<{ success: boolean; modifiedCount?: number; archivedIds?: string[]; truncated?: boolean }>(
+      '/notifications'
+    ),
   archive: (ids: string[]) => api.post('/notifications/archive', { ids }),
   unarchive: (ids: string[]) => api.post('/notifications/unarchive', { ids }),
   unarchiveAll: () => api.post('/notifications/unarchive-all'),
