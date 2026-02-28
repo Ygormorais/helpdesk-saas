@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bell, Check, Trash2, RefreshCw, Archive, X } from 'lucide-react';
+import { Bell, Check, Trash2, RefreshCw, Archive, X, CheckCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
@@ -80,6 +80,14 @@ export default function NotificationsPage() {
     ],
     []
   );
+
+  const typeLabelByValue = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of typeOptions) {
+      m.set(o.value, o.label);
+    }
+    return m;
+  }, [typeOptions]);
 
   const effectiveTypeOptions = useMemo(() => {
     if (typeFilter === 'all') return typeOptions;
@@ -369,7 +377,12 @@ export default function NotificationsPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{n.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm truncate">{n.title}</p>
+                      <span className="shrink-0 rounded-full border bg-muted/30 px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {typeLabelByValue.get(String(n.type)) || String(n.type)}
+                      </span>
+                    </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true, locale: ptBR })}
@@ -390,6 +403,23 @@ export default function NotificationsPage() {
                     </Button>
                   ) : (
                     <div className="flex items-center gap-2">
+                      {!n.read ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            markOneMutation.mutate(n.id);
+                          }}
+                          title="Marcar como lida"
+                          aria-label="Marcar como lida"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+
                       <Button
                         type="button"
                         variant="ghost"
@@ -404,8 +434,6 @@ export default function NotificationsPage() {
                       >
                         <Archive className="h-4 w-4" />
                       </Button>
-
-                      {!n.read ? <span className="mt-1 h-2 w-2 rounded-full bg-primary" /> : null}
                     </div>
                   )}
                 </div>
