@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Bell, Check, Trash2, RefreshCw, Archive } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { notificationsApi, type NotificationDto } from '@/api/notifications';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -18,12 +20,40 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [archivedOnly, setArchivedOnly] = useState(false);
+  const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const limit = 50;
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  const typeOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos os tipos' },
+      { value: 'TICKET_CREATED', label: 'Ticket criado' },
+      { value: 'TICKET_UPDATED', label: 'Ticket atualizado' },
+      { value: 'TICKET_ASSIGNED', label: 'Ticket atribuido' },
+      { value: 'TICKET_RESOLVED', label: 'Ticket resolvido' },
+      { value: 'COMMENT_CREATED', label: 'Novo comentario' },
+      { value: 'CHAT_MESSAGE', label: 'Mensagem no chat' },
+    ],
+    []
+  );
+
   const listQuery = useQuery({
-    queryKey: ['notifications', { page, limit, unreadOnly, archivedOnly }],
+    queryKey: ['notifications', { page, limit, unreadOnly, archivedOnly, q: debouncedQ, typeFilter }],
     queryFn: async () => {
-      const res = await notificationsApi.list({ page, limit, unreadOnly: archivedOnly ? false : unreadOnly, archivedOnly });
+      const res = await notificationsApi.list({
+        page,
+        limit,
+        unreadOnly: archivedOnly ? false : unreadOnly,
+        archivedOnly,
+        q: debouncedQ || undefined,
+        type: typeFilter === 'all' ? undefined : typeFilter,
+      });
       return res.data;
     },
   });
@@ -206,7 +236,38 @@ export default function NotificationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{archivedOnly ? 'Arquivadas' : 'Recentes'}</CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle>{archivedOnly ? 'Arquivadas' : 'Recentes'}</CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Input
+                value={q}
+                onChange={(e) => {
+                  setPage(1);
+                  setQ(e.target.value);
+                }}
+                placeholder="Buscar..."
+                className="h-9 w-[220px]"
+              />
+              <Select
+                value={typeFilter}
+                onValueChange={(v) => {
+                  setPage(1);
+                  setTypeFilter(v);
+                }}
+              >
+                <SelectTrigger className="h-9 w-[200px]" aria-label="Filtrar por tipo">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {listQuery.isLoading && (

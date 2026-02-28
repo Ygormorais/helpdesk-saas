@@ -14,7 +14,14 @@ export interface NotificationDto {
 }
 
 export const notificationsApi = {
-  list: (params?: { page?: number; limit?: number; unreadOnly?: boolean; archivedOnly?: boolean }) =>
+  list: (params?: {
+    page?: number;
+    limit?: number;
+    unreadOnly?: boolean;
+    archivedOnly?: boolean;
+    q?: string;
+    type?: string;
+  }) =>
     api.get<{ notifications: NotificationDto[]; pagination: any; unreadTotal?: number }>('/notifications', { params }),
   markRead: (id: string) => api.post(`/notifications/${id}/read`),
   markAllRead: () => api.post('/notifications/read-all'),

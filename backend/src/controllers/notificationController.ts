@@ -6,6 +6,8 @@ import { z } from 'zod';
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  q: z.string().trim().min(1).max(200).optional(),
+  type: z.string().trim().min(1).max(100).optional(),
   unreadOnly: z.preprocess((v) => {
     if (v === 'true' || v === '1' || v === true) return true;
     if (v === 'false' || v === '0' || v === false) return false;
@@ -24,7 +26,7 @@ const idsBodySchema = z.object({
 
 export const listNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
-  const { page, limit, unreadOnly, archivedOnly } = listQuerySchema.parse(req.query);
+  const { page, limit, q, type, unreadOnly, archivedOnly } = listQuerySchema.parse(req.query);
 
   const query: any = {
     tenant: user.tenant._id,
@@ -38,6 +40,24 @@ export const listNotifications = async (req: AuthRequest, res: Response): Promis
 
   if (unreadOnly) {
     query.readBy = { $ne: user._id };
+  }
+
+  if (q) {
+    query.$or = [
+      { title: { $regex: q, $options: 'i' } },
+      { message: { $regex: q, $options: 'i' } },
+    ];
+  }
+
+  if (type) {
+    const parts = String(type)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+
+    if (parts.length === 1) query.type = parts[0];
+    else if (parts.length > 1) query.type = { $in: parts };
   }
 
   const skip = (page - 1) * limit;
