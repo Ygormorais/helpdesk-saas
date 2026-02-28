@@ -110,6 +110,10 @@ export default function TicketsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
+  const [bulkResultOpen, setBulkResultOpen] = useState(false);
+  const [bulkFailures, setBulkFailures] = useState<Array<{ id: string; message: string }>>([]);
+  const lastBulkUpdatesRef = useRef<{ status?: string; priority?: string; assignedTo?: string | null } | null>(null);
+
   const [savedFilters, setSavedFilters] = useState<SavedTicketFilter[]>([]);
   const [saveFilterOpen, setSaveFilterOpen] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState('');
@@ -381,21 +385,35 @@ export default function TicketsPage() {
     );
   };
 
-  const bulkUpdate = async (updates: { status?: string; priority?: string; assignedTo?: string | null }) => {
-    if (selectedIds.length === 0) return;
+  const bulkUpdate = async (
+    updates: { status?: string; priority?: string; assignedTo?: string | null },
+    idsOverride?: string[]
+  ) => {
+    const ids = idsOverride || selectedIds;
+    if (ids.length === 0) return;
+
     setIsBulkUpdating(true);
+    lastBulkUpdatesRef.current = updates;
+
     try {
-      const res = await ticketsApi.bulkUpdate({ ids: selectedIds, updates });
+      const res = await ticketsApi.bulkUpdate({ ids, updates });
       const successCount = Number(res.data?.successCount || 0);
-      const failureCount = Number(res.data?.failureCount || 0);
+      const failuresRaw = Array.isArray(res.data?.failures) ? (res.data.failures as any[]) : [];
+
+      const normalizedFailures = failuresRaw
+        .map((f) => ({ id: String(f?.id || ''), message: String(f?.message || 'Falha ao atualizar') }))
+        .filter((f) => !!f.id);
 
       toast({
-        title: failureCount ? 'Ação concluída com falhas' : 'Ação concluída',
-        description: failureCount
-          ? `${successCount} atualizado(s), ${failureCount} falhou(aram).`
+        title: normalizedFailures.length ? 'Ação concluída com falhas' : 'Ação concluída',
+        description: normalizedFailures.length
+          ? `${successCount} atualizado(s), ${normalizedFailures.length} falhou(aram).`
           : `${successCount} ticket(s) atualizado(s).`,
-        variant: failureCount ? 'destructive' : 'default',
+        variant: normalizedFailures.length ? 'destructive' : 'default',
       });
+
+      setBulkFailures(normalizedFailures);
+      setBulkResultOpen(normalizedFailures.length > 0);
 
       setSelectedIds([]);
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
@@ -658,6 +676,9 @@ export default function TicketsPage() {
                   </Button>
                 </>
               ) : null}
+              {isBulkUpdating ? (
+                <span className="text-xs text-muted-foreground">Atualizando...</span>
+              ) : null}
               <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
                 Limpar seleção
               </Button>
@@ -863,6 +884,64 @@ export default function TicketsPage() {
               }}
             >
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkResultOpen} onOpenChange={setBulkResultOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Falhas no bulk update</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {bulkFailures.length} ticket(s) nao puderam ser atualizados.
+            </p>
+            <div className="max-h-[260px] overflow-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-background">
+                  <tr className="border-b">
+                    <th className="px-3 py-2 text-left font-medium">ID</th>
+                    <th className="px-3 py-2 text-left font-medium">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkFailures.slice(0, 200).map((f) => (
+                    <tr key={f.id} className="border-b last:border-0">
+                      <td className="px-3 py-2 font-mono text-xs">{f.id}</td>
+                      <td className="px-3 py-2">{f.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const ids = bulkFailures.map((f) => f.id);
+                setSelectedIds(ids);
+                setBulkResultOpen(false);
+              }}
+            >
+              Selecionar falhas
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const ids = bulkFailures.map((f) => f.id);
+                const updates = lastBulkUpdatesRef.current;
+                setBulkResultOpen(false);
+                if (updates) void bulkUpdate(updates, ids);
+                else setSelectedIds(ids);
+              }}
+            >
+              Tentar de novo
             </Button>
           </DialogFooter>
         </DialogContent>
