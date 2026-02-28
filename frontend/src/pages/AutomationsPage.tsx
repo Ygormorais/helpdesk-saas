@@ -44,7 +44,7 @@ export default function AutomationsPage() {
   const forbidden = (rulesQuery.error as any)?.response?.status === 403;
 
   const categoriesQuery = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', 'v2'],
     queryFn: async () => (await categoriesApi.list()).data.categories,
     select: (data) => {
       const anyData: any = data as any;

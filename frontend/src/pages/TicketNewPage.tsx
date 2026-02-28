@@ -42,7 +42,7 @@ export default function TicketNewPage() {
     isError: isCategoriesError,
     refetch: refetchCategories,
   } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', 'v2'],
     queryFn: async () => {
       const res = await categoriesApi.list();
       return res.data.categories as TicketCategory[];

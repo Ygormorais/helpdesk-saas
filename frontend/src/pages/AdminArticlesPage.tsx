@@ -53,7 +53,7 @@ export default function AdminArticlesPage() {
   const isEditing = !!editingId;
 
   const categoriesQuery = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', 'v2'],
     queryFn: async () => {
       const res = await categoriesApi.list();
       return res.data.categories as ArticleCategory[];
