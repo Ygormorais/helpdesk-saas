@@ -120,7 +120,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     });
 
     newSocket.on('notification:created', (n: any) => {
-      showNotification({
+      const myId = user?.id ? String(user.id) : '';
+      const createdById = n.createdBy ? String(n.createdBy) : '';
+      const isRead = !!myId && !!createdById && myId === createdById;
+
+      const incoming: Notification = {
         id: String(n.id),
         type: String(n.type),
         title: String(n.title),
@@ -129,8 +133,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         chatId: n.chatId ? String(n.chatId) : undefined,
         userId: n.createdBy ? String(n.createdBy) : undefined,
         createdAt: new Date(n.createdAt),
-        read: false,
-      });
+        read: isRead,
+      };
+
+      if (isRead) {
+        setNotifications((prev) => [incoming, ...prev].slice(0, 50));
+        return;
+      }
+
+      showNotification(incoming);
     });
 
     socketRef.current = newSocket;
@@ -155,7 +166,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const clearNotifications = useCallback(() => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications([]);
     notificationsApi.clearMine().catch(() => undefined);
   }, []);
 

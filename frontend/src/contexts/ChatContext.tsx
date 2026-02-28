@@ -140,6 +140,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           setMessages((prev) => [...prev, message]);
         }
         refreshChats();
+
+        const myId = user?.id;
+        if (myId && message.chat === currentChatIdRef.current && message.sender?._id !== myId) {
+          newSocket.emit('mark-read', { chatId: message.chat });
+        }
       });
 
       newSocket.on('user-typing', (data: { userId: string; chatId: string }) => {
@@ -161,10 +166,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             }))
           );
         }
+
+        if (userId === user?.id) {
+          refreshChats();
+        }
       });
 
-      newSocket.on('notification', (data: { type: string; chatId: string }) => {
-        if (data.type === 'new-message') {
+      newSocket.on('chat:message', (data: { chatId: string }) => {
+        if (data?.chatId) {
           refreshChats();
         }
       });
@@ -179,7 +188,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         newSocket.disconnect();
       };
     }
-  }, [isAuthenticated, token, user?.tenant?.id, refreshChats, fetchMessages]);
+  }, [isAuthenticated, token, user?.tenant?.id, user?.id, refreshChats, fetchMessages]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -195,6 +204,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       prevChatIdRef.current = currentChat._id;
       socket.emit('join-chat', currentChat._id);
       fetchMessages(currentChat._id);
+      socket.emit('mark-read', { chatId: currentChat._id });
       return;
     }
 

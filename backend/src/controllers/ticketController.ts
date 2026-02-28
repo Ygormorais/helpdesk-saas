@@ -55,7 +55,15 @@ const createTicketSchema = z.object({
 const updateTicketSchema = z.object({
   status: z.enum(['open', 'in_progress', 'waiting_customer', 'resolved', 'closed']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
-  assignedTo: z.string().optional(),
+  assignedTo: z.union([z.string().min(1), z.null()]).optional(),
+});
+
+const bulkUpdateTicketsSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(200),
+  updates: updateTicketSchema.refine(
+    (v) => typeof v.status !== 'undefined' || typeof v.priority !== 'undefined' || typeof v.assignedTo !== 'undefined',
+    { message: 'updates must include at least one field' }
+  ),
 });
 
 const addCommentSchema = z.object({
@@ -281,8 +289,28 @@ export const updateTicket = async (
   const { id } = req.params;
   const updates = updateTicketSchema.parse(req.body);
 
+  const ticket = await updateTicketInternal({
+    user,
+    ticketId: id,
+    updates,
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+  });
+
+  res.json({ message: 'Ticket atualizado com sucesso', ticket });
+};
+
+async function updateTicketInternal(args: {
+  user: any;
+  ticketId: string;
+  updates: z.infer<typeof updateTicketSchema>;
+  ip?: string;
+  userAgent?: string;
+}) {
+  const { user, ticketId, updates, ip, userAgent } = args;
+
   const ticket = await Ticket.findOne({
-    _id: id,
+    _id: ticketId,
     tenant: user.tenant._id,
   });
 
@@ -296,26 +324,40 @@ export const updateTicket = async (
   const oldStatus = ticket.status;
   const oldAssignedTo = ticket.assignedTo ? ticket.assignedTo.toString() : null;
 
-  let newAssignee: any = null;
-  if (updates.assignedTo && updates.assignedTo !== oldAssignedTo) {
-    newAssignee = await User.findOne({ _id: updates.assignedTo, tenant: user.tenant._id }).select('name role');
-    if (!newAssignee) {
-      throw new AppError('Usuario atribuido nao encontrado', 400);
-    }
-    if (!['admin', 'manager', 'agent'].includes(newAssignee.role)) {
-      throw new AppError('Assigned user must be staff', 400);
-    }
+  const requestedAssignee = typeof updates.assignedTo === 'undefined' ? undefined : updates.assignedTo;
 
-    // GLPI-like: taking ownership moves ticket to in_progress
-    if (!updates.status && ticket.status === TicketStatus.OPEN) {
-      (updates as any).status = TicketStatus.IN_PROGRESS;
+  let newAssignee: any = null;
+  if (requestedAssignee !== undefined && requestedAssignee !== oldAssignedTo) {
+    if (requestedAssignee !== null) {
+      newAssignee = await User.findOne({ _id: requestedAssignee, tenant: user.tenant._id }).select('name role');
+      if (!newAssignee) {
+        throw new AppError('Usuario atribuido nao encontrado', 400);
+      }
+      if (!['admin', 'manager', 'agent'].includes(newAssignee.role)) {
+        throw new AppError('Assigned user must be staff', 400);
+      }
+
+      // GLPI-like: taking ownership moves ticket to in_progress
+      if (!updates.status && ticket.status === TicketStatus.OPEN) {
+        (updates as any).status = TicketStatus.IN_PROGRESS;
+      }
     }
   }
-  
-  Object.assign(ticket, updates);
+
+  const updatesToApply: any = { ...updates };
+  if (requestedAssignee === null) {
+    delete updatesToApply.assignedTo;
+    ticket.assignedTo = undefined;
+  }
+
+  Object.assign(ticket, updatesToApply);
+
+  if (typeof requestedAssignee === 'string' && requestedAssignee !== oldAssignedTo) {
+    ticket.assignedTo = requestedAssignee as any;
+  }
 
   // OLA: initialize on first assignment ("owned")
-  if (updates.assignedTo && updates.assignedTo !== oldAssignedTo) {
+  if (typeof requestedAssignee === 'string' && requestedAssignee !== oldAssignedTo) {
     if (!ticket.ola) ticket.ola = { pausedMs: 0 };
 
     if (!ticket.ola.ownedAt) {
@@ -388,7 +430,7 @@ export const updateTicket = async (
   await notificationService.notifyTicketUpdated(ticket, user, oldStatus);
 
   // Se foi atribuído a alguém, enviar notificação específica
-  if (updates.assignedTo && updates.assignedTo !== user._id.toString()) {
+  if (typeof requestedAssignee === 'string' && requestedAssignee !== user._id.toString()) {
     const assignedUserName = newAssignee?.name;
     if (assignedUserName) {
       await notificationService.notifyTicketAssigned(
@@ -396,7 +438,7 @@ export const updateTicket = async (
         ticket._id.toString(),
         ticket.title,
         ticket.ticketNumber,
-        String(updates.assignedTo),
+        String(requestedAssignee),
         assignedUserName,
         user.name
       );
@@ -420,7 +462,7 @@ export const updateTicket = async (
       newAssignedTo: ticket.assignedTo ? ticket.assignedTo.toString() : null,
       updates,
     },
-    { user, ip: req.ip, userAgent: req.get('user-agent') }
+    { user, ip, userAgent }
   );
 
   if (oldAssignedTo !== (ticket.assignedTo ? ticket.assignedTo.toString() : null) && ticket.assignedTo) {
@@ -433,7 +475,7 @@ export const updateTicket = async (
         oldAssignedTo,
         newAssignedTo: ticket.assignedTo.toString(),
       },
-      { user, ip: req.ip, userAgent: req.get('user-agent') }
+      { user, ip, userAgent }
     );
   }
 
@@ -447,7 +489,7 @@ export const updateTicket = async (
         oldStatus,
         newStatus: ticket.status,
       },
-      { user, ip: req.ip, userAgent: req.get('user-agent') }
+      { user, ip, userAgent }
     );
   }
 
@@ -460,11 +502,50 @@ export const updateTicket = async (
         ticketNumber: ticket.ticketNumber,
         resolvedById: user._id.toString(),
       },
-      { user, ip: req.ip, userAgent: req.get('user-agent') }
+      { user, ip, userAgent }
     );
   }
 
-  res.json({ message: 'Ticket atualizado com sucesso', ticket });
+  return ticket;
+}
+
+export const bulkUpdateTickets = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const parsed = bulkUpdateTicketsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Erro de validacao', errors: parsed.error.errors });
+    return;
+  }
+
+  const { ids, updates } = parsed.data;
+
+  const failures: Array<{ id: string; message: string }> = [];
+  let ok = 0;
+
+  // Sequential to preserve side-effects (notifications, SLA/OLA, audit)
+  for (const id of ids) {
+    try {
+      await updateTicketInternal({
+        user,
+        ticketId: id,
+        updates,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      ok += 1;
+    } catch (err: any) {
+      failures.push({
+        id,
+        message: err?.message || 'Falha ao atualizar',
+      });
+    }
+  }
+
+  res.json({
+    successCount: ok,
+    failureCount: failures.length,
+    failures,
+  });
 };
 
 export const reopenTicket = async (req: AuthRequest, res: Response): Promise<void> => {

@@ -5,6 +5,8 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -15,6 +17,7 @@ import {
 import { ticketsApi } from '@/api/tickets';
 import { categoriesApi } from '@/api/categories';
 import { chatApi } from '@/api/chat';
+import { usersApi, type UserListItem } from '@/api/users';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -70,6 +73,23 @@ export default function TicketsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  type SavedTicketFilter = {
+    id: string;
+    name: string;
+    params: {
+      q: string;
+      status: string;
+      priority: string;
+      category: string;
+      mine: boolean;
+    };
+    createdAt: number;
+  };
+
+  const savedFiltersKey = user?.tenant?.id && user?.id
+    ? `tickets:savedFilters:${user.tenant.id}:${user.id}`
+    : null;
+
   const initialSearch = searchParams.get('q') || '';
   const initialStatus = searchParams.get('status') || 'all';
   const initialPriority = searchParams.get('priority') || 'all';
@@ -90,7 +110,44 @@ export default function TicketsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
+  const [savedFilters, setSavedFilters] = useState<SavedTicketFilter[]>([]);
+  const [saveFilterOpen, setSaveFilterOpen] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState('');
+  const [selectedSavedFilterId, setSelectedSavedFilterId] = useState<string>('');
+
   const searchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!savedFiltersKey) {
+      setSavedFilters([]);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(savedFiltersKey);
+      if (!raw) {
+        setSavedFilters([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setSavedFilters([]);
+        return;
+      }
+      setSavedFilters(parsed as SavedTicketFilter[]);
+    } catch {
+      setSavedFilters([]);
+    }
+  }, [savedFiltersKey]);
+
+  const persistSavedFilters = (next: SavedTicketFilter[]) => {
+    setSavedFilters(next);
+    if (!savedFiltersKey) return;
+    try {
+      localStorage.setItem(savedFiltersKey, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
 
   const clearFilters = () => {
     setSearch('');
@@ -186,10 +243,24 @@ export default function TicketsPage() {
   }, [debouncedSearch, mineOnly, page, priorityFilter, categoryFilter, setSearchParams, statusFilter]);
 
   const categoriesQuery = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', 'v2'],
     queryFn: async () => {
       const res = await categoriesApi.list();
       return res.data.categories as Array<any>;
+    },
+    select: (data) => {
+      const anyData: any = data as any;
+      return Array.isArray(anyData) ? anyData : (anyData?.categories || []);
+    },
+    staleTime: 60_000,
+  });
+
+  const staffQuery = useQuery({
+    queryKey: ['users', 'staff'],
+    enabled: user?.role !== 'client',
+    queryFn: async () => {
+      const res = await usersApi.listStaff({ excludeSelf: false });
+      return res.data.users as UserListItem[];
     },
     staleTime: 60_000,
   });
@@ -310,20 +381,20 @@ export default function TicketsPage() {
     );
   };
 
-  const bulkUpdateStatus = async (status: string) => {
+  const bulkUpdate = async (updates: { status?: string; priority?: string; assignedTo?: string | null }) => {
     if (selectedIds.length === 0) return;
     setIsBulkUpdating(true);
     try {
-      const results = await Promise.allSettled(
-        selectedIds.map((id) => ticketsApi.update(id, { status }))
-      );
+      const res = await ticketsApi.bulkUpdate({ ids: selectedIds, updates });
+      const successCount = Number(res.data?.successCount || 0);
+      const failureCount = Number(res.data?.failureCount || 0);
 
-      const ok = results.filter((r) => r.status === 'fulfilled').length;
-      const failed = results.length - ok;
       toast({
-        title: failed ? 'Ação concluída com falhas' : 'Ação concluída',
-        description: failed ? `${ok} atualizado(s), ${failed} falhou(aram).` : `${ok} ticket(s) atualizado(s).`,
-        variant: failed ? 'destructive' : 'default',
+        title: failureCount ? 'Ação concluída com falhas' : 'Ação concluída',
+        description: failureCount
+          ? `${successCount} atualizado(s), ${failureCount} falhou(aram).`
+          : `${successCount} ticket(s) atualizado(s).`,
+        variant: failureCount ? 'destructive' : 'default',
       });
 
       setSelectedIds([]);
@@ -337,6 +408,10 @@ export default function TicketsPage() {
     } finally {
       setIsBulkUpdating(false);
     }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   return (
@@ -454,6 +529,62 @@ export default function TicketsPage() {
               </Button>
             ) : null}
           </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Select
+              value={selectedSavedFilterId}
+              onValueChange={(id) => {
+                setSelectedSavedFilterId(id);
+                const f = savedFilters.find((x) => x.id === id);
+                if (!f) return;
+                setSearch(f.params.q);
+                setDebouncedSearch(f.params.q);
+                setStatusFilter(f.params.status || 'all');
+                setPriorityFilter(f.params.priority || 'all');
+                setCategoryFilter(f.params.category || 'all');
+                setMineOnly(!!f.params.mine);
+                setPage(1);
+              }}
+              disabled={savedFilters.length === 0}
+            >
+              <SelectTrigger className="w-[240px]" aria-label="Filtros salvos">
+                <SelectValue placeholder="Filtros salvos" />
+              </SelectTrigger>
+              <SelectContent>
+                {savedFilters.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setSaveFilterName('');
+                setSaveFilterOpen(true);
+              }}
+            >
+              Salvar filtro
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={!selectedSavedFilterId}
+              onClick={() => {
+                if (!selectedSavedFilterId) return;
+                const next = savedFilters.filter((f) => f.id !== selectedSavedFilterId);
+                persistSavedFilters(next);
+                setSelectedSavedFilterId('');
+              }}
+            >
+              Remover salvo
+            </Button>
+          </div>
+
           {isFetching && !isLoading ? (
             <div className="mt-3 text-xs text-muted-foreground">Atualizando resultados...</div>
           ) : null}
@@ -470,11 +601,48 @@ export default function TicketsPage() {
               </Button>
               {user?.role !== 'client' ? (
                 <>
+                  <Select
+                    onValueChange={(v) => {
+                      void bulkUpdate({ priority: v });
+                    }}
+                    disabled={isBulkUpdating}
+                  >
+                    <SelectTrigger className="h-8 w-[170px]" aria-label="Alterar prioridade em massa">
+                      <SelectValue placeholder="Prioridade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="low">Baixa</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    onValueChange={(v) => {
+                      if (v === '__unassign__') void bulkUpdate({ assignedTo: null });
+                      else void bulkUpdate({ assignedTo: v });
+                    }}
+                    disabled={isBulkUpdating || (staffQuery.isLoading || staffQuery.isError)}
+                  >
+                    <SelectTrigger className="h-8 w-[220px]" aria-label="Atribuir agente em massa">
+                      <SelectValue placeholder="Atribuir" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__unassign__">Desatribuir</SelectItem>
+                      {(staffQuery.data || []).map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => bulkUpdateStatus('resolved')}
+                    onClick={() => bulkUpdate({ status: 'resolved' })}
                     disabled={isBulkUpdating}
                   >
                     Marcar como resolvido
@@ -483,7 +651,7 @@ export default function TicketsPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => bulkUpdateStatus('closed')}
+                    onClick={() => bulkUpdate({ status: 'closed' })}
                     disabled={isBulkUpdating}
                   >
                     Fechar
@@ -504,6 +672,7 @@ export default function TicketsPage() {
                   <input
                     type="checkbox"
                     checked={allSelectedOnPage}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       if (e.target.checked) setSelectedIds(tickets.map((t) => String(t._id)));
                       else setSelectedIds([]);
@@ -560,14 +729,22 @@ export default function TicketsPage() {
                 </tr>
               )}
               {!isLoading && !isError && tickets.map((ticket) => (
-                <tr key={ticket._id} className="border-b last:border-0 hover:bg-muted/50">
+                <tr
+                  key={ticket._id}
+                  className="border-b last:border-0 hover:bg-muted/50"
+                  onClick={(e) => {
+                    const t = e.target as HTMLElement | null;
+                    if (t?.closest('a,button,input,select,textarea,[role="button"]')) return;
+                    toggleSelected(String(ticket._id));
+                  }}
+                >
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={selectedSet.has(String(ticket._id))}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={() => {
-                        const id = String(ticket._id);
-                        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+                        toggleSelected(String(ticket._id));
                       }}
                       aria-label={`Selecionar ticket ${ticket.ticketNumber}`}
                     />
@@ -635,6 +812,61 @@ export default function TicketsPage() {
           </div>
         </div>
       ) : null}
+
+      <Dialog open={saveFilterOpen} onOpenChange={setSaveFilterOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar filtro</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="filter-name">Nome</Label>
+            <Input
+              id="filter-name"
+              value={saveFilterName}
+              onChange={(e) => setSaveFilterName(e.target.value)}
+              placeholder="Ex: Pendentes urgentes"
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setSaveFilterOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={!saveFilterName.trim()}
+              onClick={() => {
+                const name = saveFilterName.trim();
+                const next: SavedTicketFilter = {
+                  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                  name,
+                  params: {
+                    q: debouncedSearch.trim(),
+                    status: statusFilter,
+                    priority: priorityFilter,
+                    category: categoryFilter,
+                    mine: mineOnly,
+                  },
+                  createdAt: Date.now(),
+                };
+                const merged = [next, ...savedFilters].slice(0, 30);
+                persistSavedFilters(merged);
+                setSelectedSavedFilterId(next.id);
+                setSaveFilterOpen(false);
+                toast({ title: 'Filtro salvo' });
+              }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

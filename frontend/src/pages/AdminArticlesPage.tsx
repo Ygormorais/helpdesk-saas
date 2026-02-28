@@ -30,6 +30,8 @@ import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+type ArticleCategory = { _id: string; name: string };
+
 export default function AdminArticlesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -51,10 +53,14 @@ export default function AdminArticlesPage() {
   const isEditing = !!editingId;
 
   const categoriesQuery = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', 'v2'],
     queryFn: async () => {
       const res = await categoriesApi.list();
-      return res.data.categories as Array<{ _id: string; name: string }>;
+      return res.data.categories as ArticleCategory[];
+    },
+    select: (data) => {
+      const anyData: any = data as any;
+      return (Array.isArray(anyData) ? anyData : (anyData?.categories || [])) as ArticleCategory[];
     },
   });
 

@@ -44,7 +44,7 @@ export class NotificationService {
         ticket: args.ticketId,
         chat: args.chatId,
         createdBy: args.createdById,
-        readBy: [],
+        readBy: args.createdById ? [args.createdById as any] : [],
       });
 
       this.emitToTenant(args.tenantId, 'notification:created', {

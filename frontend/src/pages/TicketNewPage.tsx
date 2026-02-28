@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -22,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
+type TicketCategory = { _id: string; name: string };
+
 const schema = z.object({
   title: z.string().min(5, 'Título deve ter no mínimo 5 caracteres'),
   description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
@@ -36,20 +37,24 @@ export default function TicketNewPage() {
   const { toast } = useToast();
 
   const {
-    data: categoriesResp,
+    data: categories,
     isLoading: isLoadingCategories,
     isError: isCategoriesError,
     refetch: refetchCategories,
   } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', 'v2'],
     queryFn: async () => {
       const res = await categoriesApi.list();
-      return res.data as { categories: Array<{ _id: string; name: string }> };
+      return res.data.categories as TicketCategory[];
+    },
+    select: (data) => {
+      const anyData: any = data as any;
+      return (Array.isArray(anyData) ? anyData : (anyData?.categories || [])) as TicketCategory[];
     },
   });
 
-  const categories = useMemo(() => categoriesResp?.categories || [], [categoriesResp]);
-  const canSubmit = categories.length > 0;
+  const safeCategories: TicketCategory[] = categories || [];
+  const canSubmit = safeCategories.length > 0;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -115,11 +120,11 @@ export default function TicketNewPage() {
             </div>
           )}
 
-          {!isLoadingCategories && !isCategoriesError && categories.length === 0 && (
-            <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground mb-4">
-              Nenhuma categoria cadastrada. Crie uma categoria para conseguir abrir tickets.
-            </div>
-          )}
+           {!isLoadingCategories && !isCategoriesError && safeCategories.length === 0 && (
+             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground mb-4">
+               Nenhuma categoria cadastrada. Crie uma categoria para conseguir abrir tickets.
+             </div>
+           )}
 
           <form
             className="space-y-4"
@@ -152,13 +157,13 @@ export default function TicketNewPage() {
                 <Select
                   value={form.watch('category')}
                   onValueChange={(v) => form.setValue('category', v, { shouldValidate: true })}
-                  disabled={isLoadingCategories || categories.length === 0}
+                  disabled={isLoadingCategories || safeCategories.length === 0}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={isLoadingCategories ? 'Carregando...' : 'Selecione'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => (
+                    {safeCategories.map((c) => (
                       <SelectItem key={c._id} value={c._id}>
                         {c.name}
                       </SelectItem>

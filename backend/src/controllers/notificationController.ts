@@ -19,6 +19,7 @@ export const listNotifications = async (req: AuthRequest, res: Response): Promis
 
   const query: any = {
     tenant: user.tenant._id,
+    archivedBy: { $ne: user._id },
   };
 
   if (unreadOnly) {
@@ -30,6 +31,7 @@ export const listNotifications = async (req: AuthRequest, res: Response): Promis
   const unreadQuery: any = {
     tenant: user.tenant._id,
     readBy: { $ne: user._id },
+    archivedBy: { $ne: user._id },
   };
 
   const [items, total, unreadTotal] = await Promise.all([
@@ -93,10 +95,10 @@ export const markAllRead = async (req: AuthRequest, res: Response): Promise<void
 export const clearMyNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
 
-  // Clearing only marks as read to avoid deleting other users' notifications.
+  // Clearing hides notifications only for the current user (per-user archive).
   await Notification.updateMany(
-    { tenant: user.tenant._id, readBy: { $ne: user._id } },
-    { $addToSet: { readBy: user._id } }
+    { tenant: user.tenant._id, archivedBy: { $ne: user._id } },
+    { $addToSet: { archivedBy: user._id, readBy: user._id } }
   );
 
   res.json({ success: true });
