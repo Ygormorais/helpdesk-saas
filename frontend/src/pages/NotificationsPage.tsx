@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Bell, Check, Trash2, RefreshCw, Archive } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -17,13 +17,51 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [page, setPage] = useState(1);
-  const [unreadOnly, setUnreadOnly] = useState(false);
-  const [archivedOnly, setArchivedOnly] = useState(false);
-  const [q, setQ] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const parseBool = (v: string | null) => v === '1' || v === 'true';
+  const parsePage = (v: string | null) => {
+    const n = Number(v || 1);
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+  };
+
+  const initialType = searchParams.get('type') || 'all';
+
+  const [page, setPage] = useState(() => parsePage(searchParams.get('page')));
+  const [unreadOnly, setUnreadOnly] = useState(() => parseBool(searchParams.get('unread')));
+  const [archivedOnly, setArchivedOnly] = useState(() => parseBool(searchParams.get('archived')));
+  const [q, setQ] = useState(() => searchParams.get('q') || '');
+  const [debouncedQ, setDebouncedQ] = useState(() => (searchParams.get('q') || '').trim());
+  const [typeFilter, setTypeFilter] = useState(() => initialType);
   const limit = 50;
+
+  useEffect(() => {
+    const nextPage = parsePage(searchParams.get('page'));
+    const nextArchived = parseBool(searchParams.get('archived'));
+    const nextUnread = nextArchived ? false : parseBool(searchParams.get('unread'));
+    const nextQ = searchParams.get('q') || '';
+    const nextType = searchParams.get('type') || 'all';
+
+    if (page !== nextPage) setPage(nextPage);
+    if (archivedOnly !== nextArchived) setArchivedOnly(nextArchived);
+    if (unreadOnly !== nextUnread) setUnreadOnly(nextUnread);
+    if (q !== nextQ) setQ(nextQ);
+    if (typeFilter !== nextType) setTypeFilter(nextType);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (page > 1) next.set('page', String(page));
+    if (archivedOnly) next.set('archived', '1');
+    if (!archivedOnly && unreadOnly) next.set('unread', '1');
+    const tq = q.trim();
+    if (tq) next.set('q', tq);
+    if (typeFilter && typeFilter !== 'all') next.set('type', typeFilter);
+
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [archivedOnly, page, q, searchParams, setSearchParams, typeFilter, unreadOnly]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(q.trim()), 250);
