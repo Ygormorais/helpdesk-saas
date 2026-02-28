@@ -24,6 +24,7 @@ export const notificationsApi = {
   }) =>
     api.get<{ notifications: NotificationDto[]; pagination: any; unreadTotal?: number }>('/notifications', { params }),
   markRead: (id: string) => api.post(`/notifications/${id}/read`),
+  markUnread: (id: string) => api.post(`/notifications/${id}/unread`),
   markAllRead: () => api.post('/notifications/read-all'),
   clearMine: () =>
     api.delete<{ success: boolean; modifiedCount?: number; archivedIds?: string[]; truncated?: boolean }>(

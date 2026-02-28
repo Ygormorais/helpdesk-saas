@@ -167,6 +167,18 @@ export const markNotificationRead = async (req: AuthRequest, res: Response): Pro
   res.json({ success: true });
 };
 
+export const markNotificationUnread = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+  const { id } = req.params;
+
+  await Notification.updateOne(
+    { _id: id, tenant: user.tenant._id },
+    { $pull: { readBy: user._id } }
+  );
+
+  res.json({ success: true });
+};
+
 export const markAllRead = async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user!;
 
