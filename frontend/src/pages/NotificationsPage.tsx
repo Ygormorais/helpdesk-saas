@@ -12,10 +12,12 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { reloadNotifications: reloadContextNotifications } = useNotifications();
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -121,6 +123,7 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
       toast({ title: 'Notificações marcadas como lidas' });
     },
   });
@@ -132,6 +135,7 @@ export default function NotificationsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
 
       const archivedIds = Array.isArray(data?.archivedIds) ? data.archivedIds : [];
       const truncated = !!data?.truncated;
@@ -164,6 +168,7 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
       toast({ title: 'Notificacoes restauradas' });
     },
   });
@@ -174,6 +179,7 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
     },
   });
 
@@ -183,6 +189,7 @@ export default function NotificationsPage() {
     },
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
       toast({
         title: 'Notificacao arquivada',
         duration: 6000,
@@ -209,6 +216,7 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
     },
   });
 
@@ -218,6 +226,7 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
     },
   });
 
@@ -228,6 +237,7 @@ export default function NotificationsPage() {
     onSuccess: () => {
       setSelectedIds([]);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
       toast({ title: 'Notificacoes marcadas como lidas' });
     },
   });
@@ -239,6 +249,7 @@ export default function NotificationsPage() {
     onSuccess: () => {
       setSelectedIds([]);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
       toast({ title: 'Notificacoes marcadas como nao lidas' });
     },
   });
@@ -250,6 +261,7 @@ export default function NotificationsPage() {
     onSuccess: () => {
       setSelectedIds([]);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
       toast({ title: 'Notificacoes arquivadas' });
     },
   });
@@ -261,6 +273,7 @@ export default function NotificationsPage() {
     onSuccess: () => {
       setSelectedIds([]);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      reloadContextNotifications().catch(() => undefined);
       toast({ title: 'Notificacoes restauradas' });
     },
   });

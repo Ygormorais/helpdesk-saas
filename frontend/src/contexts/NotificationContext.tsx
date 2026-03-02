@@ -25,6 +25,7 @@ interface NotificationContextType {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
+  reloadNotifications: () => Promise<void>;
   isConnected: boolean;
 }
 
@@ -35,13 +36,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const { toast } = useToast();
   const socketRef = useRef<Socket | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadTotal, setUnreadTotal] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
 
   const socketUrl = getSocketUrl();
   // api is handled via axios instance
 
-  // Calcular contagem de não lidas
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Prefer server-provided total (covers > 50 records)
+  const unreadCount = unreadTotal;
 
   const showNotification = useCallback((notification: Notification) => {
     setNotifications(prev => [notification, ...prev].slice(0, 50));
@@ -70,6 +72,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const reloadNotifications = useCallback(async () => {
     const res = await notificationsApi.list({ page: 1, limit: 50 });
     const list = res.data.notifications;
+
+    const nextUnreadTotal = typeof res.data?.unreadTotal === 'number'
+      ? Number(res.data.unreadTotal)
+      : list.filter((n: NotificationDto) => !n.read).length;
+
     setNotifications(
       list.map((n: NotificationDto) => ({
         id: n.id,
@@ -83,12 +90,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         read: n.read,
       }))
     );
+
+    setUnreadTotal(nextUnreadTotal);
   }, []);
 
   // Load persisted notifications
   useEffect(() => {
     if (!isAuthenticated) {
       setNotifications([]);
+      setUnreadTotal(0);
       return;
     }
 
@@ -146,6 +156,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         return;
       }
 
+      setUnreadTotal((v) => v + 1);
       showNotification(incoming);
     });
 
@@ -161,12 +172,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [isAuthenticated, user, token, socketUrl, showNotification]);
 
   const markAsRead = useCallback((id: string) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    setNotifications((prev) => {
+      let decremented = false;
+      const next = prev.map((n) => {
+        if (n.id !== id) return n;
+        if (!n.read) decremented = true;
+        return { ...n, read: true };
+      });
+      if (decremented) setUnreadTotal((v) => Math.max(0, v - 1));
+      return next;
+    });
     notificationsApi.markRead(id).catch(() => undefined);
   }, []);
 
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setUnreadTotal(0);
     notificationsApi.markAllRead().catch(() => undefined);
   }, []);
 
@@ -174,6 +195,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (notifications.length === 0) return;
 
     setNotifications([]);
+    setUnreadTotal(0);
     notificationsApi
       .clearMine()
       .then((res) => {
@@ -211,6 +233,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         markAsRead,
         markAllAsRead,
         clearNotifications,
+        reloadNotifications,
         isConnected,
       }}
     >
