@@ -25,6 +25,7 @@ interface NotificationContextType {
   markAsRead: (id: string) => void;
   markAsUnread: (id: string) => void;
   markAllAsRead: () => void;
+  archiveNotification: (id: string) => void;
   clearNotifications: () => void;
   reloadNotifications: () => Promise<void>;
   isConnected: boolean;
@@ -206,6 +207,44 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     notificationsApi.markAllRead().catch(() => undefined);
   }, []);
 
+  const archiveNotification = useCallback((id: string) => {
+    setNotifications((prev) => {
+      let decremented = false;
+      const next = prev.filter((n) => {
+        if (n.id !== id) return true;
+        if (!n.read) decremented = true;
+        return false;
+      });
+      if (decremented) setUnreadTotal((v) => Math.max(0, v - 1));
+      return next;
+    });
+
+    notificationsApi
+      .archive([id])
+      .then(() => {
+        toast({
+          title: 'Notificacao arquivada',
+          duration: 6000,
+          action: (
+            <ToastAction
+              altText="Desfazer"
+              onClick={() => {
+                notificationsApi
+                  .unarchive([id])
+                  .then(() => reloadNotifications())
+                  .catch(() => undefined);
+              }}
+            >
+              Desfazer
+            </ToastAction>
+          ),
+        });
+      })
+      .catch(() => {
+        reloadNotifications().catch(() => undefined);
+      });
+  }, [reloadNotifications, toast]);
+
   const clearNotifications = useCallback(() => {
     if (notifications.length === 0) return;
 
@@ -248,6 +287,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         markAsRead,
         markAsUnread,
         markAllAsRead,
+        archiveNotification,
         clearNotifications,
         reloadNotifications,
         isConnected,
