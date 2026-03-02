@@ -23,6 +23,7 @@ interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
   markAsRead: (id: string) => void;
+  markAsUnread: (id: string) => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
   reloadNotifications: () => Promise<void>;
@@ -185,6 +186,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     notificationsApi.markRead(id).catch(() => undefined);
   }, []);
 
+  const markAsUnread = useCallback((id: string) => {
+    setNotifications((prev) => {
+      let incremented = false;
+      const next = prev.map((n) => {
+        if (n.id !== id) return n;
+        if (n.read) incremented = true;
+        return { ...n, read: false };
+      });
+      if (incremented) setUnreadTotal((v) => v + 1);
+      return next;
+    });
+    notificationsApi.markUnread(id).catch(() => undefined);
+  }, []);
+
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     setUnreadTotal(0);
@@ -231,6 +246,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         notifications,
         unreadCount,
         markAsRead,
+        markAsUnread,
         markAllAsRead,
         clearNotifications,
         reloadNotifications,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Check, Trash2, Ticket, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import { Bell, Check, Trash2, Ticket, MessageSquare, CheckCircle, AlertCircle, Circle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,7 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAsUnread, markAllAsRead, clearNotifications } = useNotifications();
   const [open, setOpen] = useState(false);
 
   const getIcon = (type: string) => {
@@ -35,6 +35,12 @@ export function NotificationBell() {
     e.preventDefault();
     e.stopPropagation();
     markAsRead(id);
+  };
+
+  const handleMarkAsUnread = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    markAsUnread(id);
   };
 
   const handleNotificationClick = (notification: any) => {
@@ -123,14 +129,27 @@ export function NotificationBell() {
                           })}
                         </p>
                       </div>
-                      {!notification.read && (
+                      {!notification.read ? (
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 shrink-0"
                           onClick={(e) => handleMarkAsRead(e, notification.id)}
+                          title="Marcar como lida"
+                          aria-label="Marcar como lida"
                         >
                           <Check className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={(e) => handleMarkAsUnread(e, notification.id)}
+                          title="Marcar como nao lida"
+                          aria-label="Marcar como nao lida"
+                        >
+                          <Circle className="h-3 w-3" />
                         </Button>
                       )}
                     </div>
