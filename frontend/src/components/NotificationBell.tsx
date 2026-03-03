@@ -181,13 +181,31 @@ export function NotificationBell() {
         
         {notifications.length > 0 && (
           <div className="p-3 text-center border-t">
-            <Link
-              to="/notifications"
-              className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => setOpen(false)}
-            >
-              Ver todas as notificações
-            </Link>
+            <div className="flex items-center justify-center gap-3">
+              {unreadCount > 0 ? (
+                <Link
+                  to="/notifications?unread=1"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setOpen(false)}
+                >
+                  Ver não lidas
+                </Link>
+              ) : null}
+              <Link
+                to="/notifications"
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setOpen(false)}
+              >
+                Ver todas
+              </Link>
+              <Link
+                to="/notifications?archived=1"
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setOpen(false)}
+              >
+                Ver arquivadas
+              </Link>
+            </div>
           </div>
         )}
       </DialogContent>
