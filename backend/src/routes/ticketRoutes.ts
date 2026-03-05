@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createTicket,
   getTickets,
+  getSimilarTickets,
   getTicketById,
   updateTicket,
   bulkUpdateTickets,
@@ -50,6 +51,40 @@ router.use(authenticate);
 router.get('/', getTickets);
 
 router.get('/export/csv', authorize('admin', 'manager', 'agent'), exportTicketsCsv);
+
+/**
+ * @swagger
+ * /tickets/similar:
+ *   get:
+ *     summary: Sugerir tickets parecidos (evitar duplicados)
+ *     tags: [Tickets]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 8
+ *           maxLength: 500
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 10
+ *           default: 5
+ *       - in: query
+ *         name: excludeId
+ *         schema:
+ *           type: string
+ *         description: ID do ticket para excluir da busca (opcional)
+ *     responses:
+ *       200:
+ *         description: Lista de tickets parecidos
+ *       400:
+ *         description: Erro de validacao
+ */
+router.get('/similar', getSimilarTickets);
 
 /**
  * @swagger

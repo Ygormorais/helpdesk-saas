@@ -22,10 +22,23 @@ export interface AddCommentInput {
   isInternal?: boolean;
 }
 
+export type SimilarTicket = {
+  _id: string;
+  ticketNumber: string;
+  title: string;
+  status: string;
+  priority?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  score?: number;
+};
+
 export const ticketsApi = {
   list: (params: TicketListParams) => api.get('/tickets', { params }),
   getById: (id: string) => api.get(`/tickets/${id}`),
   create: (data: CreateTicketInput) => api.post('/tickets', data),
+  similar: (params: { q: string; limit?: number; excludeId?: string }) =>
+    api.get<{ tickets: SimilarTicket[] }>('/tickets/similar', { params }),
   addComment: (ticketId: string, data: AddCommentInput) => api.post(`/tickets/${ticketId}/comments`, data),
   update: (ticketId: string, data: Record<string, unknown>) => api.put(`/tickets/${ticketId}`, data),
   bulkUpdate: (data: { ids: string[]; updates: { status?: string; priority?: string; assignedTo?: string | null } }) =>

@@ -180,4 +180,21 @@ ticketSchema.index({ tenant: 1, status: 1 });
 ticketSchema.index({ tenant: 1, createdBy: 1 });
 ticketSchema.index({ assignedTo: 1 });
 
+// Similar/duplicate detection (best-effort). Tenant filter is applied at query-time.
+ticketSchema.index(
+  {
+    ticketNumber: 'text',
+    title: 'text',
+    description: 'text',
+  },
+  {
+    name: 'ticket_text',
+    weights: {
+      ticketNumber: 15,
+      title: 10,
+      description: 3,
+    },
+  }
+);
+
 export const Ticket = mongoose.model<ITicket>('Ticket', ticketSchema);

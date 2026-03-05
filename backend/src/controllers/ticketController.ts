@@ -82,6 +82,12 @@ const exportTicketsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50_000).optional(),
 });
 
+const similarTicketsQuerySchema = z.object({
+  q: z.string().trim().min(8).max(500),
+  limit: z.coerce.number().int().min(1).max(10).optional(),
+  excludeId: z.string().trim().min(1).optional(),
+});
+
 function parseDayStrict(value: string): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!m) throw new Error('Data invalida');
@@ -175,6 +181,97 @@ export const createTicket = async (
       message: 'Ticket criado com sucesso',
       ticket,
     });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
+      return;
+    }
+    throw error;
+  }
+};
+
+export const getSimilarTickets = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user!;
+
+  try {
+    const { q, limit, excludeId } = similarTicketsQuerySchema.parse(req.query);
+    const take = limit ?? 5;
+
+    const base: Record<string, any> = {
+      tenant: user.tenant._id,
+    };
+
+    if (user.role === 'client') {
+      base.createdBy = user._id;
+    }
+
+    if (excludeId) {
+      base._id = { $ne: excludeId };
+    }
+
+    const tokens = Array.from(
+      new Set(
+        String(q)
+          .toLowerCase()
+          .split(/[^a-z0-9]+/i)
+          .map((s) => s.trim())
+          .filter((s) => s.length >= 3)
+      )
+    ).slice(0, 8);
+
+    // Prefer $text (uses index if available); fallback to regex when index isn't ready.
+    try {
+      const tickets = await Ticket.find(
+        {
+          ...base,
+          $text: { $search: q },
+        },
+        {
+          score: { $meta: 'textScore' },
+        }
+      )
+        .sort({ score: { $meta: 'textScore' }, updatedAt: -1 })
+        .limit(take)
+        .select({
+          ticketNumber: 1,
+          title: 1,
+          status: 1,
+          priority: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          createdBy: 1,
+          assignedTo: 1,
+          score: { $meta: 'textScore' },
+        })
+        .populate('createdBy', 'name email')
+        .populate('assignedTo', 'name email')
+        .lean();
+
+      res.json({ tickets });
+      return;
+    } catch (err: any) {
+      // Mongo error when $text is used without a text index.
+      const msg = String(err?.message || '');
+      const code = err?.code;
+      const needsIndex = code === 27 || /text index required/i.test(msg);
+      if (!needsIndex) throw err;
+    }
+
+    const pattern = tokens.length ? `(${tokens.map(escapeRegex).join('|')})` : escapeRegex(q);
+    const rx = new RegExp(pattern, 'i');
+
+    const tickets = await Ticket.find({
+      ...base,
+      $or: [{ title: rx }, { description: rx }, { ticketNumber: rx }],
+    })
+      .sort({ updatedAt: -1 })
+      .limit(take)
+      .select('ticketNumber title status priority createdAt updatedAt createdBy assignedTo')
+      .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email')
+      .lean();
+
+    res.json({ tickets });
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
