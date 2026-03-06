@@ -1,0 +1,4 @@
+# Avoid accidental CRLF in CI-sensitive files when core.autocrlf is enabled.
+.github/workflows/*.yml text eol=lf
+.nvmrc text eol=lf
+job-platform/.nvmrc text eol=lf

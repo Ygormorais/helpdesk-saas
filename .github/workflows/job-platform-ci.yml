@@ -32,7 +32,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: 'job-platform/.nvmrc'
           cache: 'npm'
           cache-dependency-path: job-platform/package-lock.json
 
@@ -62,7 +62,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: 'job-platform/.nvmrc'
           cache: 'npm'
           cache-dependency-path: job-platform/package-lock.json
 

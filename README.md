@@ -1,4 +1,4 @@
-# HelpDesk SaaS
+﻿# HelpDesk SaaS
 
 Sistema SaaS de Help Desk multi-tenancy para gestão de atendimento ao cliente, construído com stack MERN.
 
