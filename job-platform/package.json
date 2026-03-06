@@ -14,7 +14,7 @@
     "dashboard:build": "npm -w @jp/dashboard run build",
     "dashboard:preview": "npm -w @jp/dashboard run preview",
     "lint": "npm run typecheck",
-    "gen:client": "openapi-typescript openapi/job-platform-api.yaml -o packages/client/src/schema.ts",
+    "gen:client": "openapi-typescript openapi/job-platform-api.yaml -o packages/client/src/schema.ts && node scripts/normalize-eol.cjs packages/client/src/schema.ts",
     "build": "npm run build -w @jp/shared && npm run gen:client && npm run build -w @jp/client && npm run build -w @jp/api && npm run build -w @jp/worker && npm run build -w @jp/dashboard",
     "typecheck": "npm run build -w @jp/shared && npm run gen:client && npm run build -w @jp/client && npm run typecheck -w @jp/shared && npm run typecheck -w @jp/client && npm run typecheck -w @jp/api && npm run typecheck -w @jp/worker && npm run typecheck -w @jp/dashboard",
     "test": "npm --workspaces run test",
