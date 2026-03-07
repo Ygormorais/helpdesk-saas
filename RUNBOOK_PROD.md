@@ -93,6 +93,7 @@ Diario:
 
 - Verificar `/health`.
 - Conferir ultimo deploy e logs de erro.
+- Conferir ultimo run do workflow `Synthetic Health Check` (GitHub Actions).
 
 Semanal:
 

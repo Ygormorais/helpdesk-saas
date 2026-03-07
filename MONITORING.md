@@ -35,6 +35,24 @@ Parametros sugeridos:
 - Confirmacoes antes de alertar: 2
 - Canais: email + Telegram/Slack
 
+## 3.1 Monitoramento automatico via GitHub Actions
+
+Workflow: `.github/workflows/synthetic-health-check.yml`
+
+- Agenda: a cada 1 hora (`cron: 0 * * * *`)
+- Checks executados:
+  - `GET /health/live`
+  - `GET /health`
+  - `GET /health/version`
+  - `GET /` (frontend)
+- Script usado: `scripts/synthetic-health-check.mjs`
+
+Uso manual:
+
+1. GitHub -> Actions -> `Synthetic Health Check`
+2. `Run workflow`
+3. Validar log final com `status: "ok"`
+
 ## 4) Severidade e resposta
 
 ### P1 - indisponivel
