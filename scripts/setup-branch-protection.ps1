@@ -2,6 +2,9 @@ param(
   [string]$Repo = "",
   [string]$Branch = "master",
   [string]$RequiredChecks = "build",
+  [int]$RequiredApprovals = 1,
+  [switch]$RequireCodeOwnerReviews,
+  [switch]$EnableConversationResolution,
   [switch]$DryRun
 )
 
@@ -45,14 +48,14 @@ $payload = @{
   enforce_admins                   = $true
   required_pull_request_reviews    = @{
     dismiss_stale_reviews           = $true
-    require_code_owner_reviews      = $true
-    required_approving_review_count = 1
+    require_code_owner_reviews      = $RequireCodeOwnerReviews.IsPresent
+    required_approving_review_count = $RequiredApprovals
   }
   restrictions                     = $null
   required_linear_history          = $true
   allow_force_pushes               = $false
   allow_deletions                  = $false
-  required_conversation_resolution = $true
+  required_conversation_resolution = $EnableConversationResolution.IsPresent
 }
 
 $json = $payload | ConvertTo-Json -Depth 8
