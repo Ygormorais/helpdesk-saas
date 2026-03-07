@@ -322,6 +322,7 @@ MongooseServerSelectionError: Could not connect to any servers
 - [ ] Emails funcionando (opcional)
 - [ ] Custom domain configurado (opcional)
 - [ ] SSL funcionando
+- [ ] Smoke test executado (`scripts/smoke-deploy.sh <backend_url> <frontend_url>` ou `scripts\smoke-deploy.bat <backend_url> <frontend_url>`)
 
 ---
 

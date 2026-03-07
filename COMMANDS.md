@@ -107,6 +107,16 @@ curl https://seu-frontend.vercel.app
 # Deve retornar a página inicial
 ```
 
+## Smoke Test Pós-Deploy (Recomendado)
+
+```bash
+# Linux/macOS
+scripts/smoke-deploy.sh https://seu-backend.railway.app https://seu-frontend.vercel.app
+
+# Windows
+scripts\smoke-deploy.bat https://seu-backend.railway.app https://seu-frontend.vercel.app
+```
+
 ## Logs
 
 ```bash
