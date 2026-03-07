@@ -42,7 +42,7 @@ cd "$PROJECT_ROOT/backend"
 
 # Install dependencies
 echo "Installing backend dependencies..."
-npm ci --only=production || npm install --only=production
+npm ci || npm install
 
 if [ $? -eq 0 ]; then
     print_status "Backend dependencies installed"

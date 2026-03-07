@@ -23,6 +23,14 @@ if %errorlevel% neq 0 (
 echo ✅ Logado no Railway
 echo.
 
+REM Entrar na pasta do backend (monorepo)
+if not exist backend\package.json (
+    echo ❌ backend\package.json não encontrado neste diretório
+    pause
+    exit /b 1
+)
+cd backend
+
 REM Criar/selecionar projeto
 echo 📋 Selecionando projeto...
 railway list >nul 2>&1

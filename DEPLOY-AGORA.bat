@@ -41,11 +41,18 @@ pause >nul
 
 echo.
 echo 4. Inicializando projeto Railway...
+if not exist backend\package.json (
+    echo ❌ backend\package.json não encontrado neste diretório
+    pause
+    exit /b 1
+)
+pushd backend
 railway init
 
 echo.
 echo 5. Deployando backend...
 railway up
+popd
 
 echo.
 echo ================================================

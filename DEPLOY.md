@@ -129,34 +129,14 @@ VITE_API_URL=https://helpdesk-backend.up.railway.app/api
 
 ### Passo 3: Configurar rewrites (importante!)
 
-Crie um arquivo `vercel.json` na pasta `frontend`:
-
-```json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://helpdesk-backend.up.railway.app/api/$1"
-    },
-    {
-      "source": "/socket.io/(.*)",
-      "destination": "https://helpdesk-backend.up.railway.app/socket.io/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
-}
-```
+Use o `frontend/vercel.json` que já está no repositório (fallback SPA para `index.html`).
+Para API e Socket.IO em produção, configure `VITE_API_URL` (e opcionalmente `VITE_SOCKET_URL`) com a URL pública do backend.
 
 ### Passo 4: Atualizar configuração do Vercel
 
-1. No painel do Vercel, vá em **Settings** → **Functions**
-2. Certifique-se de que a rewrites está configurada corretamente
+1. No painel do Vercel, vá em **Settings** → **Environment Variables**
+2. Confirme que `VITE_API_URL` aponta para seu backend (ex: `https://seu-backend.railway.app/api`)
+3. Se necessário, adicione `VITE_SOCKET_URL` (ex: `https://seu-backend.railway.app`)
 
 ---
 
