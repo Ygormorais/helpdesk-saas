@@ -1,0 +1,24 @@
+name: Synthetic Health Check
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Run synthetic check
+        env:
+          BACKEND_URL: https://helpdesk-saas-production-0cd0.up.railway.app
+          FRONTEND_URL: https://helpdesk-two-livid.vercel.app
+          HEALTHCHECK_TIMEOUT_MS: 10000
+        run: node scripts/synthetic-health-check.mjs
