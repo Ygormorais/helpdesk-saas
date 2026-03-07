@@ -23,6 +23,20 @@ Linux/macOS:
 scripts/setup-branch-protection.sh Ygormorais/helpdesk-saas master build
 ```
 
+Modo solo (sem review obrigatoria, mantendo PR + CI):
+
+Windows:
+
+```bash
+scripts/setup-branch-protection.ps1 -Repo Ygormorais/helpdesk-saas -Branch master -RequiredChecks "build" -RequiredApprovals 0
+```
+
+Linux/macOS:
+
+```bash
+scripts/setup-branch-protection.sh Ygormorais/helpdesk-saas master build 0 false false
+```
+
 ## 4) Regras aplicadas
 
 - Pull request obrigatorio.

@@ -4,6 +4,9 @@ set -euo pipefail
 repo="${1:-}"
 branch="${2:-master}"
 required_checks="${3:-build}"
+required_approvals="${4:-1}"
+require_code_owner_reviews="${5:-true}"
+require_conversation_resolution="${6:-true}"
 
 if ! command -v gh >/dev/null 2>&1; then
   echo "[error] GitHub CLI (gh) nao encontrado. Instale: https://cli.github.com/"
@@ -50,14 +53,14 @@ cat >"$tmp" <<JSON
   "enforce_admins": true,
   "required_pull_request_reviews": {
     "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": true,
-    "required_approving_review_count": 1
+    "require_code_owner_reviews": $require_code_owner_reviews,
+    "required_approving_review_count": $required_approvals
   },
   "restrictions": null,
   "required_linear_history": true,
   "allow_force_pushes": false,
   "allow_deletions": false,
-  "required_conversation_resolution": true
+  "required_conversation_resolution": $require_conversation_resolution
 }
 JSON
 
