@@ -27,12 +27,11 @@ export function prodRateLimit(options: Parameters<typeof rateLimit>[0]): Request
 type RlRedisClient = ReturnType<typeof createClient>;
 
 let rlClient: RlRedisClient | null = null;
-let rlStore: any | null = null;
+let rlStoreSeq = 0;
 
 function getRedisRateLimitStore() {
   const url = String(process.env.REDIS_URL || '').trim();
   if (!url) return null;
-  if (rlStore) return rlStore;
 
   try {
     if (!rlClient) {
@@ -40,12 +39,12 @@ function getRedisRateLimitStore() {
       rlClient.connect().catch(() => undefined);
     }
 
-    rlStore = new RedisStore({
+    // express-rate-limit requires one store instance per limiter.
+    rlStoreSeq += 1;
+    return new RedisStore({
       sendCommand: (...args: string[]) => (rlClient as any).sendCommand(args),
-      prefix: 'rl:',
+      prefix: `rl:${rlStoreSeq}:`,
     });
-
-    return rlStore;
   } catch {
     return null;
   }
