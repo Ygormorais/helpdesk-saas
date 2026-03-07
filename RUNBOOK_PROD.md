@@ -108,3 +108,9 @@ Mensal:
 - Redis privado.
 - Alertas de uptime para `/health/live` e `/health`.
 
+## 9) Monitoramento continuo
+
+- Guia completo: `MONITORING.md`
+- Check operacional diario (rapido):
+  - Windows: `scripts\prod-check.bat https://helpdesk-saas-production-0cd0.up.railway.app https://helpdesk-two-livid.vercel.app`
+  - Linux/macOS: `scripts/prod-check.sh https://helpdesk-saas-production-0cd0.up.railway.app https://helpdesk-two-livid.vercel.app`

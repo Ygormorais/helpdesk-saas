@@ -118,6 +118,16 @@ scripts/smoke-deploy.sh https://seu-backend.railway.app https://seu-frontend.ver
 scripts\smoke-deploy.bat https://seu-backend.railway.app https://seu-frontend.vercel.app
 ```
 
+## Check Operacional Diario
+
+```bash
+# Linux/macOS
+scripts/prod-check.sh https://seu-backend.railway.app https://seu-frontend.vercel.app
+
+# Windows
+scripts\prod-check.bat https://seu-backend.railway.app https://seu-frontend.vercel.app
+```
+
 ## Logs
 
 ```bash
