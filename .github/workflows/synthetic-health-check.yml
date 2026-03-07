@@ -25,6 +25,8 @@ jobs:
           BACKEND_URL: https://helpdesk-saas-production-0cd0.up.railway.app
           FRONTEND_URL: https://helpdesk-two-livid.vercel.app
           HEALTHCHECK_TIMEOUT_MS: 10000
+          HEALTHCHECK_RETRIES: 2
+          HEALTHCHECK_RETRY_DELAY_MS: 1500
           MAX_BACKEND_LATENCY_MS: 4000
           MAX_FRONTEND_LATENCY_MS: 6000
         run: node scripts/synthetic-health-check.mjs
