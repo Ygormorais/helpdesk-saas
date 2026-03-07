@@ -49,6 +49,9 @@ Workflow: `.github/workflows/synthetic-health-check.yml`
 - Thresholds de latencia (workflow atual):
   - Backend: `MAX_BACKEND_LATENCY_MS=4000`
   - Frontend: `MAX_FRONTEND_LATENCY_MS=6000`
+- Retry anti-flake (workflow atual):
+  - `HEALTHCHECK_RETRIES=2`
+  - `HEALTHCHECK_RETRY_DELAY_MS=1500`
 - Automacao de incidente:
   - Em falha: abre/atualiza issue `[Incident] Synthetic Health Check failure`
   - Em recuperacao: comenta e fecha a issue automaticamente
