@@ -12,6 +12,13 @@ const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 const corsAllowedOrigins = Array.from(
   new Set([...parseCsv(process.env.CORS_ALLOWED_ORIGINS), frontendUrl])
 );
+const commitSha = (
+  process.env.APP_COMMIT_SHA
+  || process.env.RAILWAY_GIT_COMMIT_SHA
+  || process.env.VERCEL_GIT_COMMIT_SHA
+  || process.env.GITHUB_SHA
+  || ''
+).trim();
 
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
@@ -70,6 +77,9 @@ export const config = {
     | 'ollama'
     | 'none'
     | '',
+  app: {
+    commitSha: commitSha || 'unknown',
+  },
 };
 
 const validateProductionConfig = (): void => {

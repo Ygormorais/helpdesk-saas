@@ -91,6 +91,16 @@ app.get('/health', async (_req, res) => {
   });
 });
 
+app.get('/health/version', (_req, res) => {
+  res.json({
+    status: 'ok',
+    commitSha: config.app.commitSha,
+    nodeEnv: config.nodeEnv,
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use(notFound);
 app.use(errorHandler);
 

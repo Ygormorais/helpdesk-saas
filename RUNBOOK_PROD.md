@@ -19,12 +19,14 @@
 
 - Liveness: `GET /health/live`
 - Readiness: `GET /health`
+- Versao/Build: `GET /health/version`
 
 Exemplo:
 
 ```bash
 curl https://helpdesk-saas-production-0cd0.up.railway.app/health/live
 curl https://helpdesk-saas-production-0cd0.up.railway.app/health
+curl https://helpdesk-saas-production-0cd0.up.railway.app/health/version
 ```
 
 Saude esperada:

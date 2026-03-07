@@ -12,6 +12,7 @@ Detectar indisponibilidade cedo e ter acao padrao para:
 
 - Backend liveness: `GET /health/live`
 - Backend readiness: `GET /health`
+- Backend version/build: `GET /health/version`
 - Frontend root: `GET /`
 
 URLs atuais:
