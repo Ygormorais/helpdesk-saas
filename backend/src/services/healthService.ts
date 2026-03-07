@@ -1,46 +1,13 @@
 import mongoose from 'mongoose';
-import net from 'net';
+import { createClient } from 'redis';
 
 async function pingRedis(urlRaw: string): Promise<boolean> {
   try {
-    const u = new URL(urlRaw);
-    const host = u.hostname;
-    const port = u.port ? parseInt(u.port, 10) : 6379;
-
-    return await new Promise<boolean>((resolve) => {
-      const socket = net.createConnection({ host, port });
-      const timer = setTimeout(() => {
-        try {
-          socket.destroy();
-        } catch {
-          // ignore
-        }
-        resolve(false);
-      }, 500);
-
-      socket.on('error', () => {
-        clearTimeout(timer);
-        resolve(false);
-      });
-
-      socket.on('connect', () => {
-        socket.write('*1\r\n$4\r\nPING\r\n');
-      });
-
-      let buf = '';
-      socket.on('data', (d) => {
-        buf += d.toString('utf8');
-        if (buf.includes('PONG')) {
-          clearTimeout(timer);
-          try {
-            socket.end();
-          } catch {
-            // ignore
-          }
-          resolve(true);
-        }
-      });
-    });
+    const client = createClient({ url: urlRaw, socket: { connectTimeout: 1000 } });
+    await client.connect();
+    await client.ping();
+    await client.quit();
+    return true;
   } catch {
     return false;
   }
