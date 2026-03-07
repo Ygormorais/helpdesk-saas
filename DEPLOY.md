@@ -70,8 +70,10 @@ Este guia passo a passo vai te ajudar a colocar seu projeto em produção.
 1. Acesse [Railway](https://railway.app)
 2. Clique em "New Project"
 3. Selecione "Deploy from GitHub repo"
-4. Escolha seu repositório (selecione apenas a pasta `backend` se necessário)
-5. Clique em "Deploy Now"
+4. Escolha seu repositório
+5. Se o serviço estiver apontando para a raiz do repo, use Dockerfile (o projeto já possui `Dockerfile` na raiz que builda o backend)
+6. Alternativa: configure **Root Directory** = `backend`
+7. Clique em "Deploy Now"
 
 ### Passo 2: Configurar variáveis de ambiente
 
@@ -278,6 +280,7 @@ MongooseServerSelectionError: Could not connect to any servers
 1. Verifique logs no Railway/Vercel
 2. Certifique-se de que todas as dependências estão no `package.json`
 3. Verifique versão do Node.js (use 20.x)
+4. Se aparecer `Error creating build plan with Railpack`, configure **Root Directory** = `backend` ou use o `Dockerfile` da raiz
 
 ### Sessão expirando
 

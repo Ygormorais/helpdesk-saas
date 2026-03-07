@@ -48,8 +48,9 @@ railway up
 1. Acesse https://railway.app
 2. Clique em "New Project" → "Deploy from GitHub repo"
 3. Selecione seu repositório
-4. Configure variáveis de ambiente
-5. Clique em "Deploy"
+4. Se usar build automático, configure **Root Directory** = `backend` (ou use o `Dockerfile` da raiz)
+5. Configure variáveis de ambiente
+6. Clique em "Deploy"
 
 ## Deploy Frontend (Vercel)
 
