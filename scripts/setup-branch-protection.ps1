@@ -69,12 +69,15 @@ if ($DryRun) {
 
 $tmp = New-TemporaryFile
 try {
-  Set-Content -Path $tmp -Value $json -Encoding UTF8
-  gh api `
+  Set-Content -Path $tmp -Value $json -Encoding Ascii
+  & gh api `
     --method PUT `
     --header "Accept: application/vnd.github+json" `
     "/repos/$Repo/branches/$Branch/protection" `
     --input $tmp | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "Falha ao aplicar protecao de branch (gh exit code $LASTEXITCODE)."
+  }
   Write-Host "Protecao de branch aplicada com sucesso."
 } finally {
   if (Test-Path $tmp) {
