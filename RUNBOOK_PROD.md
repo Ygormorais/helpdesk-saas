@@ -94,6 +94,7 @@ Diario:
 - Verificar `/health`.
 - Conferir ultimo deploy e logs de erro.
 - Conferir ultimo run do workflow `Synthetic Health Check` (GitHub Actions).
+- Se falhar por latencia, validar regressao de performance antes de novo deploy.
 
 Semanal:
 

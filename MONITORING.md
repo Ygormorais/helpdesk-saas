@@ -46,12 +46,16 @@ Workflow: `.github/workflows/synthetic-health-check.yml`
   - `GET /health/version`
   - `GET /` (frontend)
 - Script usado: `scripts/synthetic-health-check.mjs`
+- Thresholds de latencia (workflow atual):
+  - Backend: `MAX_BACKEND_LATENCY_MS=4000`
+  - Frontend: `MAX_FRONTEND_LATENCY_MS=6000`
 
 Uso manual:
 
 1. GitHub -> Actions -> `Synthetic Health Check`
 2. `Run workflow`
 3. Validar log final com `status: "ok"`
+4. Se falhar por latencia, revisar Railway/Vercel e picos de resposta.
 
 ## 4) Severidade e resposta
 
