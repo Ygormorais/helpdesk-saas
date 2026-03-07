@@ -15,6 +15,7 @@ set "FAIL=0"
 
 call :check "backend live" "!BACKEND!/health/live" "200"
 call :check "backend ready" "!BACKEND!/health" "200"
+call :check "backend version" "!BACKEND!/health/version" "200"
 call :check "frontend root" "!FRONTEND!/" "200"
 
 if !FAIL! neq 0 (
@@ -24,6 +25,16 @@ if !FAIL! neq 0 (
 
 cmd /c scripts\smoke-deploy.bat "!BACKEND!" "!FRONTEND!"
 if errorlevel 1 exit /b 1
+
+set "VERSION_PAYLOAD="
+for /f "delims=" %%I in ('curl -s -L -m 20 "!BACKEND!/health/version"') do set "VERSION_PAYLOAD=%%I"
+set "COMMIT_SHA="
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "$ErrorActionPreference='SilentlyContinue'; $obj = $env:VERSION_PAYLOAD | ConvertFrom-Json; if ($obj -and $obj.commitSha) { $obj.commitSha }"`) do set "COMMIT_SHA=%%I"
+if defined COMMIT_SHA (
+  echo [ok] backend commitSha: !COMMIT_SHA!
+) else (
+  echo [warn] could not parse commitSha from /health/version
+)
 
 echo [ok] production check passed
 exit /b 0

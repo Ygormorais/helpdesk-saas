@@ -99,6 +99,7 @@ vercel domains add helpdesk.seudominio.com
 ```bash
 # Backend
 curl https://seu-backend.railway.app/health
+curl https://seu-backend.railway.app/health/version
 
 # Deve retornar: {"status":"ok"}
 

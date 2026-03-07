@@ -32,6 +32,7 @@ check() {
 
 check "backend live" "$backend/health/live" "200"
 check "backend ready" "$backend/health" "200"
+check "backend version" "$backend/health/version" "200"
 check "frontend root" "$frontend/" "200"
 
 if [ "$fail" -ne 0 ]; then
@@ -40,4 +41,11 @@ if [ "$fail" -ne 0 ]; then
 fi
 
 scripts/smoke-deploy.sh "$backend" "$frontend"
+version_payload="$(curl -sS -L -m 20 "$backend/health/version" || true)"
+commit_sha="$(printf '%s' "$version_payload" | sed -n 's/.*"commitSha":"\([^"]*\)".*/\1/p')"
+if [ -n "$commit_sha" ]; then
+  echo "[ok] backend commitSha: $commit_sha"
+else
+  echo "[warn] could not parse commitSha from /health/version"
+fi
 echo "[ok] production check passed"
