@@ -91,6 +91,10 @@ FRONTEND_URL=https://seu-frontend.vercel.app
 CORS_ALLOWED_ORIGINS=https://seu-frontend.vercel.app
 ```
 
+Importante:
+- Em producao, `JWT_SECRET` precisa ter no minimo 32 caracteres.
+- `FRONTEND_URL` e `CORS_ALLOWED_ORIGINS` devem usar `https` e nao devem usar `localhost`.
+
 3. Clique em "Deploy" para reiniciar o serviço
 
 ### Passo 3: Verificar deploy

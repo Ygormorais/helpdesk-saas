@@ -71,3 +71,44 @@ export const config = {
     | 'none'
     | '',
 };
+
+const validateProductionConfig = (): void => {
+  if (config.nodeEnv !== 'production') {
+    return;
+  }
+
+  const errors: string[] = [];
+
+  const jwtSecret = config.jwt.secret.trim();
+  if (!jwtSecret || jwtSecret === 'super-secret-key-change-in-production') {
+    errors.push('JWT_SECRET ausente ou usando valor padrao inseguro.');
+  } else if (jwtSecret.length < 32) {
+    errors.push('JWT_SECRET deve ter ao menos 32 caracteres em producao.');
+  }
+
+  const frontend = config.frontendUrl.trim();
+  if (!frontend) {
+    errors.push('FRONTEND_URL e obrigatorio em producao.');
+  } else {
+    if (frontend.includes('localhost')) {
+      errors.push('FRONTEND_URL nao pode usar localhost em producao.');
+    }
+    if (!/^https:\/\//i.test(frontend)) {
+      errors.push('FRONTEND_URL deve usar https em producao.');
+    }
+  }
+
+  const insecureCorsOrigins = config.corsAllowedOrigins.filter(
+    (origin) => origin.includes('localhost') || /^http:\/\//i.test(origin)
+  );
+  if (insecureCorsOrigins.length > 0) {
+    errors.push(`CORS_ALLOWED_ORIGINS contem origem insegura em producao: ${insecureCorsOrigins.join(', ')}`);
+  }
+
+  if (errors.length > 0) {
+    const header = 'Configuracao invalida para producao';
+    throw new Error(`${header}:\n- ${errors.join('\n- ')}`);
+  }
+};
+
+validateProductionConfig();

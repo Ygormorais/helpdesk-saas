@@ -111,6 +111,7 @@ Mensal:
 - Usuario Mongo com menor privilegio necessario.
 - Redis privado.
 - Alertas de uptime para `/health/live` e `/health`.
+- Observacao: o backend agora bloqueia startup em `NODE_ENV=production` se detectar `JWT_SECRET` fraco/padrao ou origens CORS inseguras.
 
 ## 9) Monitoramento continuo
 
