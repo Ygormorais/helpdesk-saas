@@ -85,8 +85,10 @@ NODE_ENV=production
 PORT=3000
 MONGODB_URI=mongodb+srv://helpdesk_admin:SUA_SENHA@cluster0.xxxxx.mongodb.net/helpdesk?retryWrites=true&w=majority
 JWT_SECRET=uma-string-super-segura-de-no-minimo-32-caracteres
+JWT_SECRET_PREVIOUS=
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=https://seu-frontend.vercel.app
+CORS_ALLOWED_ORIGINS=https://seu-frontend.vercel.app
 ```
 
 3. Clique em "Deploy" para reiniciar o serviço
@@ -193,10 +195,12 @@ MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/helpdesk?retryWrites
 
 # JWT Authentication
 JWT_SECRET=uma-string-segura-de-32-ou-mais-caracteres-aqui
+JWT_SECRET_PREVIOUS=
 JWT_EXPIRES_IN=7d
 
 # Frontend URL (for CORS)
 FRONTEND_URL=https://seu-projeto.vercel.app
+CORS_ALLOWED_ORIGINS=https://seu-projeto.vercel.app,https://admin.seu-projeto.vercel.app
 
 # Email (Mailgun/SendGrid)
 SMTP_HOST=smtp.mailgun.org

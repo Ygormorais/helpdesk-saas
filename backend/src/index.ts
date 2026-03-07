@@ -20,10 +20,20 @@ import { reportScheduleService } from './services/reportScheduleService.js';
 
 const app = express();
 const httpServer = createServer(app);
+const allowedOrigins = config.corsAllowedOrigins;
+
+const isOriginAllowed = (origin?: string): boolean => {
+  if (!origin) {
+    return true;
+  }
+  return allowedOrigins.includes(origin);
+};
 
 const io = new Server(httpServer, {
   cors: {
-    origin: config.frontendUrl,
+    origin: (origin, callback) => {
+      callback(null, isOriginAllowed(origin));
+    },
     methods: ['GET', 'POST'],
   },
 });
@@ -36,7 +46,13 @@ chatService.initialize(io);
 
 app.use(helmet());
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`Origin not allowed by CORS: ${origin || 'unknown'}`));
+  },
   credentials: true,
 }));
 

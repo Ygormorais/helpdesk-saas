@@ -2,6 +2,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const parseCsv = (value: string | undefined): string[] =>
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const corsAllowedOrigins = Array.from(
+  new Set([...parseCsv(process.env.CORS_ALLOWED_ORIGINS), frontendUrl])
+);
+
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -10,6 +21,7 @@ export const config = {
 
   jwt: {
     secret: process.env.JWT_SECRET || 'super-secret-key-change-in-production',
+    previousSecret: process.env.JWT_SECRET_PREVIOUS || '',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
 
@@ -20,7 +32,8 @@ export const config = {
     pass: process.env.SMTP_PASS || '',
   },
 
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  frontendUrl,
+  corsAllowedOrigins,
 
   aws: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',

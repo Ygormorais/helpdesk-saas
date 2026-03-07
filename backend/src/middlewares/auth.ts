@@ -8,6 +8,33 @@ export interface AuthRequest extends Request {
   user?: IUser;
 }
 
+interface AuthTokenPayload extends jwt.JwtPayload {
+  userId?: string;
+  tenantId?: string;
+}
+
+const verifyToken = (token: string): AuthTokenPayload => {
+  const secrets = [config.jwt.secret, config.jwt.previousSecret]
+    .map((secret) => secret.trim())
+    .filter((secret, index, arr) => Boolean(secret) && arr.indexOf(secret) === index);
+
+  let lastError: unknown = new Error('Token verification failed');
+
+  for (const secret of secrets) {
+    try {
+      const decoded = jwt.verify(token, secret);
+      if (typeof decoded === 'string') {
+        throw new Error('Token payload format invalid');
+      }
+      return decoded as AuthTokenPayload;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+};
+
 export const authenticate = async (
   req: AuthRequest,
   res: Response,
@@ -23,10 +50,12 @@ export const authenticate = async (
 
     const token = authHeader.split(' ')[1];
 
-    const decoded = jwt.verify(token, config.jwt.secret) as {
-      userId: string;
-      tenantId: string;
-    };
+    const decoded = verifyToken(token);
+
+    if (!decoded.userId || !decoded.tenantId) {
+      res.status(401).json({ message: 'Token invalido' });
+      return;
+    }
 
     const user = await User.findById(decoded.userId).populate('tenant');
 

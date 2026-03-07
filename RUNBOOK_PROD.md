@@ -9,7 +9,9 @@
 
 - `MONGODB_URI`
 - `JWT_SECRET`
+- `JWT_SECRET_PREVIOUS` (opcional, para rotacao sem downtime)
 - `FRONTEND_URL`
+- `CORS_ALLOWED_ORIGINS` (opcional, lista separada por virgula)
 - `REDIS_URL`
 - `NODE_ENV=production`
 
@@ -103,7 +105,9 @@ Mensal:
 ## 8) Checklist de hardening
 
 - `FRONTEND_URL` em producao (sem localhost).
+- `CORS_ALLOWED_ORIGINS` revisado (somente dominios confiaveis).
 - `JWT_SECRET` com alta entropia e armazenado em cofre.
+- `JWT_SECRET_PREVIOUS` definido somente durante janela de rotacao.
 - Usuario Mongo com menor privilegio necessario.
 - Redis privado.
 - Alertas de uptime para `/health/live` e `/health`.
