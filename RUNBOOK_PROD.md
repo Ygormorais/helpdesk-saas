@@ -103,6 +103,10 @@ Mensal:
 
 - Testar restore de backup no Atlas (ambiente de teste).
 - Rotacionar segredos criticos (`JWT_SECRET` e credenciais DB), se aplicavel.
+- Rodar backup check automatizado:
+  - Windows: `set MONGODB_URI=<uri> && scripts\monthly-backup-check.bat`
+  - Linux/macOS: `MONGODB_URI=<uri> scripts/monthly-backup-check.sh`
+- Validar execucao do workflow `Monthly Backup Check` no GitHub Actions.
 
 ## 8) Checklist de hardening
 
@@ -118,6 +122,7 @@ Mensal:
 ## 9) Monitoramento continuo
 
 - Guia completo: `MONITORING.md`
+- Governanca de branch/PR: `GITHUB_GOVERNANCE.md`
 - Check operacional diario (rapido):
   - Windows: `scripts\prod-check.bat https://helpdesk-saas-production-0cd0.up.railway.app https://helpdesk-two-livid.vercel.app`
   - Linux/macOS: `scripts/prod-check.sh https://helpdesk-saas-production-0cd0.up.railway.app https://helpdesk-two-livid.vercel.app`

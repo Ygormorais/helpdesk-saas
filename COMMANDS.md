@@ -129,6 +129,17 @@ scripts/prod-check.sh https://seu-backend.railway.app https://seu-frontend.verce
 scripts\prod-check.bat https://seu-backend.railway.app https://seu-frontend.vercel.app
 ```
 
+## Backup Check Mensal
+
+```bash
+# Linux/macOS
+MONGODB_URI="mongodb+srv://..." scripts/monthly-backup-check.sh
+
+# Windows
+set MONGODB_URI=mongodb+srv://...
+scripts\monthly-backup-check.bat
+```
+
 ## Logs
 
 ```bash

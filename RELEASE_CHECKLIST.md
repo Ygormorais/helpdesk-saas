@@ -44,6 +44,7 @@
 - [ ] Criar tag de release (ex: `v1.0.0-prod-stable`).
 - [ ] Atualizar changelog/resumo de release (PR ou issue).
 - [ ] Confirmar alertas e contatos de on-call.
+- [ ] Validar template de incidente disponivel em `.github/ISSUE_TEMPLATE/postmortem.md`.
 
 ## 6) Rotina mensal (operacao)
 

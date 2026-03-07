@@ -1,0 +1,46 @@
+name: Monthly Backup Check
+
+on:
+  schedule:
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+
+jobs:
+  backup-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Run monthly backup check
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          BACKUP_CHECK_DB: helpdesk
+          BACKUP_CHECK_COLLECTIONS: users,tickets,tenants
+          BACKUP_CHECK_OUTPUT_DIR: reports/backup-check
+        run: |
+          if [ -z "$MONGODB_URI" ]; then
+            echo "::error::Configure o secret MONGODB_URI no GitHub Actions."
+            exit 2
+          fi
+          cd backend
+          node scripts/monthly-backup-check.mjs
+
+      - name: Upload backup check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-check-report
+          path: backend/reports/backup-check/*.json
+          if-no-files-found: warn
