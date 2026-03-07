@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+
 const backend = String(process.env.BACKEND_URL || '').trim();
 const frontend = String(process.env.FRONTEND_URL || '').trim();
 const timeoutMs = Number(process.env.HEALTHCHECK_TIMEOUT_MS || '10000');
@@ -6,6 +8,7 @@ const maxBackendLatencyMs = Number(process.env.MAX_BACKEND_LATENCY_MS || String(
 const maxFrontendLatencyMs = Number(process.env.MAX_FRONTEND_LATENCY_MS || String(defaultMaxLatencyMs));
 const retries = Math.max(0, Number(process.env.HEALTHCHECK_RETRIES || '2'));
 const retryDelayMs = Math.max(0, Number(process.env.HEALTHCHECK_RETRY_DELAY_MS || '1500'));
+const outputFile = String(process.env.SYNTHETIC_OUTPUT_FILE || '').trim();
 
 if (!backend || !frontend) {
   console.error('[error] BACKEND_URL e FRONTEND_URL sao obrigatorias.');
@@ -122,21 +125,25 @@ try {
   checks.frontendRootMs = frontendRoot.durationMs;
   assertLatency('frontend root', frontendRoot.durationMs, maxFrontendLatencyMs);
 
-  console.log(
-    JSON.stringify({
-      status: 'ok',
-      checkedAt: new Date().toISOString(),
-      backend: backendBase,
-      frontend: frontendBase,
-      commitSha: version.payload.commitSha || 'unknown',
-      maxBackendLatencyMs,
-      maxFrontendLatencyMs,
-      retries,
-      retryDelayMs,
-      checks,
-      attempts,
-    })
-  );
+  const result = {
+    status: 'ok',
+    checkedAt: new Date().toISOString(),
+    backend: backendBase,
+    frontend: frontendBase,
+    commitSha: version.payload.commitSha || 'unknown',
+    maxBackendLatencyMs,
+    maxFrontendLatencyMs,
+    retries,
+    retryDelayMs,
+    checks,
+    attempts,
+  };
+
+  if (outputFile) {
+    await fs.writeFile(outputFile, JSON.stringify(result, null, 2), 'utf8');
+  }
+
+  console.log(JSON.stringify(result));
 } catch (error) {
   console.error('[error]', error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

@@ -1,6 +1,9 @@
 name: Synthetic Health Check
 
 on:
+  push:
+    branches:
+      - master
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
@@ -21,6 +24,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Run synthetic check
+        id: synthetic
         env:
           BACKEND_URL: https://helpdesk-saas-production-0cd0.up.railway.app
           FRONTEND_URL: https://helpdesk-two-livid.vercel.app
@@ -29,11 +33,28 @@ jobs:
           HEALTHCHECK_RETRY_DELAY_MS: 1500
           MAX_BACKEND_LATENCY_MS: 4000
           MAX_FRONTEND_LATENCY_MS: 6000
-        run: node scripts/synthetic-health-check.mjs
+          SYNTHETIC_OUTPUT_FILE: synthetic-output.json
+        run: |
+          node scripts/synthetic-health-check.mjs | tee synthetic-output.log
+
+      - name: Publish synthetic summary
+        if: always()
+        run: |
+          node -e "const fs=require('fs');const summary=process.env.GITHUB_STEP_SUMMARY;const p='synthetic-output.json';const lines=['## Synthetic Health Check'];if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf8'));lines.push('');lines.push(`- status: **${d.status}**`);lines.push(`- commit: \`${d.commitSha}\``);lines.push(`- backend live: ${d.checks.backendLiveMs}ms (attempts: ${d.attempts.backendLive})`);lines.push(`- backend ready: ${d.checks.backendReadyMs}ms (attempts: ${d.attempts.backendReady})`);lines.push(`- backend version: ${d.checks.backendVersionMs}ms (attempts: ${d.attempts.backendVersion})`);lines.push(`- frontend root: ${d.checks.frontendRootMs}ms (attempts: ${d.attempts.frontendRoot})`);} else {lines.push('');lines.push('- status: **error** (no JSON output generated)');}fs.appendFileSync(summary, lines.join('\n') + '\n');"
+
+      - name: Upload synthetic result artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-health-result
+          path: |
+            synthetic-output.json
+            synthetic-output.log
+          if-no-files-found: warn
 
   notify-on-failure:
     needs: monitor
-    if: ${{ failure() }}
+    if: ${{ failure() && github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Open/update incident issue
@@ -84,7 +105,7 @@ jobs:
 
   notify-on-recovery:
     needs: monitor
-    if: ${{ success() }}
+    if: ${{ success() && github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Close incident issue on recovery

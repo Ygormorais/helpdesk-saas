@@ -97,6 +97,7 @@ Diario:
 - Se falhar por latencia, validar regressao de performance antes de novo deploy.
 - Considerar falha apos retries automaticos do monitor (evita falso positivo de oscilacao).
 - Se abrir issue automatica de incidente, seguir template de postmortem apos resolucao.
+- Em cada merge na `master`, validar o `Job Summary` e o artefato do synthetic check.
 
 Semanal:
 
