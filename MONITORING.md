@@ -39,7 +39,10 @@ Parametros sugeridos:
 
 Workflow: `.github/workflows/synthetic-health-check.yml`
 
-- Agenda: a cada 1 hora (`cron: 0 * * * *`)
+- Gatilhos:
+  - a cada 1 hora (`cron: 0 * * * *`)
+  - a cada merge/push em `master`
+  - manual (`workflow_dispatch`)
 - Checks executados:
   - `GET /health/live`
   - `GET /health`
@@ -62,6 +65,7 @@ Uso manual:
 2. `Run workflow`
 3. Validar log final com `status: "ok"`
 4. Se falhar por latencia, revisar Railway/Vercel e picos de resposta.
+5. Ver `Job Summary` e artefato `synthetic-health-result` para detalhes de latencia/tentativas.
 
 ## 4) Severidade e resposta
 
