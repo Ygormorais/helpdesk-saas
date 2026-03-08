@@ -98,6 +98,7 @@ Diario:
 - Considerar falha apos retries automaticos do monitor (evita falso positivo de oscilacao).
 - Se abrir issue automatica de incidente, seguir template de postmortem apos resolucao.
 - Em cada merge na `master`, validar o `Job Summary` e o artefato do synthetic check.
+- Revisar/ajustar `Repository Variables` do monitor sintetico quando URLs/SLAs mudarem.
 
 Semanal:
 

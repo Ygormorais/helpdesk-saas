@@ -50,11 +50,13 @@ Workflow: `.github/workflows/synthetic-health-check.yml`
   - `GET /` (frontend)
 - Script usado: `scripts/synthetic-health-check.mjs`
 - Thresholds de latencia (workflow atual):
-  - Backend: `MAX_BACKEND_LATENCY_MS=4000`
-  - Frontend: `MAX_FRONTEND_LATENCY_MS=6000`
+  - Backend: `SYNTHETIC_MAX_BACKEND_LATENCY_MS` (default `4000`)
+  - Frontend: `SYNTHETIC_MAX_FRONTEND_LATENCY_MS` (default `6000`)
 - Retry anti-flake (workflow atual):
-  - `HEALTHCHECK_RETRIES=2`
-  - `HEALTHCHECK_RETRY_DELAY_MS=1500`
+  - `SYNTHETIC_HEALTHCHECK_RETRIES` (default `2`)
+  - `SYNTHETIC_HEALTHCHECK_RETRY_DELAY_MS` (default `1500`)
+- Timeout:
+  - `SYNTHETIC_HEALTHCHECK_TIMEOUT_MS` (default `10000`)
 - Automacao de incidente:
   - Em falha: abre/atualiza issue `[Incident] Synthetic Health Check failure`
   - Em recuperacao: comenta e fecha a issue automaticamente
@@ -66,6 +68,16 @@ Uso manual:
 3. Validar log final com `status: "ok"`
 4. Se falhar por latencia, revisar Railway/Vercel e picos de resposta.
 5. Ver `Job Summary` e artefato `synthetic-health-result` para detalhes de latencia/tentativas.
+
+Configuracao recomendada em `GitHub -> Settings -> Secrets and variables -> Actions -> Variables`:
+
+- `PROD_BACKEND_URL`
+- `PROD_FRONTEND_URL`
+- `SYNTHETIC_HEALTHCHECK_TIMEOUT_MS`
+- `SYNTHETIC_HEALTHCHECK_RETRIES`
+- `SYNTHETIC_HEALTHCHECK_RETRY_DELAY_MS`
+- `SYNTHETIC_MAX_BACKEND_LATENCY_MS`
+- `SYNTHETIC_MAX_FRONTEND_LATENCY_MS`
 
 ## 4) Severidade e resposta
 

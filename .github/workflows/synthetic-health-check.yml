@@ -26,13 +26,13 @@ jobs:
       - name: Run synthetic check
         id: synthetic
         env:
-          BACKEND_URL: https://helpdesk-saas-production-0cd0.up.railway.app
-          FRONTEND_URL: https://helpdesk-two-livid.vercel.app
-          HEALTHCHECK_TIMEOUT_MS: 10000
-          HEALTHCHECK_RETRIES: 2
-          HEALTHCHECK_RETRY_DELAY_MS: 1500
-          MAX_BACKEND_LATENCY_MS: 4000
-          MAX_FRONTEND_LATENCY_MS: 6000
+          BACKEND_URL: ${{ vars.PROD_BACKEND_URL || 'https://helpdesk-saas-production-0cd0.up.railway.app' }}
+          FRONTEND_URL: ${{ vars.PROD_FRONTEND_URL || 'https://helpdesk-two-livid.vercel.app' }}
+          HEALTHCHECK_TIMEOUT_MS: ${{ vars.SYNTHETIC_HEALTHCHECK_TIMEOUT_MS || '10000' }}
+          HEALTHCHECK_RETRIES: ${{ vars.SYNTHETIC_HEALTHCHECK_RETRIES || '2' }}
+          HEALTHCHECK_RETRY_DELAY_MS: ${{ vars.SYNTHETIC_HEALTHCHECK_RETRY_DELAY_MS || '1500' }}
+          MAX_BACKEND_LATENCY_MS: ${{ vars.SYNTHETIC_MAX_BACKEND_LATENCY_MS || '4000' }}
+          MAX_FRONTEND_LATENCY_MS: ${{ vars.SYNTHETIC_MAX_FRONTEND_LATENCY_MS || '6000' }}
           SYNTHETIC_OUTPUT_FILE: synthetic-output.json
         run: |
           node scripts/synthetic-health-check.mjs | tee synthetic-output.log
