@@ -84,15 +84,34 @@ async function getStatus(url, name) {
   }
 }
 
-try {
-  const checks = {};
-  const attempts = {};
+const result = {
+  status: 'error',
+  checkedAt: new Date().toISOString(),
+  backend: backendBase,
+  frontend: frontendBase,
+  commitSha: 'unknown',
+  maxBackendLatencyMs,
+  maxFrontendLatencyMs,
+  retries,
+  retryDelayMs,
+  checks: {},
+  attempts: {},
+  error: '',
+};
 
+async function writeResult() {
+  if (!outputFile) {
+    return;
+  }
+  await fs.writeFile(outputFile, JSON.stringify(result, null, 2), 'utf8');
+}
+
+try {
   const live = await withRetry('backend live', () =>
     getJson(`${backendBase}/health/live`, 'backend live')
   );
-  attempts.backendLive = live.attempts;
-  checks.backendLiveMs = live.durationMs;
+  result.attempts.backendLive = live.attempts;
+  result.checks.backendLiveMs = live.durationMs;
   assertLatency('backend live', live.durationMs, maxBackendLatencyMs);
   if (live.payload.status !== 'ok') {
     throw new Error('backend live: status != ok');
@@ -101,8 +120,8 @@ try {
   const ready = await withRetry('backend ready', () =>
     getJson(`${backendBase}/health`, 'backend ready')
   );
-  attempts.backendReady = ready.attempts;
-  checks.backendReadyMs = ready.durationMs;
+  result.attempts.backendReady = ready.attempts;
+  result.checks.backendReadyMs = ready.durationMs;
   assertLatency('backend ready', ready.durationMs, maxBackendLatencyMs);
   if (ready.payload.status !== 'ok' || ready.payload.ready !== true) {
     throw new Error('backend ready: expected status=ok and ready=true');
@@ -111,40 +130,30 @@ try {
   const version = await withRetry('backend version', () =>
     getJson(`${backendBase}/health/version`, 'backend version')
   );
-  attempts.backendVersion = version.attempts;
-  checks.backendVersionMs = version.durationMs;
+  result.attempts.backendVersion = version.attempts;
+  result.checks.backendVersionMs = version.durationMs;
   assertLatency('backend version', version.durationMs, maxBackendLatencyMs);
   if (version.payload.status !== 'ok') {
     throw new Error('backend version: status != ok');
   }
+  result.commitSha = version.payload.commitSha || 'unknown';
 
   const frontendRoot = await withRetry('frontend root', () =>
     getStatus(`${frontendBase}/`, 'frontend root')
   );
-  attempts.frontendRoot = frontendRoot.attempts;
-  checks.frontendRootMs = frontendRoot.durationMs;
+  result.attempts.frontendRoot = frontendRoot.attempts;
+  result.checks.frontendRootMs = frontendRoot.durationMs;
   assertLatency('frontend root', frontendRoot.durationMs, maxFrontendLatencyMs);
 
-  const result = {
-    status: 'ok',
-    checkedAt: new Date().toISOString(),
-    backend: backendBase,
-    frontend: frontendBase,
-    commitSha: version.payload.commitSha || 'unknown',
-    maxBackendLatencyMs,
-    maxFrontendLatencyMs,
-    retries,
-    retryDelayMs,
-    checks,
-    attempts,
-  };
-
-  if (outputFile) {
-    await fs.writeFile(outputFile, JSON.stringify(result, null, 2), 'utf8');
-  }
-
+  result.status = 'ok';
+  result.error = '';
+  await writeResult();
   console.log(JSON.stringify(result));
 } catch (error) {
-  console.error('[error]', error instanceof Error ? error.message : String(error));
+  result.status = 'error';
+  result.error = error instanceof Error ? error.message : String(error);
+  await writeResult();
+  console.error('[error]', result.error);
+  console.log(JSON.stringify(result));
   process.exitCode = 1;
 }
