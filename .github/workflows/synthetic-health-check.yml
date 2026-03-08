@@ -15,6 +15,18 @@ permissions:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.collect.outputs.status }}
+      error: ${{ steps.collect.outputs.error }}
+      commit_sha: ${{ steps.collect.outputs.commit_sha }}
+      backend_live_ms: ${{ steps.collect.outputs.backend_live_ms }}
+      backend_ready_ms: ${{ steps.collect.outputs.backend_ready_ms }}
+      backend_version_ms: ${{ steps.collect.outputs.backend_version_ms }}
+      frontend_root_ms: ${{ steps.collect.outputs.frontend_root_ms }}
+      backend_live_attempts: ${{ steps.collect.outputs.backend_live_attempts }}
+      backend_ready_attempts: ${{ steps.collect.outputs.backend_ready_attempts }}
+      backend_version_attempts: ${{ steps.collect.outputs.backend_version_attempts }}
+      frontend_root_attempts: ${{ steps.collect.outputs.frontend_root_attempts }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +37,7 @@ jobs:
 
       - name: Run synthetic check
         id: synthetic
+        continue-on-error: true
         env:
           BACKEND_URL: ${{ vars.PROD_BACKEND_URL || 'https://helpdesk-saas-production-0cd0.up.railway.app' }}
           FRONTEND_URL: ${{ vars.PROD_FRONTEND_URL || 'https://helpdesk-two-livid.vercel.app' }}
@@ -36,6 +49,13 @@ jobs:
           SYNTHETIC_OUTPUT_FILE: synthetic-output.json
         run: |
           node scripts/synthetic-health-check.mjs | tee synthetic-output.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Collect synthetic outputs
+        id: collect
+        if: always()
+        run: |
+          node -e "const fs=require('fs');const out=process.env.GITHUB_OUTPUT;const p='synthetic-output.json';let d={status:'error',error:'missing synthetic-output.json',checks:{},attempts:{},commitSha:'unknown'};if(fs.existsSync(p)){try{d=JSON.parse(fs.readFileSync(p,'utf8'));}catch(e){d={status:'error',error:'invalid synthetic-output.json',checks:{},attempts:{},commitSha:'unknown'};}}const set=(k,v)=>fs.appendFileSync(out, `${k}=${String(v ?? '').replace(/\n/g,' ')}\n`);set('status',d.status||'error');set('error',d.error||'');set('commit_sha',d.commitSha||'unknown');set('backend_live_ms',d.checks?.backendLiveMs ?? '');set('backend_ready_ms',d.checks?.backendReadyMs ?? '');set('backend_version_ms',d.checks?.backendVersionMs ?? '');set('frontend_root_ms',d.checks?.frontendRootMs ?? '');set('backend_live_attempts',d.attempts?.backendLive ?? '');set('backend_ready_attempts',d.attempts?.backendReady ?? '');set('backend_version_attempts',d.attempts?.backendVersion ?? '');set('frontend_root_attempts',d.attempts?.frontendRoot ?? '');"
 
       - name: Publish synthetic summary
         if: always()
@@ -52,6 +72,14 @@ jobs:
             synthetic-output.log
           if-no-files-found: warn
 
+      - name: Enforce monitor result
+        if: always()
+        run: |
+          if [ "${{ steps.synthetic.outputs.exit_code }}" != "0" ]; then
+            echo "Synthetic check failed with exit code ${{ steps.synthetic.outputs.exit_code }}"
+            exit 1
+          fi
+
   notify-on-failure:
     needs: monitor
     if: ${{ failure() && github.event_name != 'workflow_dispatch' }}
@@ -59,16 +87,41 @@ jobs:
     steps:
       - name: Open/update incident issue
         uses: actions/github-script@v7
+        env:
+          MONITOR_ERROR: ${{ needs.monitor.outputs.error }}
+          MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
+          MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
+          MONITOR_BACKEND_READY_MS: ${{ needs.monitor.outputs.backend_ready_ms }}
+          MONITOR_BACKEND_VERSION_MS: ${{ needs.monitor.outputs.backend_version_ms }}
+          MONITOR_FRONTEND_ROOT_MS: ${{ needs.monitor.outputs.frontend_root_ms }}
+          MONITOR_BACKEND_LIVE_ATTEMPTS: ${{ needs.monitor.outputs.backend_live_attempts }}
+          MONITOR_BACKEND_READY_ATTEMPTS: ${{ needs.monitor.outputs.backend_ready_attempts }}
+          MONITOR_BACKEND_VERSION_ATTEMPTS: ${{ needs.monitor.outputs.backend_version_attempts }}
+          MONITOR_FRONTEND_ROOT_ATTEMPTS: ${{ needs.monitor.outputs.frontend_root_attempts }}
         with:
           script: |
             const title = '[Incident] Synthetic Health Check failure';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const monitorError = process.env.MONITOR_ERROR || 'unknown';
+            const monitorCommit = process.env.MONITOR_COMMIT || 'unknown';
+            const backendLiveMs = process.env.MONITOR_BACKEND_LIVE_MS || 'n/a';
+            const backendReadyMs = process.env.MONITOR_BACKEND_READY_MS || 'n/a';
+            const backendVersionMs = process.env.MONITOR_BACKEND_VERSION_MS || 'n/a';
+            const frontendRootMs = process.env.MONITOR_FRONTEND_ROOT_MS || 'n/a';
+            const backendLiveAttempts = process.env.MONITOR_BACKEND_LIVE_ATTEMPTS || 'n/a';
+            const backendReadyAttempts = process.env.MONITOR_BACKEND_READY_ATTEMPTS || 'n/a';
+            const backendVersionAttempts = process.env.MONITOR_BACKEND_VERSION_ATTEMPTS || 'n/a';
+            const frontendRootAttempts = process.env.MONITOR_FRONTEND_ROOT_ATTEMPTS || 'n/a';
             const body = [
               'Synthetic Health Check falhou.',
               '',
               `- Workflow run: ${runUrl}`,
               `- Trigger: ${context.eventName}`,
               `- Time (UTC): ${new Date().toISOString()}`,
+              `- Error: ${monitorError}`,
+              `- Commit: ${monitorCommit}`,
+              `- Latencias (ms): live=${backendLiveMs}, ready=${backendReadyMs}, version=${backendVersionMs}, frontend=${frontendRootMs}`,
+              `- Attempts: live=${backendLiveAttempts}, ready=${backendReadyAttempts}, version=${backendVersionAttempts}, frontend=${frontendRootAttempts}`,
               '',
               'Acoes sugeridas:',
               '1. Verificar logs do workflow.',
@@ -89,7 +142,13 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: incident.number,
-                body: `Nova falha detectada em ${new Date().toISOString()}\n\nRun: ${runUrl}`,
+                body: [
+                  `Nova falha detectada em ${new Date().toISOString()}`,
+                  '',
+                  `Run: ${runUrl}`,
+                  `Error: ${monitorError}`,
+                  `Commit: ${monitorCommit}`,
+                ].join('\n'),
               });
               core.info(`Issue existente atualizada: #${incident.number}`);
             } else {
@@ -110,10 +169,21 @@ jobs:
     steps:
       - name: Close incident issue on recovery
         uses: actions/github-script@v7
+        env:
+          MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
+          MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
+          MONITOR_BACKEND_READY_MS: ${{ needs.monitor.outputs.backend_ready_ms }}
+          MONITOR_BACKEND_VERSION_MS: ${{ needs.monitor.outputs.backend_version_ms }}
+          MONITOR_FRONTEND_ROOT_MS: ${{ needs.monitor.outputs.frontend_root_ms }}
         with:
           script: |
             const title = '[Incident] Synthetic Health Check failure';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const monitorCommit = process.env.MONITOR_COMMIT || 'unknown';
+            const backendLiveMs = process.env.MONITOR_BACKEND_LIVE_MS || 'n/a';
+            const backendReadyMs = process.env.MONITOR_BACKEND_READY_MS || 'n/a';
+            const backendVersionMs = process.env.MONITOR_BACKEND_VERSION_MS || 'n/a';
+            const frontendRootMs = process.env.MONITOR_FRONTEND_ROOT_MS || 'n/a';
 
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
@@ -132,7 +202,13 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: incident.number,
-              body: `Recuperacao detectada em ${new Date().toISOString()}\n\nRun: ${runUrl}`,
+              body: [
+                `Recuperacao detectada em ${new Date().toISOString()}`,
+                '',
+                `Run: ${runUrl}`,
+                `Commit: ${monitorCommit}`,
+                `Latencias (ms): live=${backendLiveMs}, ready=${backendReadyMs}, version=${backendVersionMs}, frontend=${frontendRootMs}`,
+              ].join('\n'),
             });
 
             await github.rest.issues.update({
