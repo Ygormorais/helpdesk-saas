@@ -55,12 +55,77 @@ jobs:
         id: collect
         if: always()
         run: |
-          node -e "const fs=require('fs');const out=process.env.GITHUB_OUTPUT;const p='synthetic-output.json';let d={status:'error',error:'missing synthetic-output.json',checks:{},attempts:{},commitSha:'unknown'};if(fs.existsSync(p)){try{d=JSON.parse(fs.readFileSync(p,'utf8'));}catch(e){d={status:'error',error:'invalid synthetic-output.json',checks:{},attempts:{},commitSha:'unknown'};}}const set=(k,v)=>fs.appendFileSync(out, `${k}=${String(v ?? '').replace(/\n/g,' ')}\n`);set('status',d.status||'error');set('error',d.error||'');set('commit_sha',d.commitSha||'unknown');set('backend_live_ms',d.checks?.backendLiveMs ?? '');set('backend_ready_ms',d.checks?.backendReadyMs ?? '');set('backend_version_ms',d.checks?.backendVersionMs ?? '');set('frontend_root_ms',d.checks?.frontendRootMs ?? '');set('backend_live_attempts',d.attempts?.backendLive ?? '');set('backend_ready_attempts',d.attempts?.backendReady ?? '');set('backend_version_attempts',d.attempts?.backendVersion ?? '');set('frontend_root_attempts',d.attempts?.frontendRoot ?? '');"
+          node <<'NODE'
+          const fs = require('fs');
+          const out = process.env.GITHUB_OUTPUT;
+          const p = 'synthetic-output.json';
+          let d = {
+            status: 'error',
+            error: 'missing synthetic-output.json',
+            checks: {},
+            attempts: {},
+            commitSha: 'unknown',
+          };
+
+          if (fs.existsSync(p)) {
+            try {
+              d = JSON.parse(fs.readFileSync(p, 'utf8'));
+            } catch {
+              d = {
+                status: 'error',
+                error: 'invalid synthetic-output.json',
+                checks: {},
+                attempts: {},
+                commitSha: 'unknown',
+              };
+            }
+          }
+
+          const set = (k, v) => {
+            fs.appendFileSync(out, `${k}=${String(v ?? '').replace(/\n/g, ' ')}\n`);
+          };
+
+          set('status', d.status || 'error');
+          set('error', d.error || '');
+          set('commit_sha', d.commitSha || 'unknown');
+          set('backend_live_ms', d.checks?.backendLiveMs ?? '');
+          set('backend_ready_ms', d.checks?.backendReadyMs ?? '');
+          set('backend_version_ms', d.checks?.backendVersionMs ?? '');
+          set('frontend_root_ms', d.checks?.frontendRootMs ?? '');
+          set('backend_live_attempts', d.attempts?.backendLive ?? '');
+          set('backend_ready_attempts', d.attempts?.backendReady ?? '');
+          set('backend_version_attempts', d.attempts?.backendVersion ?? '');
+          set('frontend_root_attempts', d.attempts?.frontendRoot ?? '');
+          NODE
 
       - name: Publish synthetic summary
         if: always()
         run: |
-          node -e "const fs=require('fs');const summary=process.env.GITHUB_STEP_SUMMARY;const p='synthetic-output.json';const lines=['## Synthetic Health Check'];if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf8'));lines.push('');lines.push(`- status: **${d.status}**`);lines.push(`- commit: \`${d.commitSha}\``);lines.push(`- backend live: ${d.checks.backendLiveMs}ms (attempts: ${d.attempts.backendLive})`);lines.push(`- backend ready: ${d.checks.backendReadyMs}ms (attempts: ${d.attempts.backendReady})`);lines.push(`- backend version: ${d.checks.backendVersionMs}ms (attempts: ${d.attempts.backendVersion})`);lines.push(`- frontend root: ${d.checks.frontendRootMs}ms (attempts: ${d.attempts.frontendRoot})`);} else {lines.push('');lines.push('- status: **error** (no JSON output generated)');}fs.appendFileSync(summary, lines.join('\n') + '\n');"
+          node <<'NODE'
+          const fs = require('fs');
+          const summary = process.env.GITHUB_STEP_SUMMARY;
+          const p = 'synthetic-output.json';
+          const lines = ['## Synthetic Health Check'];
+
+          if (fs.existsSync(p)) {
+            const d = JSON.parse(fs.readFileSync(p, 'utf8'));
+            lines.push('');
+            lines.push(`- status: **${d.status}**`);
+            lines.push(`- commit: \`${d.commitSha}\``);
+            lines.push(`- backend live: ${d.checks.backendLiveMs}ms (attempts: ${d.attempts.backendLive})`);
+            lines.push(`- backend ready: ${d.checks.backendReadyMs}ms (attempts: ${d.attempts.backendReady})`);
+            lines.push(`- backend version: ${d.checks.backendVersionMs}ms (attempts: ${d.attempts.backendVersion})`);
+            lines.push(`- frontend root: ${d.checks.frontendRootMs}ms (attempts: ${d.attempts.frontendRoot})`);
+            if (d.error) {
+              lines.push(`- error: ${d.error}`);
+            }
+          } else {
+            lines.push('');
+            lines.push('- status: **error** (no JSON output generated)');
+          }
+
+          fs.appendFileSync(summary, lines.join('\n') + '\n');
+          NODE
 
       - name: Upload synthetic result artifact
         if: always()
