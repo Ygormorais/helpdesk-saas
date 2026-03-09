@@ -57,7 +57,6 @@ jobs:
               error: 'SMOKE_TEST_EMAIL/SMOKE_TEST_PASSWORD not configured',
             }, null, 2));
             NODE
-            echo "exit_code=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -66,7 +65,6 @@ jobs:
           scripts/smoke-auth.sh "$BACKEND_URL" "$SMOKE_TEST_EMAIL" "$SMOKE_TEST_PASSWORD" "$FRONTEND_URL"
           exit_code=$?
           set -e
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit "$exit_code"
 
       - name: Collect auth smoke outputs
@@ -158,8 +156,8 @@ jobs:
       - name: Enforce auth smoke result
         if: always()
         run: |
-          if [ "${{ steps.smoke.outputs.exit_code }}" != "0" ]; then
-            echo "Auth smoke check failed with exit code ${{ steps.smoke.outputs.exit_code }}"
+          if [ "${{ steps.collect.outputs.status }}" != "ok" ] && [ "${{ steps.collect.outputs.status }}" != "skipped" ]; then
+            echo "Auth smoke check failed with status ${{ steps.collect.outputs.status }}"
             exit 1
           fi
 
