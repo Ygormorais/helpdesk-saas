@@ -43,13 +43,20 @@ Windows:
 
 ```bash
 scripts\smoke-deploy.bat https://helpdesk-saas-production-0cd0.up.railway.app https://helpdesk-two-livid.vercel.app
+scripts\smoke-auth.bat https://helpdesk-saas-production-0cd0.up.railway.app smoke@example.com sua-senha https://helpdesk-two-livid.vercel.app
 ```
 
 Linux/macOS:
 
 ```bash
 scripts/smoke-deploy.sh https://helpdesk-saas-production-0cd0.up.railway.app https://helpdesk-two-livid.vercel.app
+scripts/smoke-auth.sh https://helpdesk-saas-production-0cd0.up.railway.app smoke@example.com sua-senha https://helpdesk-two-livid.vercel.app
 ```
+
+Secrets recomendados no GitHub Actions para smoke funcional:
+
+- `SMOKE_TEST_EMAIL`
+- `SMOKE_TEST_PASSWORD`
 
 ## 5) Deploy seguro (resumo)
 
@@ -58,7 +65,8 @@ scripts/smoke-deploy.sh https://helpdesk-saas-production-0cd0.up.railway.app htt
 3. Validar `/health/live` e `/health`.
 4. Deploy frontend (Vercel).
 5. Rodar smoke test.
-6. Validar fluxo funcional: login, criar ticket, comentar e fechar ticket.
+6. Rodar smoke autenticado e validar login.
+7. Validar fluxo funcional: criar ticket, comentar e fechar ticket.
 
 ## 6) Incidentes comuns
 
@@ -87,6 +95,12 @@ scripts/smoke-deploy.sh https://helpdesk-saas-production-0cd0.up.railway.app htt
   - `https://helpdesk-saas-production-0cd0.up.railway.app/api`
 - Fazer redeploy do frontend.
 
+## 6.5 Regressao funcional apos deploy
+
+- Rodar `scripts/smoke-auth.*`.
+- Se login ou `GET /api/auth/me` falhar, comparar com `GET /health/version`.
+- Se a regressao vier do deploy atual, seguir `ROLLBACK_RUNBOOK.md`.
+
 ## 7) Rotina operacional
 
 Diario:
@@ -94,7 +108,9 @@ Diario:
 - Verificar `/health`.
 - Conferir ultimo deploy e logs de erro.
 - Conferir ultimo run do workflow `Synthetic Health Check` (GitHub Actions).
+- Conferir ultimo run do workflow `Auth Smoke Check` (GitHub Actions).
 - Se falhar por latencia, validar regressao de performance antes de novo deploy.
+- Se o smoke autenticado falhar, bloquear promocao e avaliar rollback.
 - Considerar falha apos retries automaticos do monitor (evita falso positivo de oscilacao).
 - Se abrir issue automatica de incidente, seguir template de postmortem apos resolucao.
 - Validar se a severidade automatica (`P1`/`P2`) bate com o impacto real.
@@ -130,6 +146,7 @@ Mensal:
 ## 9) Monitoramento continuo
 
 - Guia completo: `MONITORING.md`
+- Rollback detalhado: `ROLLBACK_RUNBOOK.md`
 - Governanca de branch/PR: `GITHUB_GOVERNANCE.md`
 - Check operacional diario (rapido):
   - Windows: `scripts\prod-check.bat https://helpdesk-saas-production-0cd0.up.railway.app https://helpdesk-two-livid.vercel.app`

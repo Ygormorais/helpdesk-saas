@@ -1,0 +1,36 @@
+name: Auth Smoke Check
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  auth-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Run authenticated smoke check
+        env:
+          BACKEND_URL: ${{ vars.PROD_BACKEND_URL || 'https://helpdesk-saas-production-0cd0.up.railway.app' }}
+          FRONTEND_URL: ${{ vars.PROD_FRONTEND_URL || 'https://helpdesk-two-livid.vercel.app' }}
+          SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+          SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+        run: |
+          if [ -z "$SMOKE_TEST_EMAIL" ] || [ -z "$SMOKE_TEST_PASSWORD" ]; then
+            echo "::notice::SMOKE_TEST_EMAIL/SMOKE_TEST_PASSWORD nao configurados; pulando auth smoke check."
+            exit 0
+          fi
+
+          chmod +x scripts/smoke-auth.sh
+          scripts/smoke-auth.sh "$BACKEND_URL" "$SMOKE_TEST_EMAIL" "$SMOKE_TEST_PASSWORD" "$FRONTEND_URL"

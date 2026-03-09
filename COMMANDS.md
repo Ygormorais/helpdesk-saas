@@ -119,6 +119,16 @@ scripts/smoke-deploy.sh https://seu-backend.railway.app https://seu-frontend.ver
 scripts\smoke-deploy.bat https://seu-backend.railway.app https://seu-frontend.vercel.app
 ```
 
+## Smoke Funcional Autenticado
+
+```bash
+# Linux/macOS
+scripts/smoke-auth.sh https://seu-backend.railway.app smoke@example.com sua-senha https://seu-frontend.vercel.app
+
+# Windows
+scripts\smoke-auth.bat https://seu-backend.railway.app smoke@example.com sua-senha https://seu-frontend.vercel.app
+```
+
 ## Check Operacional Diario
 
 ```bash
@@ -176,11 +186,8 @@ vercel env add VITE_API_URL production
 ## Rollback (se algo der errado)
 
 ```bash
-# Railway
-railway rollback
-
-# Vercel
-vercel rollback
+# Procedimento documentado
+cat ROLLBACK_RUNBOOK.md
 ```
 
 ## Comandos Úteis
