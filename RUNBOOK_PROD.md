@@ -99,6 +99,7 @@ Diario:
 - Se abrir issue automatica de incidente, seguir template de postmortem apos resolucao.
 - Em cada merge na `master`, validar o `Job Summary` e o artefato do synthetic check.
 - Revisar/ajustar `Repository Variables` do monitor sintetico quando URLs/SLAs mudarem.
+- Se usar Slack/Discord, revisar `INCIDENT_WEBHOOK_URL` e `INCIDENT_WEBHOOK_PROVIDER`.
 
 Semanal:
 
