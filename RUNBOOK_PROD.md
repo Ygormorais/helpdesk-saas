@@ -37,6 +37,12 @@ Saude esperada:
 - `deps.redis.configured = true`
 - `deps.redis.ok = true`
 
+Observabilidade:
+
+- respostas de erro agora retornam `requestId` e `errorCode`
+- logs estruturados do backend incluem `route`, `requestId`, `errorCode` e stack em erros 5xx
+- `/api/metrics` expõe agregacao por rota/status e por `errorCode`
+
 ## 4) Smoke test pos-deploy
 
 Windows:

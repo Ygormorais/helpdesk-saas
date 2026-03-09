@@ -1,6 +1,9 @@
 import { getContext } from './requestContext.js';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
+type SerializeErrorOptions = {
+  includeStack?: boolean;
+};
 
 const levelRank: Record<Exclude<LogLevel, 'silent'>, number> = {
   debug: 10,
@@ -81,6 +84,32 @@ function safeJsonStringify(obj: any): string {
     }
     return v;
   });
+}
+
+export function serializeError(error: unknown, options: SerializeErrorOptions = {}) {
+  if (error instanceof Error) {
+    const out: Record<string, unknown> = {
+      name: error.name,
+      message: error.message,
+    };
+
+    if (options.includeStack && error.stack) {
+      out.stack = error.stack;
+    }
+
+    const cause = (error as any).cause;
+    if (cause instanceof Error) {
+      out.cause = serializeError(cause, options);
+    } else if (cause !== undefined) {
+      out.cause = cause;
+    }
+
+    return out;
+  }
+
+  return {
+    message: typeof error === 'string' ? error : safeJsonStringify(error),
+  };
 }
 
 function write(level: Exclude<LogLevel, 'silent'>, obj: Record<string, any>) {

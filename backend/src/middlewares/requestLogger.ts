@@ -43,10 +43,13 @@ export const requestLogger: RequestHandler = (req: any, res, next) => {
       msg: 'request',
       requestId,
       method: req.method,
+      route: route || '/',
       path: req.originalUrl || req.url,
       status: res.statusCode,
+      errorCode: errorCode || undefined,
       durationMs,
       ip: req.ip,
+      userAgent: req.get?.('user-agent') || undefined,
       userId,
       tenantId,
     };

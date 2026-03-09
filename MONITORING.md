@@ -14,6 +14,7 @@ Detectar indisponibilidade cedo e ter acao padrao para:
 - Backend readiness: `GET /health`
 - Backend version/build: `GET /health/version`
 - Frontend root: `GET /`
+- Erros de aplicacao: usar `requestId` + `errorCode` retornados pelo backend
 
 URLs atuais:
 
@@ -134,6 +135,8 @@ Condicao:
 Acao:
 
 1. Verificar Railway Deploy Logs.
+   - filtrar pelo `requestId` retornado ao cliente
+   - usar `errorCode` para agrupar regressao por tipo
 2. Verificar ultimo deploy e fazer rollback/redeploy se necessario.
 3. Confirmar retorno de `/health/live`.
 4. Rodar rollback conforme `ROLLBACK_RUNBOOK.md` se a falha vier do ultimo deploy.

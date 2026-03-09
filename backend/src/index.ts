@@ -17,6 +17,7 @@ import { getReadiness } from './services/healthService.js';
 import { metricsService } from './services/metricsService.js';
 import { startAuditRetentionCleanupScheduler } from './services/auditRetentionCleanupService.js';
 import { reportScheduleService } from './services/reportScheduleService.js';
+import { logger, serializeError } from './services/logger.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -108,8 +109,12 @@ app.set('io', io);
 
 const startServer = () => {
   httpServer.listen(config.port, () => {
-    console.log(`Server running on port ${config.port}`);
-    console.log(`Environment: ${config.nodeEnv}`);
+    logger.info({
+      msg: 'server.started',
+      port: config.port,
+      environment: config.nodeEnv,
+      commitSha: config.app.commitSha,
+    });
   });
 
   // Best-effort load persisted metrics.
@@ -136,12 +141,29 @@ const startServer = () => {
 connectDB()
   .then(startServer)
   .catch((err) => {
-    console.error('Starting server without MongoDB connection');
-    console.error(err);
+    logger.error({
+      msg: 'server.mongo_bootstrap_failed',
+      error: serializeError(err, { includeStack: true }),
+      environment: config.nodeEnv,
+    });
     if (config.nodeEnv === 'production') {
       process.exit(1);
     }
     startServer();
   });
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({
+    msg: 'process.unhandled_rejection',
+    error: serializeError(reason, { includeStack: true }),
+  });
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error({
+    msg: 'process.uncaught_exception',
+    error: serializeError(error, { includeStack: true }),
+  });
+});
 
 export default app;

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { config } from './index.js';
+import { logger, serializeError } from '../services/logger.js';
 
 export async function connectDB(): Promise<void> {
   try {
@@ -10,9 +11,16 @@ export async function connectDB(): Promise<void> {
       serverSelectionTimeoutMS: 5000,
       connectTimeoutMS: 5000,
     });
-    console.log(`MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+    logger.info({
+      msg: 'mongodb.connected',
+      host: conn.connection.host,
+      dbName: conn.connection.name,
+    });
   } catch (error) {
-    console.error(`MongoDB connection error: ${(error as Error).message}`);
+    logger.error({
+      msg: 'mongodb.connection_error',
+      error: serializeError(error, { includeStack: true }),
+    });
     throw error;
   }
 }

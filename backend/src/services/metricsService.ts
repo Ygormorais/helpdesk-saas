@@ -5,6 +5,8 @@ type CounterName =
   | 'http_requests_total'
   | 'http_4xx_total'
   | 'http_5xx_total'
+  | 'app_errors_total'
+  | 'operational_errors_total'
   | 'db_not_ready_total';
 
 type RouteKey = {
@@ -28,6 +30,7 @@ function routeField(key: RouteKey): string {
 export class MetricsService {
   private counters = new Map<CounterName, number>();
   private routes = new Map<string, number>();
+  private errorCodes = new Map<string, number>();
   private latencyMs: number[] = [];
   private startedAt = Date.now();
   private initialized = false;
@@ -75,6 +78,32 @@ export class MetricsService {
     void this.persistRoute(field, 1);
   }
 
+  observeError(params: {
+    method: string;
+    route: string;
+    statusCode: number;
+    errorCode: string;
+    isOperational: boolean;
+  }) {
+    this.inc('app_errors_total', 1);
+    if (params.isOperational) {
+      this.inc('operational_errors_total', 1);
+    }
+
+    const statusClass = toStatusClass(params.statusCode);
+    const field = [
+      String(params.method || '').toUpperCase(),
+      params.route || '/',
+      params.errorCode || 'UNKNOWN_ERROR',
+      statusClass,
+      params.isOperational ? 'operational' : 'unexpected',
+    ].join('|');
+
+    const prev = this.errorCodes.get(field) || 0;
+    this.errorCodes.set(field, prev + 1);
+    void this.persistErrorCode(field, 1);
+  }
+
   async initialize(): Promise<void> {
     if (this.initialized) return;
     this.initialized = true;
@@ -83,9 +112,10 @@ export class MetricsService {
     if (!redis) return;
 
     try {
-      const [counters, routes, latencyRaw] = await Promise.all([
+      const [counters, routes, errorCodes, latencyRaw] = await Promise.all([
         redis.hGetAll('metrics:counters'),
         redis.hGetAll('metrics:routes'),
+        redis.hGetAll('metrics:error-codes'),
         redis.lRange('metrics:latency', 0, 1999),
       ]);
 
@@ -99,6 +129,12 @@ export class MetricsService {
         const n = Number(v);
         if (!Number.isFinite(n)) continue;
         this.routes.set(k, n);
+      }
+
+      for (const [k, v] of Object.entries(errorCodes || {})) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) continue;
+        this.errorCodes.set(k, n);
       }
 
       const lat = (latencyRaw || [])
@@ -125,6 +161,7 @@ export class MetricsService {
       uptimeSec,
       counters: Object.fromEntries(this.counters.entries()),
       routes: Object.fromEntries(this.routes.entries()),
+      errorCodes: Object.fromEntries(this.errorCodes.entries()),
       latencyMs: {
         count: lat.length,
         p50: pct(50),
@@ -173,6 +210,17 @@ export class MetricsService {
       );
     }
 
+    lines.push('# TYPE app_errors_by_code_total counter');
+    for (const [field, value] of Object.entries(snap.errorCodes || {})) {
+      const [method, route, errorCode, statusClass, kind] = String(field).split('|');
+      const v = Number(value) || 0;
+      const safeRoute = (route || '').replace(/"/g, '');
+      const safeCode = (errorCode || '').replace(/"/g, '');
+      lines.push(
+        `app_errors_by_code_total{method="${method}",route="${safeRoute}",error_code="${safeCode}",status_class="${statusClass}",kind="${kind}"} ${v}`
+      );
+    }
+
     return `${lines.join('\n')}\n`;
   }
 
@@ -191,6 +239,16 @@ export class MetricsService {
     if (!redis) return;
     try {
       await redis.hIncrBy('metrics:routes', field, by);
+    } catch {
+      // ignore
+    }
+  }
+
+  private async persistErrorCode(field: string, by: number) {
+    const redis = await getRedisClient();
+    if (!redis) return;
+    try {
+      await redis.hIncrBy('metrics:error-codes', field, by);
     } catch {
       // ignore
     }
