@@ -228,7 +228,6 @@ jobs:
             }
 
       - name: Send webhook alert on failure
-        if: ${{ secrets.INCIDENT_WEBHOOK_URL != '' }}
         env:
           INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
           INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
@@ -242,6 +241,10 @@ jobs:
           node <<'NODE'
           const provider = String(process.env.INCIDENT_WEBHOOK_PROVIDER || 'slack').toLowerCase();
           const webhookUrl = process.env.INCIDENT_WEBHOOK_URL;
+          if (!webhookUrl) {
+            console.log('INCIDENT_WEBHOOK_URL not configured; skipping failure webhook.');
+            process.exit(0);
+          }
           const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
           const lines = [
             'Synthetic Health Check falhou.',
@@ -328,7 +331,6 @@ jobs:
             core.info(`Issue fechada: #${incident.number}`);
 
       - name: Send webhook alert on recovery
-        if: ${{ secrets.INCIDENT_WEBHOOK_URL != '' }}
         env:
           INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
           INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
@@ -341,6 +343,10 @@ jobs:
           node <<'NODE'
           const provider = String(process.env.INCIDENT_WEBHOOK_PROVIDER || 'slack').toLowerCase();
           const webhookUrl = process.env.INCIDENT_WEBHOOK_URL;
+          if (!webhookUrl) {
+            console.log('INCIDENT_WEBHOOK_URL not configured; skipping recovery webhook.');
+            process.exit(0);
+          }
           const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
           const lines = [
             'Synthetic Health Check recuperou.',
