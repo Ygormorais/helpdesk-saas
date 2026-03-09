@@ -61,6 +61,7 @@ Workflow: `.github/workflows/synthetic-health-check.yml`
   - Em falha: abre/atualiza issue `[Incident] Synthetic Health Check failure`
   - Em recuperacao: comenta e fecha a issue automaticamente
   - Opcional: envia alerta para webhook externo (`slack` ou `discord`)
+  - Classificacao automatica: `P1` para indisponibilidade, `P2` para degradacao/latencia
 
 Uso manual:
 

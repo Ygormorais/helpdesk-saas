@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.collect.outputs.status }}
+      severity: ${{ steps.collect.outputs.severity }}
+      failure_scope: ${{ steps.collect.outputs.failure_scope }}
       error: ${{ steps.collect.outputs.error }}
       commit_sha: ${{ steps.collect.outputs.commit_sha }}
       backend_live_ms: ${{ steps.collect.outputs.backend_live_ms }}
@@ -85,7 +87,39 @@ jobs:
             fs.appendFileSync(out, `${k}=${String(v ?? '').replace(/\n/g, ' ')}\n`);
           };
 
+          const classify = (payload) => {
+            if (payload.status === 'ok') {
+              return { severity: 'none', failureScope: 'none' };
+            }
+
+            const checks = payload.checks || {};
+            const error = String(payload.error || '').toLowerCase();
+            const hasBackendLive = checks.backendLiveMs !== undefined;
+            const hasBackendReady = checks.backendReadyMs !== undefined;
+            const hasBackendVersion = checks.backendVersionMs !== undefined;
+            const hasFrontendRoot = checks.frontendRootMs !== undefined;
+
+            if (!hasBackendLive) {
+              return { severity: 'P1', failureScope: 'backend-live' };
+            }
+            if (hasBackendVersion && !hasFrontendRoot) {
+              return { severity: 'P1', failureScope: 'frontend-root' };
+            }
+            if (!hasBackendReady || error.includes('ready=true') || error.includes('backend ready')) {
+              return { severity: 'P2', failureScope: 'backend-readiness' };
+            }
+            if (error.includes('latency')) {
+              return { severity: 'P2', failureScope: 'latency' };
+            }
+
+            return { severity: 'P1', failureScope: 'unknown' };
+          };
+
+          const classification = classify(d);
+
           set('status', d.status || 'error');
+          set('severity', classification.severity);
+          set('failure_scope', classification.failureScope);
           set('error', d.error || '');
           set('commit_sha', d.commitSha || 'unknown');
           set('backend_live_ms', d.checks?.backendLiveMs ?? '');
@@ -111,6 +145,12 @@ jobs:
             const d = JSON.parse(fs.readFileSync(p, 'utf8'));
             lines.push('');
             lines.push(`- status: **${d.status}**`);
+            if (d.severity) {
+              lines.push(`- severity: **${d.severity}**`);
+            }
+            if (d.failureScope) {
+              lines.push(`- scope: ${d.failureScope}`);
+            }
             lines.push(`- commit: \`${d.commitSha}\``);
             lines.push(`- backend live: ${d.checks.backendLiveMs}ms (attempts: ${d.attempts.backendLive})`);
             lines.push(`- backend ready: ${d.checks.backendReadyMs}ms (attempts: ${d.attempts.backendReady})`);
@@ -153,6 +193,8 @@ jobs:
       - name: Open/update incident issue
         uses: actions/github-script@v7
         env:
+          MONITOR_SEVERITY: ${{ needs.monitor.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.monitor.outputs.failure_scope }}
           MONITOR_ERROR: ${{ needs.monitor.outputs.error }}
           MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
           MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
@@ -167,6 +209,8 @@ jobs:
           script: |
             const title = '[Incident] Synthetic Health Check failure';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const monitorSeverity = process.env.MONITOR_SEVERITY || 'unknown';
+            const monitorFailureScope = process.env.MONITOR_FAILURE_SCOPE || 'unknown';
             const monitorError = process.env.MONITOR_ERROR || 'unknown';
             const monitorCommit = process.env.MONITOR_COMMIT || 'unknown';
             const backendLiveMs = process.env.MONITOR_BACKEND_LIVE_MS || 'n/a';
@@ -183,6 +227,8 @@ jobs:
               `- Workflow run: ${runUrl}`,
               `- Trigger: ${context.eventName}`,
               `- Time (UTC): ${new Date().toISOString()}`,
+              `- Severity: ${monitorSeverity}`,
+              `- Scope: ${monitorFailureScope}`,
               `- Error: ${monitorError}`,
               `- Commit: ${monitorCommit}`,
               `- Latencias (ms): live=${backendLiveMs}, ready=${backendReadyMs}, version=${backendVersionMs}, frontend=${frontendRootMs}`,
@@ -211,6 +257,8 @@ jobs:
                   `Nova falha detectada em ${new Date().toISOString()}`,
                   '',
                   `Run: ${runUrl}`,
+                  `Severity: ${monitorSeverity}`,
+                  `Scope: ${monitorFailureScope}`,
                   `Error: ${monitorError}`,
                   `Commit: ${monitorCommit}`,
                 ].join('\n'),
@@ -231,6 +279,8 @@ jobs:
         env:
           INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
           INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
+          MONITOR_SEVERITY: ${{ needs.monitor.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.monitor.outputs.failure_scope }}
           MONITOR_ERROR: ${{ needs.monitor.outputs.error }}
           MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
           MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
@@ -248,6 +298,8 @@ jobs:
           const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
           const lines = [
             'Synthetic Health Check falhou.',
+            `Severity: ${process.env.MONITOR_SEVERITY || 'unknown'}`,
+            `Scope: ${process.env.MONITOR_FAILURE_SCOPE || 'unknown'}`,
             `Repo: ${process.env.GITHUB_REPOSITORY}`,
             `Run: ${runUrl}`,
             `Error: ${process.env.MONITOR_ERROR || 'unknown'}`,
@@ -280,6 +332,8 @@ jobs:
       - name: Close incident issue on recovery
         uses: actions/github-script@v7
         env:
+          MONITOR_SEVERITY: ${{ needs.monitor.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.monitor.outputs.failure_scope }}
           MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
           MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
           MONITOR_BACKEND_READY_MS: ${{ needs.monitor.outputs.backend_ready_ms }}
@@ -289,6 +343,8 @@ jobs:
           script: |
             const title = '[Incident] Synthetic Health Check failure';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const monitorSeverity = process.env.MONITOR_SEVERITY || 'none';
+            const monitorFailureScope = process.env.MONITOR_FAILURE_SCOPE || 'none';
             const monitorCommit = process.env.MONITOR_COMMIT || 'unknown';
             const backendLiveMs = process.env.MONITOR_BACKEND_LIVE_MS || 'n/a';
             const backendReadyMs = process.env.MONITOR_BACKEND_READY_MS || 'n/a';
@@ -316,6 +372,7 @@ jobs:
                 `Recuperacao detectada em ${new Date().toISOString()}`,
                 '',
                 `Run: ${runUrl}`,
+                `Recovered from: ${monitorSeverity}/${monitorFailureScope}`,
                 `Commit: ${monitorCommit}`,
                 `Latencias (ms): live=${backendLiveMs}, ready=${backendReadyMs}, version=${backendVersionMs}, frontend=${frontendRootMs}`,
               ].join('\n'),
@@ -334,6 +391,8 @@ jobs:
         env:
           INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
           INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
+          MONITOR_SEVERITY: ${{ needs.monitor.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.monitor.outputs.failure_scope }}
           MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
           MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
           MONITOR_BACKEND_READY_MS: ${{ needs.monitor.outputs.backend_ready_ms }}
@@ -350,6 +409,7 @@ jobs:
           const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
           const lines = [
             'Synthetic Health Check recuperou.',
+            `Recovered from: ${process.env.MONITOR_SEVERITY || 'none'}/${process.env.MONITOR_FAILURE_SCOPE || 'none'}`,
             `Repo: ${process.env.GITHUB_REPOSITORY}`,
             `Run: ${runUrl}`,
             `Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,

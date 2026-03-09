@@ -97,6 +97,7 @@ Diario:
 - Se falhar por latencia, validar regressao de performance antes de novo deploy.
 - Considerar falha apos retries automaticos do monitor (evita falso positivo de oscilacao).
 - Se abrir issue automatica de incidente, seguir template de postmortem apos resolucao.
+- Validar se a severidade automatica (`P1`/`P2`) bate com o impacto real.
 - Em cada merge na `master`, validar o `Job Summary` e o artefato do synthetic check.
 - Revisar/ajustar `Repository Variables` do monitor sintetico quando URLs/SLAs mudarem.
 - Se usar Slack/Discord, revisar `INCIDENT_WEBHOOK_URL` e `INCIDENT_WEBHOOK_PROVIDER`.
