@@ -43,20 +43,7 @@ jobs:
         run: |
           if [ -z "$SMOKE_TEST_EMAIL" ] || [ -z "$SMOKE_TEST_PASSWORD" ]; then
             echo "::notice::SMOKE_TEST_EMAIL/SMOKE_TEST_PASSWORD nao configurados; pulando auth smoke check."
-            node <<'NODE'
-            const fs = require('fs');
-            fs.writeFileSync('auth-smoke-output.json', JSON.stringify({
-              status: 'skipped',
-              severity: 'none',
-              failureScope: 'skipped',
-              checkedAt: new Date().toISOString(),
-              backend: process.env.BACKEND_URL,
-              frontend: process.env.FRONTEND_URL,
-              commitSha: 'unknown',
-              checks: {},
-              error: 'SMOKE_TEST_EMAIL/SMOKE_TEST_PASSWORD not configured',
-            }, null, 2));
-            NODE
+            node -e "const fs=require('fs'); fs.writeFileSync('auth-smoke-output.json', JSON.stringify({ status: 'skipped', severity: 'none', failureScope: 'skipped', checkedAt: new Date().toISOString(), backend: process.env.BACKEND_URL, frontend: process.env.FRONTEND_URL, commitSha: 'unknown', checks: {}, error: 'SMOKE_TEST_EMAIL/SMOKE_TEST_PASSWORD not configured' }, null, 2));"
             exit 0
           fi
 
