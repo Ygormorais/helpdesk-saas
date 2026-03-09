@@ -86,6 +86,8 @@ async function getStatus(url, name) {
 
 const result = {
   status: 'error',
+  severity: 'none',
+  failureScope: 'none',
   checkedAt: new Date().toISOString(),
   backend: backendBase,
   frontend: frontendBase,
@@ -99,7 +101,38 @@ const result = {
   error: '',
 };
 
+function classifyResult(payload) {
+  if (payload.status === 'ok') {
+    return { severity: 'none', failureScope: 'none' };
+  }
+
+  const checks = payload.checks || {};
+  const error = String(payload.error || '').toLowerCase();
+  const hasBackendLive = checks.backendLiveMs !== undefined;
+  const hasBackendReady = checks.backendReadyMs !== undefined;
+  const hasBackendVersion = checks.backendVersionMs !== undefined;
+  const hasFrontendRoot = checks.frontendRootMs !== undefined;
+
+  if (!hasBackendLive) {
+    return { severity: 'P1', failureScope: 'backend-live' };
+  }
+  if (hasBackendVersion && !hasFrontendRoot) {
+    return { severity: 'P1', failureScope: 'frontend-root' };
+  }
+  if (!hasBackendReady || error.includes('ready=true') || error.includes('backend ready')) {
+    return { severity: 'P2', failureScope: 'backend-readiness' };
+  }
+  if (error.includes('latency')) {
+    return { severity: 'P2', failureScope: 'latency' };
+  }
+
+  return { severity: 'P1', failureScope: 'unknown' };
+}
+
 async function writeResult() {
+  const classification = classifyResult(result);
+  result.severity = classification.severity;
+  result.failureScope = classification.failureScope;
   if (!outputFile) {
     return;
   }
