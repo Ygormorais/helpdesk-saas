@@ -227,6 +227,48 @@ jobs:
               core.info(`Issue criada: #${created.number}`);
             }
 
+      - name: Send webhook alert on failure
+        if: ${{ secrets.INCIDENT_WEBHOOK_URL != '' }}
+        env:
+          INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
+          INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
+          MONITOR_ERROR: ${{ needs.monitor.outputs.error }}
+          MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
+          MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
+          MONITOR_BACKEND_READY_MS: ${{ needs.monitor.outputs.backend_ready_ms }}
+          MONITOR_BACKEND_VERSION_MS: ${{ needs.monitor.outputs.backend_version_ms }}
+          MONITOR_FRONTEND_ROOT_MS: ${{ needs.monitor.outputs.frontend_root_ms }}
+        run: |
+          node <<'NODE'
+          const provider = String(process.env.INCIDENT_WEBHOOK_PROVIDER || 'slack').toLowerCase();
+          const webhookUrl = process.env.INCIDENT_WEBHOOK_URL;
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const lines = [
+            'Synthetic Health Check falhou.',
+            `Repo: ${process.env.GITHUB_REPOSITORY}`,
+            `Run: ${runUrl}`,
+            `Error: ${process.env.MONITOR_ERROR || 'unknown'}`,
+            `Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,
+            `Latencias (ms): live=${process.env.MONITOR_BACKEND_LIVE_MS || 'n/a'}, ready=${process.env.MONITOR_BACKEND_READY_MS || 'n/a'}, version=${process.env.MONITOR_BACKEND_VERSION_MS || 'n/a'}, frontend=${process.env.MONITOR_FRONTEND_ROOT_MS || 'n/a'}`,
+          ];
+          const text = lines.join('\n');
+          const payload = provider === 'discord'
+            ? { content: text }
+            : { text };
+
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            throw new Error(`Webhook failure alert failed with HTTP ${res.status}`);
+          }
+
+          console.log(`Webhook alert sent via ${provider}`);
+          NODE
+
   notify-on-recovery:
     needs: monitor
     if: ${{ success() && github.event_name != 'workflow_dispatch' }}
@@ -284,3 +326,43 @@ jobs:
             });
 
             core.info(`Issue fechada: #${incident.number}`);
+
+      - name: Send webhook alert on recovery
+        if: ${{ secrets.INCIDENT_WEBHOOK_URL != '' }}
+        env:
+          INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
+          INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
+          MONITOR_COMMIT: ${{ needs.monitor.outputs.commit_sha }}
+          MONITOR_BACKEND_LIVE_MS: ${{ needs.monitor.outputs.backend_live_ms }}
+          MONITOR_BACKEND_READY_MS: ${{ needs.monitor.outputs.backend_ready_ms }}
+          MONITOR_BACKEND_VERSION_MS: ${{ needs.monitor.outputs.backend_version_ms }}
+          MONITOR_FRONTEND_ROOT_MS: ${{ needs.monitor.outputs.frontend_root_ms }}
+        run: |
+          node <<'NODE'
+          const provider = String(process.env.INCIDENT_WEBHOOK_PROVIDER || 'slack').toLowerCase();
+          const webhookUrl = process.env.INCIDENT_WEBHOOK_URL;
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const lines = [
+            'Synthetic Health Check recuperou.',
+            `Repo: ${process.env.GITHUB_REPOSITORY}`,
+            `Run: ${runUrl}`,
+            `Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,
+            `Latencias (ms): live=${process.env.MONITOR_BACKEND_LIVE_MS || 'n/a'}, ready=${process.env.MONITOR_BACKEND_READY_MS || 'n/a'}, version=${process.env.MONITOR_BACKEND_VERSION_MS || 'n/a'}, frontend=${process.env.MONITOR_FRONTEND_ROOT_MS || 'n/a'}`,
+          ];
+          const text = lines.join('\n');
+          const payload = provider === 'discord'
+            ? { content: text }
+            : { text };
+
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            throw new Error(`Webhook recovery alert failed with HTTP ${res.status}`);
+          }
+
+          console.log(`Webhook recovery sent via ${provider}`);
+          NODE

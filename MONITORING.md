@@ -60,6 +60,7 @@ Workflow: `.github/workflows/synthetic-health-check.yml`
 - Automacao de incidente:
   - Em falha: abre/atualiza issue `[Incident] Synthetic Health Check failure`
   - Em recuperacao: comenta e fecha a issue automaticamente
+  - Opcional: envia alerta para webhook externo (`slack` ou `discord`)
 
 Uso manual:
 
@@ -78,6 +79,11 @@ Configuracao recomendada em `GitHub -> Settings -> Secrets and variables -> Acti
 - `SYNTHETIC_HEALTHCHECK_RETRY_DELAY_MS`
 - `SYNTHETIC_MAX_BACKEND_LATENCY_MS`
 - `SYNTHETIC_MAX_FRONTEND_LATENCY_MS`
+- `INCIDENT_WEBHOOK_PROVIDER` (`slack` ou `discord`, default `slack`)
+
+Configuracao recomendada em `GitHub -> Settings -> Secrets and variables -> Actions -> Secrets`:
+
+- `INCIDENT_WEBHOOK_URL`
 
 ## 4) Severidade e resposta
 
