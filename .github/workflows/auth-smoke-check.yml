@@ -8,10 +8,21 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   auth-smoke:
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.collect.outputs.status }}
+      severity: ${{ steps.collect.outputs.severity }}
+      failure_scope: ${{ steps.collect.outputs.failure_scope }}
+      error: ${{ steps.collect.outputs.error }}
+      commit_sha: ${{ steps.collect.outputs.commit_sha }}
+      auth_login_ms: ${{ steps.collect.outputs.auth_login_ms }}
+      auth_me_ms: ${{ steps.collect.outputs.auth_me_ms }}
+      backend_version_ms: ${{ steps.collect.outputs.backend_version_ms }}
+      frontend_root_ms: ${{ steps.collect.outputs.frontend_root_ms }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,16 +32,318 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Run authenticated smoke check
+        id: smoke
+        continue-on-error: true
         env:
           BACKEND_URL: ${{ vars.PROD_BACKEND_URL || 'https://helpdesk-saas-production-0cd0.up.railway.app' }}
           FRONTEND_URL: ${{ vars.PROD_FRONTEND_URL || 'https://helpdesk-two-livid.vercel.app' }}
           SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
           SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+          AUTH_SMOKE_OUTPUT_FILE: auth-smoke-output.json
         run: |
           if [ -z "$SMOKE_TEST_EMAIL" ] || [ -z "$SMOKE_TEST_PASSWORD" ]; then
             echo "::notice::SMOKE_TEST_EMAIL/SMOKE_TEST_PASSWORD nao configurados; pulando auth smoke check."
+            node -e "const fs=require('fs'); fs.writeFileSync('auth-smoke-output.json', JSON.stringify({ status: 'skipped', severity: 'none', failureScope: 'skipped', checkedAt: new Date().toISOString(), backend: process.env.BACKEND_URL, frontend: process.env.FRONTEND_URL, commitSha: 'unknown', checks: {}, error: 'SMOKE_TEST_EMAIL/SMOKE_TEST_PASSWORD not configured' }, null, 2));"
             exit 0
           fi
 
           chmod +x scripts/smoke-auth.sh
+          set +e
           scripts/smoke-auth.sh "$BACKEND_URL" "$SMOKE_TEST_EMAIL" "$SMOKE_TEST_PASSWORD" "$FRONTEND_URL"
+          exit_code=$?
+          set -e
+          exit "$exit_code"
+
+      - name: Collect auth smoke outputs
+        id: collect
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const out = process.env.GITHUB_OUTPUT;
+          const p = 'auth-smoke-output.json';
+          let d = {
+            status: 'error',
+            severity: 'P1',
+            failureScope: 'unknown',
+            error: 'missing auth-smoke-output.json',
+            commitSha: 'unknown',
+            checks: {},
+          };
+
+          if (fs.existsSync(p)) {
+            try {
+              d = JSON.parse(fs.readFileSync(p, 'utf8'));
+            } catch {
+              d = {
+                status: 'error',
+                severity: 'P1',
+                failureScope: 'unknown',
+                error: 'invalid auth-smoke-output.json',
+                commitSha: 'unknown',
+                checks: {},
+              };
+            }
+          }
+
+          const set = (k, v) => {
+            fs.appendFileSync(out, `${k}=${String(v ?? '').replace(/\n/g, ' ')}\n`);
+          };
+
+          set('status', d.status || 'error');
+          set('severity', d.severity || 'P1');
+          set('failure_scope', d.failureScope || 'unknown');
+          set('error', d.error || '');
+          set('commit_sha', d.commitSha || 'unknown');
+          set('auth_login_ms', d.checks?.authLoginMs ?? '');
+          set('auth_me_ms', d.checks?.authMeMs ?? '');
+          set('backend_version_ms', d.checks?.backendVersionMs ?? '');
+          set('frontend_root_ms', d.checks?.frontendRootMs ?? '');
+          NODE
+
+      - name: Publish auth smoke summary
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const summary = process.env.GITHUB_STEP_SUMMARY;
+          const p = 'auth-smoke-output.json';
+          const lines = ['## Auth Smoke Check'];
+
+          if (fs.existsSync(p)) {
+            const d = JSON.parse(fs.readFileSync(p, 'utf8'));
+            lines.push('');
+            lines.push(`- status: **${d.status}**`);
+            lines.push(`- severity: **${d.severity || 'none'}**`);
+            lines.push(`- scope: ${d.failureScope || 'none'}`);
+            lines.push(`- commit: \`${d.commitSha || 'unknown'}\``);
+            lines.push(`- auth login: ${d.checks?.authLoginMs ?? 'n/a'}ms`);
+            lines.push(`- auth me: ${d.checks?.authMeMs ?? 'n/a'}ms`);
+            lines.push(`- health version: ${d.checks?.backendVersionMs ?? 'n/a'}ms`);
+            lines.push(`- frontend root: ${d.checks?.frontendRootMs ?? 'n/a'}ms`);
+            if (d.error) {
+              lines.push(`- error: ${d.error}`);
+            }
+          } else {
+            lines.push('');
+            lines.push('- status: **error** (no JSON output generated)');
+          }
+
+          fs.appendFileSync(summary, lines.join('\n') + '\n');
+          NODE
+
+      - name: Upload auth smoke result artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-smoke-result
+          path: auth-smoke-output.json
+          if-no-files-found: warn
+
+      - name: Enforce auth smoke result
+        if: always()
+        run: |
+          if [ "${{ steps.collect.outputs.status }}" != "ok" ] && [ "${{ steps.collect.outputs.status }}" != "skipped" ]; then
+            echo "Auth smoke check failed with status ${{ steps.collect.outputs.status }}"
+            exit 1
+          fi
+
+  notify-on-failure:
+    needs: auth-smoke
+    if: ${{ failure() && github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open/update auth incident issue
+        uses: actions/github-script@v7
+        env:
+          MONITOR_SEVERITY: ${{ needs.auth-smoke.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.auth-smoke.outputs.failure_scope }}
+          MONITOR_ERROR: ${{ needs.auth-smoke.outputs.error }}
+          MONITOR_COMMIT: ${{ needs.auth-smoke.outputs.commit_sha }}
+          MONITOR_AUTH_LOGIN_MS: ${{ needs.auth-smoke.outputs.auth_login_ms }}
+          MONITOR_AUTH_ME_MS: ${{ needs.auth-smoke.outputs.auth_me_ms }}
+          MONITOR_BACKEND_VERSION_MS: ${{ needs.auth-smoke.outputs.backend_version_ms }}
+          MONITOR_FRONTEND_ROOT_MS: ${{ needs.auth-smoke.outputs.frontend_root_ms }}
+        with:
+          script: |
+            const title = '[Incident] Auth Smoke Check failure';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              'Auth Smoke Check falhou.',
+              '',
+              `- Workflow run: ${runUrl}`,
+              `- Trigger: ${context.eventName}`,
+              `- Time (UTC): ${new Date().toISOString()}`,
+              `- Severity: ${process.env.MONITOR_SEVERITY || 'unknown'}`,
+              `- Scope: ${process.env.MONITOR_FAILURE_SCOPE || 'unknown'}`,
+              `- Error: ${process.env.MONITOR_ERROR || 'unknown'}`,
+              `- Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,
+              `- Latencias (ms): login=${process.env.MONITOR_AUTH_LOGIN_MS || 'n/a'}, me=${process.env.MONITOR_AUTH_ME_MS || 'n/a'}, version=${process.env.MONITOR_BACKEND_VERSION_MS || 'n/a'}, frontend=${process.env.MONITOR_FRONTEND_ROOT_MS || 'n/a'}`,
+              '',
+              'Acoes sugeridas:',
+              '1. Validar login manualmente.',
+              '2. Validar /api/auth/me com token gerado.',
+              '3. Se a regressao veio do deploy atual, seguir ROLLBACK_RUNBOOK.md.',
+            ].join('\n');
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const incident = issues.find((i) => i.title === title);
+            if (incident) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: incident.number,
+                body: [
+                  `Nova falha detectada em ${new Date().toISOString()}`,
+                  '',
+                  `Run: ${runUrl}`,
+                  `Severity: ${process.env.MONITOR_SEVERITY || 'unknown'}`,
+                  `Scope: ${process.env.MONITOR_FAILURE_SCOPE || 'unknown'}`,
+                  `Error: ${process.env.MONITOR_ERROR || 'unknown'}`,
+                  `Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,
+                ].join('\n'),
+              });
+              core.info(`Issue existente atualizada: #${incident.number}`);
+            } else {
+              const { data: created } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['incident', 'monitoring'],
+              });
+              core.info(`Issue criada: #${created.number}`);
+            }
+
+      - name: Send webhook alert on auth smoke failure
+        env:
+          INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
+          INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
+          MONITOR_SEVERITY: ${{ needs.auth-smoke.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.auth-smoke.outputs.failure_scope }}
+          MONITOR_ERROR: ${{ needs.auth-smoke.outputs.error }}
+          MONITOR_COMMIT: ${{ needs.auth-smoke.outputs.commit_sha }}
+        run: |
+          node <<'NODE'
+          const provider = String(process.env.INCIDENT_WEBHOOK_PROVIDER || 'slack').toLowerCase();
+          const webhookUrl = process.env.INCIDENT_WEBHOOK_URL;
+          if (!webhookUrl) {
+            console.log('INCIDENT_WEBHOOK_URL not configured; skipping auth smoke failure webhook.');
+            process.exit(0);
+          }
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const lines = [
+            'Auth Smoke Check falhou.',
+            `Severity: ${process.env.MONITOR_SEVERITY || 'unknown'}`,
+            `Scope: ${process.env.MONITOR_FAILURE_SCOPE || 'unknown'}`,
+            `Repo: ${process.env.GITHUB_REPOSITORY}`,
+            `Run: ${runUrl}`,
+            `Error: ${process.env.MONITOR_ERROR || 'unknown'}`,
+            `Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,
+          ];
+          const payload = provider === 'discord'
+            ? { content: lines.join('\n') }
+            : { text: lines.join('\n') };
+
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            throw new Error(`Webhook auth smoke failure alert failed with HTTP ${res.status}`);
+          }
+          NODE
+
+  notify-on-recovery:
+    needs: auth-smoke
+    if: ${{ success() && needs.auth-smoke.outputs.status == 'ok' && github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close auth incident issue on recovery
+        uses: actions/github-script@v7
+        env:
+          MONITOR_SEVERITY: ${{ needs.auth-smoke.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.auth-smoke.outputs.failure_scope }}
+          MONITOR_COMMIT: ${{ needs.auth-smoke.outputs.commit_sha }}
+        with:
+          script: |
+            const title = '[Incident] Auth Smoke Check failure';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const incident = issues.find((i) => i.title === title);
+            if (!incident) {
+              core.info('Nenhum incidente auth aberto para fechar.');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: incident.number,
+              body: [
+                `Recuperacao detectada em ${new Date().toISOString()}`,
+                '',
+                `Run: ${runUrl}`,
+                `Recovered from: ${process.env.MONITOR_SEVERITY || 'none'}/${process.env.MONITOR_FAILURE_SCOPE || 'none'}`,
+                `Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,
+              ].join('\n'),
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: incident.number,
+              state: 'closed',
+            });
+
+      - name: Send webhook alert on auth smoke recovery
+        env:
+          INCIDENT_WEBHOOK_URL: ${{ secrets.INCIDENT_WEBHOOK_URL }}
+          INCIDENT_WEBHOOK_PROVIDER: ${{ vars.INCIDENT_WEBHOOK_PROVIDER || 'slack' }}
+          MONITOR_SEVERITY: ${{ needs.auth-smoke.outputs.severity }}
+          MONITOR_FAILURE_SCOPE: ${{ needs.auth-smoke.outputs.failure_scope }}
+          MONITOR_COMMIT: ${{ needs.auth-smoke.outputs.commit_sha }}
+        run: |
+          node <<'NODE'
+          const provider = String(process.env.INCIDENT_WEBHOOK_PROVIDER || 'slack').toLowerCase();
+          const webhookUrl = process.env.INCIDENT_WEBHOOK_URL;
+          if (!webhookUrl) {
+            console.log('INCIDENT_WEBHOOK_URL not configured; skipping auth smoke recovery webhook.');
+            process.exit(0);
+          }
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const lines = [
+            'Auth Smoke Check recuperou.',
+            `Recovered from: ${process.env.MONITOR_SEVERITY || 'none'}/${process.env.MONITOR_FAILURE_SCOPE || 'none'}`,
+            `Repo: ${process.env.GITHUB_REPOSITORY}`,
+            `Run: ${runUrl}`,
+            `Commit: ${process.env.MONITOR_COMMIT || 'unknown'}`,
+          ];
+          const payload = provider === 'discord'
+            ? { content: lines.join('\n') }
+            : { text: lines.join('\n') };
+
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            throw new Error(`Webhook auth smoke recovery alert failed with HTTP ${res.status}`);
+          }
+          NODE

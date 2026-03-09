@@ -96,6 +96,7 @@ Workflow: `.github/workflows/auth-smoke-check.yml`
   - a cada merge/push em `master`
   - manual (`workflow_dispatch`)
 - Script usado:
+  - Node: `scripts/auth-smoke-check.mjs`
   - Linux/macOS: `scripts/smoke-auth.sh`
   - Windows: `scripts\smoke-auth.bat`
 - Checks executados:
@@ -107,6 +108,12 @@ Workflow: `.github/workflows/auth-smoke-check.yml`
 - Secrets exigidos:
   - `SMOKE_TEST_EMAIL`
   - `SMOKE_TEST_PASSWORD`
+- Se os secrets nao estiverem configurados, o workflow fecha como `skipped` e nao abre incidente.
+- Em falha funcional real:
+  - abre/atualiza issue `[Incident] Auth Smoke Check failure`
+  - publica `Job Summary`
+  - salva artefato `auth-smoke-result`
+  - opcionalmente envia webhook externo usando `INCIDENT_WEBHOOK_URL`
 
 Uso manual:
 
