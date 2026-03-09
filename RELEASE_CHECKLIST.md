@@ -35,6 +35,7 @@
 - [ ] `GET /health/live` retorna `status=ok`.
 - [ ] `GET /health` retorna `ready=true`.
 - [ ] `GET /health/version` retorna `commitSha` esperado.
+- [ ] `Auth Smoke Check` passou (ou foi executado manualmente com credenciais validas).
 - [ ] Login funciona no frontend.
 - [ ] Fluxo basico testado: criar chamado, comentar e fechar.
 - [ ] Sem erros criticos nos logs de deploy/runtime.
@@ -45,6 +46,7 @@
 - [ ] Atualizar changelog/resumo de release (PR ou issue).
 - [ ] Confirmar alertas e contatos de on-call.
 - [ ] Validar template de incidente disponivel em `.github/ISSUE_TEMPLATE/postmortem.md`.
+- [ ] Revisar se `ROLLBACK_RUNBOOK.md` continua coerente com Railway/Vercel atuais.
 
 ## 6) Rotina mensal (operacao)
 

@@ -85,6 +85,35 @@ Configuracao recomendada em `GitHub -> Settings -> Secrets and variables -> Acti
 Configuracao recomendada em `GitHub -> Settings -> Secrets and variables -> Actions -> Secrets`:
 
 - `INCIDENT_WEBHOOK_URL`
+- `SMOKE_TEST_EMAIL`
+- `SMOKE_TEST_PASSWORD`
+
+## 3.2 Smoke funcional autenticado
+
+Workflow: `.github/workflows/auth-smoke-check.yml`
+
+- Gatilhos:
+  - a cada merge/push em `master`
+  - manual (`workflow_dispatch`)
+- Script usado:
+  - Linux/macOS: `scripts/smoke-auth.sh`
+  - Windows: `scripts\smoke-auth.bat`
+- Checks executados:
+  - frontend `/` (opcional)
+  - `POST /api/auth/login`
+  - validacao do `token`
+  - `GET /api/auth/me`
+  - `GET /health/version`
+- Secrets exigidos:
+  - `SMOKE_TEST_EMAIL`
+  - `SMOKE_TEST_PASSWORD`
+
+Uso manual:
+
+```bash
+scripts/smoke-auth.sh https://helpdesk-saas-production-0cd0.up.railway.app smoke@example.com sua-senha https://helpdesk-two-livid.vercel.app
+scripts\smoke-auth.bat https://helpdesk-saas-production-0cd0.up.railway.app smoke@example.com sua-senha https://helpdesk-two-livid.vercel.app
+```
 
 ## 4) Severidade e resposta
 
@@ -93,12 +122,14 @@ Configuracao recomendada em `GitHub -> Settings -> Secrets and variables -> Acti
 Condicao:
 
 - `/health/live` falha, ou frontend falha por mais de 2 checks seguidos.
+- smoke autenticado falha em login/`/api/auth/me` apos deploy.
 
 Acao:
 
 1. Verificar Railway Deploy Logs.
 2. Verificar ultimo deploy e fazer rollback/redeploy se necessario.
 3. Confirmar retorno de `/health/live`.
+4. Rodar rollback conforme `ROLLBACK_RUNBOOK.md` se a falha vier do ultimo deploy.
 
 ### P2 - degradado
 
@@ -130,3 +161,4 @@ scripts/prod-check.sh https://helpdesk-saas-production-0cd0.up.railway.app https
 
 - Se P1 durar > 15 min, abrir incidente formal e congelar novos deploys.
 - Se P2 repetir mais de 3 vezes na semana, abrir tarefa de correcao definitiva.
+- Se o smoke autenticado falhar em deploy novo, tratar como regressao funcional e bloquear promocao ate corrigir ou rollback.
