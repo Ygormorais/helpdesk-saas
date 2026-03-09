@@ -111,6 +111,7 @@ Diario:
 - Conferir ultimo run do workflow `Auth Smoke Check` (GitHub Actions).
 - Se falhar por latencia, validar regressao de performance antes de novo deploy.
 - Se o smoke autenticado falhar, bloquear promocao e avaliar rollback.
+- Se o auth smoke estiver `skipped`, revisar `SMOKE_TEST_EMAIL` e `SMOKE_TEST_PASSWORD` no GitHub Actions.
 - Considerar falha apos retries automaticos do monitor (evita falso positivo de oscilacao).
 - Se abrir issue automatica de incidente, seguir template de postmortem apos resolucao.
 - Validar se a severidade automatica (`P1`/`P2`) bate com o impacto real.
