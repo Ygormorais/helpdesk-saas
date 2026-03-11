@@ -129,6 +129,7 @@ Semanal:
 
 - Revisar erros 5xx no backend.
 - Validar fluxo de login e abertura de ticket.
+- Rodar ou revisar o workflow `Data Sanity Check` para inconsistencias de usuario/tenant.
 
 Mensal:
 
@@ -137,6 +138,9 @@ Mensal:
 - Rodar backup check automatizado:
   - Windows: `set MONGODB_URI=<uri> && scripts\monthly-backup-check.bat`
   - Linux/macOS: `MONGODB_URI=<uri> scripts/monthly-backup-check.sh`
+- Rodar data sanity check manual se houver suspeita de inconsistencia:
+  - Windows: `set MONGODB_URI=<uri> && scripts\data-sanity-check.bat`
+  - Linux/macOS: `MONGODB_URI=<uri> scripts/data-sanity-check.sh`
 - Validar execucao do workflow `Monthly Backup Check` no GitHub Actions.
 
 ## 8) Checklist de hardening

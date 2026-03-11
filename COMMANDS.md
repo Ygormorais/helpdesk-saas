@@ -150,6 +150,17 @@ set MONGODB_URI=mongodb+srv://...
 scripts\monthly-backup-check.bat
 ```
 
+## Data Sanity Check
+
+```bash
+# Linux/macOS
+MONGODB_URI="mongodb+srv://..." scripts/data-sanity-check.sh
+
+# Windows
+set MONGODB_URI=mongodb+srv://...
+scripts\data-sanity-check.bat
+```
+
 ## Logs
 
 ```bash
