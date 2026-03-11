@@ -123,6 +123,29 @@ scripts/smoke-auth.sh https://helpdesk-saas-production-0cd0.up.railway.app smoke
 scripts\smoke-auth.bat https://helpdesk-saas-production-0cd0.up.railway.app smoke@example.com sua-senha https://helpdesk-two-livid.vercel.app
 ```
 
+## 3.3 Sanity check de dados
+
+Workflow: `.github/workflows/data-sanity-check.yml`
+
+- Gatilhos:
+  - semanalmente (segunda-feira, 10:00 UTC)
+  - manual (`workflow_dispatch`)
+- Script usado:
+  - `backend/scripts/data-sanity-check.mjs`
+  - wrappers: `scripts/data-sanity-check.sh` e `scripts\data-sanity-check.bat`
+- Verificacoes:
+  - usuarios sem tenant valido
+  - usuarios ativos em tenant inativo
+  - tenants sem admin ativo
+  - emails duplicados em usuarios
+  - hashes de senha invalidos
+- Secret exigido:
+  - `MONGODB_URI`
+- Em falha agendada:
+  - abre/atualiza issue `[Ops] Data Sanity Check findings`
+  - publica `Job Summary`
+  - salva artefato `data-sanity-report`
+
 ## 4) Severidade e resposta
 
 ### P1 - indisponivel

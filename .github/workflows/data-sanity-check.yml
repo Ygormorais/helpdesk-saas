@@ -1,0 +1,250 @@
+name: Data Sanity Check
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  data-sanity:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.collect.outputs.status }}
+      users_without_tenant: ${{ steps.collect.outputs.users_without_tenant }}
+      active_users_in_inactive_tenant: ${{ steps.collect.outputs.active_users_in_inactive_tenant }}
+      tenants_without_active_admin: ${{ steps.collect.outputs.tenants_without_active_admin }}
+      duplicate_user_emails: ${{ steps.collect.outputs.duplicate_user_emails }}
+      invalid_password_hashes: ${{ steps.collect.outputs.invalid_password_hashes }}
+      error: ${{ steps.collect.outputs.error }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Run data sanity check
+        id: sanity
+        continue-on-error: true
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          DATA_SANITY_CHECK_DB: helpdesk
+          DATA_SANITY_CHECK_OUTPUT_DIR: reports/data-sanity-check
+        run: |
+          if [ -z "$MONGODB_URI" ]; then
+            echo "::error::Configure o secret MONGODB_URI no GitHub Actions."
+            exit 2
+          fi
+
+          set +e
+          cd backend
+          node scripts/data-sanity-check.mjs
+          exit_code=$?
+          set -e
+          exit "$exit_code"
+
+      - name: Collect data sanity outputs
+        id: collect
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const out = process.env.GITHUB_OUTPUT;
+          const dir = path.join('backend', 'reports', 'data-sanity-check');
+          const files = fs.existsSync(dir)
+            ? fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort()
+            : [];
+
+          let d = {
+            status: 'error',
+            checks: {},
+            error: 'missing data sanity report',
+          };
+
+          if (files.length > 0) {
+            const latest = path.join(dir, files[files.length - 1]);
+            try {
+              d = JSON.parse(fs.readFileSync(latest, 'utf8'));
+            } catch {
+              d = {
+                status: 'error',
+                checks: {},
+                error: 'invalid data sanity report',
+              };
+            }
+          }
+
+          const set = (k, v) => {
+            fs.appendFileSync(out, `${k}=${String(v ?? '').replace(/\n/g, ' ')}\n`);
+          };
+
+          set('status', d.status || 'error');
+          set('users_without_tenant', d.checks?.usersWithoutTenant?.count ?? 0);
+          set('active_users_in_inactive_tenant', d.checks?.activeUsersInInactiveTenant?.count ?? 0);
+          set('tenants_without_active_admin', d.checks?.tenantsWithoutActiveAdmin?.count ?? 0);
+          set('duplicate_user_emails', d.checks?.duplicateUserEmails?.count ?? 0);
+          set('invalid_password_hashes', d.checks?.usersWithInvalidPasswordHash?.count ?? 0);
+          set('error', d.error || '');
+          NODE
+
+      - name: Publish data sanity summary
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const summary = process.env.GITHUB_STEP_SUMMARY;
+          const dir = path.join('backend', 'reports', 'data-sanity-check');
+          const files = fs.existsSync(dir)
+            ? fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort()
+            : [];
+          const lines = ['## Data Sanity Check'];
+
+          if (files.length > 0) {
+            const latest = path.join(dir, files[files.length - 1]);
+            const d = JSON.parse(fs.readFileSync(latest, 'utf8'));
+            lines.push('');
+            lines.push(`- status: **${d.status}**`);
+            lines.push(`- users without tenant: ${d.checks?.usersWithoutTenant?.count ?? 0}`);
+            lines.push(`- active users in inactive tenant: ${d.checks?.activeUsersInInactiveTenant?.count ?? 0}`);
+            lines.push(`- tenants without active admin: ${d.checks?.tenantsWithoutActiveAdmin?.count ?? 0}`);
+            lines.push(`- duplicate user emails: ${d.checks?.duplicateUserEmails?.count ?? 0}`);
+            lines.push(`- invalid password hashes: ${d.checks?.usersWithInvalidPasswordHash?.count ?? 0}`);
+            if (d.error) {
+              lines.push(`- error: ${d.error}`);
+            }
+          } else {
+            lines.push('');
+            lines.push('- status: **error** (no JSON output generated)');
+          }
+
+          fs.appendFileSync(summary, lines.join('\n') + '\n');
+          NODE
+
+      - name: Upload data sanity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-sanity-report
+          path: backend/reports/data-sanity-check/*.json
+          if-no-files-found: warn
+
+      - name: Enforce data sanity result
+        if: always()
+        run: |
+          if [ "${{ steps.collect.outputs.status }}" != "ok" ]; then
+            echo "Data sanity check finished with status ${{ steps.collect.outputs.status }}"
+            exit 1
+          fi
+
+  notify-on-failure:
+    needs: data-sanity
+    if: ${{ failure() && github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open/update data sanity issue
+        uses: actions/github-script@v7
+        env:
+          USERS_WITHOUT_TENANT: ${{ needs.data-sanity.outputs.users_without_tenant }}
+          ACTIVE_USERS_IN_INACTIVE_TENANT: ${{ needs.data-sanity.outputs.active_users_in_inactive_tenant }}
+          TENANTS_WITHOUT_ACTIVE_ADMIN: ${{ needs.data-sanity.outputs.tenants_without_active_admin }}
+          DUPLICATE_USER_EMAILS: ${{ needs.data-sanity.outputs.duplicate_user_emails }}
+          INVALID_PASSWORD_HASHES: ${{ needs.data-sanity.outputs.invalid_password_hashes }}
+          DATA_SANITY_ERROR: ${{ needs.data-sanity.outputs.error }}
+        with:
+          script: |
+            const title = '[Ops] Data Sanity Check findings';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              'Data Sanity Check encontrou inconsistencias.',
+              '',
+              `- Workflow run: ${runUrl}`,
+              `- Trigger: ${context.eventName}`,
+              `- Time (UTC): ${new Date().toISOString()}`,
+              `- users without tenant: ${process.env.USERS_WITHOUT_TENANT || '0'}`,
+              `- active users in inactive tenant: ${process.env.ACTIVE_USERS_IN_INACTIVE_TENANT || '0'}`,
+              `- tenants without active admin: ${process.env.TENANTS_WITHOUT_ACTIVE_ADMIN || '0'}`,
+              `- duplicate user emails: ${process.env.DUPLICATE_USER_EMAILS || '0'}`,
+              `- invalid password hashes: ${process.env.INVALID_PASSWORD_HASHES || '0'}`,
+              process.env.DATA_SANITY_ERROR ? `- error: ${process.env.DATA_SANITY_ERROR}` : '',
+            ].filter(Boolean).join('\n');
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const issue = issues.find((item) => item.title === title);
+            if (issue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['ops', 'data-quality'],
+              });
+            }
+
+  notify-on-recovery:
+    needs: data-sanity
+    if: ${{ success() && github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close data sanity issue on recovery
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '[Ops] Data Sanity Check findings';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const issue = issues.find((item) => item.title === title);
+            if (!issue) {
+              core.info('Nenhuma issue de data sanity aberta.');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: [
+                `Recuperacao detectada em ${new Date().toISOString()}`,
+                '',
+                `Run: ${runUrl}`,
+              ].join('\n'),
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              state: 'closed',
+            });
