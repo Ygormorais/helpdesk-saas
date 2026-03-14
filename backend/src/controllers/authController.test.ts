@@ -94,6 +94,30 @@ describe('authController', () => {
   });
 
   describe('googleLogin', () => {
+    it('returns a controlled error when Google token validation fails', async () => {
+      vi.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockRejectedValue(
+        new Error('Wrong number of segments in token')
+      );
+
+      await expect(
+        googleLogin(
+          {
+            body: {
+              credential: 'invalid-token',
+            },
+          } as any,
+          {
+            status: vi.fn().mockReturnThis(),
+            json: vi.fn(),
+          } as unknown as Response
+        )
+      ).rejects.toMatchObject<AppError>({
+        message: 'Conta Google invalida ou expirada',
+        statusCode: 401,
+        code: 'GOOGLE_IDENTITY_INVALID',
+      });
+    });
+
     it('logs in an existing provisioned user from a valid Google identity token', async () => {
       const response = {
         json: vi.fn(),
