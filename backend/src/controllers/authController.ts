@@ -206,10 +206,18 @@ export const googleLogin = async (
   try {
     const { credential } = googleLoginSchema.parse(req.body);
     const googleClient = getGoogleClient();
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: config.google.clientId,
-    });
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: config.google.clientId,
+      });
+    } catch (error) {
+      throw new AppError('Conta Google invalida ou expirada', 401, {
+        code: 'GOOGLE_IDENTITY_INVALID',
+        cause: error,
+      });
+    }
 
     const payload = ticket.getPayload();
     const normalizedEmail = String(payload?.email || '').trim().toLowerCase();
