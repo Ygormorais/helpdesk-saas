@@ -89,6 +89,8 @@ JWT_SECRET_PREVIOUS=
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=https://seu-frontend.vercel.app
 CORS_ALLOWED_ORIGINS=https://seu-frontend.vercel.app
+GOOGLE_CLIENT_ID=seu-client-id-web.apps.googleusercontent.com
+GOOGLE_ALLOWED_DOMAINS=
 ```
 
 Importante:
@@ -131,6 +133,7 @@ Guarde essa URL para usar no frontend!
 
 ```env
 VITE_API_URL=https://helpdesk-backend.up.railway.app/api
+VITE_GOOGLE_CLIENT_ID=seu-client-id-web.apps.googleusercontent.com
 ```
 
 3. Clique em "Deploy"
@@ -206,6 +209,10 @@ JWT_EXPIRES_IN=7d
 FRONTEND_URL=https://seu-projeto.vercel.app
 CORS_ALLOWED_ORIGINS=https://seu-projeto.vercel.app,https://admin.seu-projeto.vercel.app
 
+# Google Sign-In (opcional)
+GOOGLE_CLIENT_ID=seu-client-id-web.apps.googleusercontent.com
+GOOGLE_ALLOWED_DOMAINS=technova.com.br
+
 # Email (Mailgun/SendGrid)
 SMTP_HOST=smtp.mailgun.org
 SMTP_PORT=587
@@ -228,6 +235,7 @@ AWS_REGION=us-east-1
 
 VITE_API_URL=https://seu-backend.railway.app/api
 VITE_SOCKET_URL=https://seu-backend.railway.app
+VITE_GOOGLE_CLIENT_ID=seu-client-id-web.apps.googleusercontent.com
 ```
 
 ---

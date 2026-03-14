@@ -29,6 +29,7 @@ Sistema SaaS de Help Desk multi-tenancy para gestão de atendimento ao cliente, 
 
 ### Autenticação & Autorização
 - JWT Authentication
+- Google Sign-In para contas ja provisionadas
 - Roles: Admin, Manager, Agent, Client
 - Multi-tenancy (empresas isoladas)
 
@@ -112,6 +113,10 @@ PLATFORM_ADMIN_EMAILS=admin@exemplo.com
 
 # Billing reminders (optional)
 BILLING_REMINDERS_ENABLED=false
+
+# Google Sign-In (optional)
+GOOGLE_CLIENT_ID=
+GOOGLE_ALLOWED_DOMAINS=
 ```
 
 ### Variáveis de Ambiente (Frontend)
@@ -120,6 +125,9 @@ BILLING_REMINDERS_ENABLED=false
 VITE_API_URL=/api
 # ou, se estiver chamando um backend externo:
 # VITE_BACKEND_URL=https://seu-backend.com
+
+# Google Sign-In (optional)
+VITE_GOOGLE_CLIENT_ID=
 ```
 
 ## 💳 Billing (Asaas)
@@ -220,6 +228,7 @@ helpdesk-saas/
 ### Auth
 - `POST /api/auth/register` - Registro
 - `POST /api/auth/login` - Login
+- `POST /api/auth/google` - Login com Google para usuario ja provisionado
 - `GET /api/auth/me` - Perfil atual
 
 ### Tickets

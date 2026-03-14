@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, registerInvite, login, getMe } from '../controllers/authController.js';
+import { register, registerInvite, login, googleLogin, getMe } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 
 const router = Router();
@@ -70,6 +70,7 @@ router.post('/register-invite', registerInvite);
  *         description: Credenciais inválidas
  */
 router.post('/login', login);
+router.post('/google', googleLogin);
 
 /**
  * @swagger
