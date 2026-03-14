@@ -1,0 +1,17 @@
+{
+  "name": "HelpDesk SaaS | Technova",
+  "short_name": "Technova",
+  "description": "Plataforma de atendimento e suporte para operacoes, equipes e clientes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/assets/logos/technova.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
