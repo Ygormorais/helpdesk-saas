@@ -39,7 +39,9 @@ export function GoogleLoginButton({ onCredential, disabled = false }: GoogleLogi
   const [scriptReady, setScriptReady] = useState(false);
   const [scriptError, setScriptError] = useState(false);
 
-  callbackRef.current = onCredential;
+  useEffect(() => {
+    callbackRef.current = onCredential;
+  }, [onCredential]);
 
   useEffect(() => {
     if (!googleClientId) {
