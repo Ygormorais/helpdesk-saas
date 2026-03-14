@@ -67,6 +67,11 @@ export const config = {
     embeddingModel: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
   },
 
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    allowedDomains: parseCsv(process.env.GOOGLE_ALLOWED_DOMAINS).map((domain) => domain.toLowerCase()),
+  },
+
   ollama: {
     baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
     embeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',

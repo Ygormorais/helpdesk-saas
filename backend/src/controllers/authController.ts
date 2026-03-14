@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config/index.js';
 import { Invite, Tenant, User, UserRole } from '../models/index.js';
 import { AuthRequest } from '../middlewares/auth.js';
@@ -17,6 +18,10 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
+});
+
+const googleLoginSchema = z.object({
+  credential: z.string().min(1),
 });
 
 const registerInviteSchema = z.object({
@@ -39,6 +44,58 @@ const invalidAccountError = (details: Record<string, unknown>, cause?: unknown):
     details,
     cause,
   });
+
+const getGoogleClient = (): OAuth2Client => {
+  if (!config.google.clientId.trim()) {
+    throw new AppError('Login com Google nao configurado', 503, {
+      code: 'GOOGLE_SSO_NOT_CONFIGURED',
+    });
+  }
+
+  return new OAuth2Client(config.google.clientId);
+};
+
+const resolveUserTenant = (user: any): any => {
+  const tenant = user.tenant as any;
+  if (!tenant?._id) {
+    throw invalidAccountError({
+      reason: 'tenant_missing',
+      userId: user._id?.toString(),
+      email: user.email,
+    });
+  }
+
+  if (tenant.isActive === false) {
+    throw new AppError('Tenant inativo', 403, {
+      code: 'TENANT_INACTIVE',
+    });
+  }
+
+  return tenant;
+};
+
+const buildAuthResponse = (
+  user: any,
+  tenant: any,
+  token: string,
+  message: string,
+  avatarOverride?: string
+) => ({
+  message,
+  token,
+  user: {
+    id: user._id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    avatar: avatarOverride || user.avatar,
+    tenant: {
+      id: tenant._id,
+      name: tenant.name,
+      slug: tenant.slug,
+    },
+  },
+});
 
 export const register = async (
   req: AuthRequest,
@@ -129,39 +186,73 @@ export const login = async (
       throw new AppError('Conta inativa', 401);
     }
 
-    const tenant = user.tenant as any;
-    if (!tenant?._id) {
-      throw invalidAccountError({
-        reason: 'tenant_missing',
-        userId: user._id?.toString(),
-        email: user.email,
-      });
-    }
-
-    if (tenant.isActive === false) {
-      throw new AppError('Tenant inativo', 403, {
-        code: 'TENANT_INACTIVE',
-      });
-    }
-
+    const tenant = resolveUserTenant(user);
     const token = generateToken(user._id.toString(), tenant._id.toString());
 
-    res.json({
-      message: 'Login realizado com sucesso',
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        avatar: user.avatar,
-        tenant: {
-          id: tenant._id,
-          name: tenant.name,
-          slug: tenant.slug,
-        },
-      },
+    res.json(buildAuthResponse(user, tenant, token, 'Login realizado com sucesso'));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
+      return;
+    }
+    throw error;
+  }
+};
+
+export const googleLogin = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { credential } = googleLoginSchema.parse(req.body);
+    const googleClient = getGoogleClient();
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: config.google.clientId,
     });
+
+    const payload = ticket.getPayload();
+    const normalizedEmail = String(payload?.email || '').trim().toLowerCase();
+
+    if (!payload?.email_verified || !normalizedEmail) {
+      throw new AppError('Conta Google invalida', 401, {
+        code: 'GOOGLE_IDENTITY_INVALID',
+      });
+    }
+
+    const emailDomain = normalizedEmail.split('@')[1] || '';
+    if (
+      config.google.allowedDomains.length > 0
+      && !config.google.allowedDomains.includes(emailDomain)
+    ) {
+      throw new AppError('Dominio do Google nao permitido', 403, {
+        code: 'GOOGLE_DOMAIN_NOT_ALLOWED',
+      });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail }).populate('tenant');
+    if (!user) {
+      throw new AppError('Conta nao provisionada. Cadastre-se primeiro.', 404, {
+        code: 'AUTH_ACCOUNT_NOT_PROVISIONED',
+      });
+    }
+
+    if (!user.isActive) {
+      throw new AppError('Conta inativa', 401);
+    }
+
+    const tenant = resolveUserTenant(user);
+    const token = generateToken(user._id.toString(), tenant._id.toString());
+
+    res.json(
+      buildAuthResponse(
+        user,
+        tenant,
+        token,
+        'Login com Google realizado com sucesso',
+        String(payload.picture || '').trim() || undefined
+      )
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ message: 'Erro de validacao', errors: error.errors });
