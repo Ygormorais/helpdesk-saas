@@ -33,6 +33,13 @@ const generateToken = (userId: string, tenantId: string): string => {
   );
 };
 
+const invalidAccountError = (details: Record<string, unknown>, cause?: unknown): AppError =>
+  new AppError('Conta com configuracao invalida. Contate o suporte', 409, {
+    code: 'AUTH_ACCOUNT_INVALID',
+    details,
+    cause,
+  });
+
 export const register = async (
   req: AuthRequest,
   res: Response
@@ -100,7 +107,20 @@ export const login = async (
       throw new AppError('Credenciais invalidas', 401);
     }
 
-    const isMatch = await user.comparePassword(password);
+    let isMatch = false;
+    try {
+      isMatch = await user.comparePassword(password);
+    } catch (error) {
+      throw invalidAccountError(
+        {
+          reason: 'password_compare_failed',
+          userId: user._id?.toString(),
+          email: user.email,
+        },
+        error
+      );
+    }
+
     if (!isMatch) {
       throw new AppError('Credenciais invalidas', 401);
     }
@@ -110,6 +130,19 @@ export const login = async (
     }
 
     const tenant = user.tenant as any;
+    if (!tenant?._id) {
+      throw invalidAccountError({
+        reason: 'tenant_missing',
+        userId: user._id?.toString(),
+        email: user.email,
+      });
+    }
+
+    if (tenant.isActive === false) {
+      throw new AppError('Tenant inativo', 403, {
+        code: 'TENANT_INACTIVE',
+      });
+    }
 
     const token = generateToken(user._id.toString(), tenant._id.toString());
 
